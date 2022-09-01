@@ -1,0 +1,22 @@
+ElementName,DataType,Size,Required,ElementDescription,ValueRange,Notes,Aliases
+subjectkey,GUID,,Required,The NDAR Global Unique Identifier (GUID) for research subject,NDAR*,,guid
+src_subject_id,String,20,Required,Subject ID how it's defined in lab/project,,,subject_id
+interview_date,Date,,Required,Date on which the interview/genetic test/sampling/imaging/biospecimen was completed. MM/DD/YYYY,,,
+interview_age,Integer,,Required,Age in months at the time of the interview/test/sampling/imaging.,0 :: 1260,"Age is rounded to chronological month. If the research participant is 15-days-old at time of interview, the appropriate value would be 0 months. If the participant is 16-days-old, the value would be 1 month.",
+sex,String,20,Required,Sex of the subject,M;F; O; NR,M = Male; F = Female; O=Other; NR = Not reported,"gender,studyday"
+phenotype,String,200,Recommended,Phenotype/diagnosis for the subject,,,dx
+site,String,101,Recommended,Site,,Study Site,siteid
+visit,String,60,Recommended,Visit name,,,srt_timepoint
+handedness,String,29,Recommended,handedness,R;L;B;999,R = Right; L = Left; B = Both,
+experiment_description,String,4000,Recommended,Description of experiment/sequence/event,,,
+stimuli_detail,String,100,Recommended,stimuli description,,,
+testduration,Integer,,Recommended,Seconds Taken To Complete Test,,,srt_duration
+wcst_nt,Integer,,Recommended,Number of Trials,,,
+trial_duration,String,20,Recommended,Trial Duration and Units ie 20 minutes,,,
+srt_foreperiod,Integer,,Recommended,How Long Blank Screen Before Next Trial(ms),,,
+ddt_mn_rt,Float,,Recommended,Mean reaction time for all trials,,,srt_meanrt
+ddt_sd_rt,Float,,Recommended,Standard deviation of reaction time for all trials,,,srt_sdrt
+ddt_md_response,String,20,Recommended,Median response for all trials,,,"ddt_md_answer,srt_median_answer,srt_median_response"
+data_file1,File,,Required,Data file 1,,,image_file
+comments_misc,String,4000,Recommended,"Miscellaneous comments on study, interview, methodology relevant to this form data",,,
+experiment_id,Integer,,Recommended,ID for the Experiment/settings/run,,,

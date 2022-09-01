@@ -1,0 +1,30 @@
+﻿ElementName,DataType,Size,Required,Condition,ElementDescription,ValueRange,Notes,Aliases
+subjectkey,GUID,,Required,,The NDAR Global Unique Identifier (GUID) for research subject,NDAR*,,"GUID,ndar_panas,z1"
+src_subject_id,String,20,Required,,Subject ID how it's defined in lab/project,,,"participant_id,record_id,subject_id,z2"
+interview_date,Date,,Required,,Date on which the interview/genetic test/sampling/imaging/biospecimen was completed. MM/DD/YYYY,,Required field,"date,date10,date_ctq,lab_interview_date,v2_ctq_date,z3"
+interview_age,Integer,,Required,,Age in months at the time of the interview/test/sampling/imaging.,0 :: 1260,"Age is rounded to chronological month. If the research participant is 15-days-old at time of interview, the appropriate value would be 0 months. If the participant is 16-days-old, the value would be 1 month.","age_panas,lab_interview_age,v2_ctq_age,z4"
+sex,String,20,Required,,Sex of the subject,M;F; O; NR,M = Male; F = Female; O=Other; NR = Not reported,"gender,gender_panas,z5"
+amusement_01,Integer,,Recommended,,To what degree did you feel amused during the scan?,1::7;-99;77;88,-99= N/A ; 77= Refused ; 88= Missing,
+anger_02,Integer,,Recommended,,To what degree did you feel angry during the scan?,1::7;-99;77;89,-99= N/A ; 77= Refused ; 88= Missing,
+anxiety_03,Integer,,Recommended,,To what degree did you feel anxious during the scan?,1::7;-99;77;90,-99= N/A ; 77= Refused ; 88= Missing,
+awe_04,Integer,,Recommended,,To what degree did you feel in awe during the scan?,1::7;-99;77;91,-99= N/A ; 77= Refused ; 88= Missing,
+calmness_05,Integer,,Recommended,,To what degree did you feel calm during the scan?,1::7;-99;77;92,-99= N/A ; 77= Refused ; 88= Missing,
+craving_06,Integer,,Recommended,,To what degree did you feel a craving during the scan?,1::7;-99;77;93,-99= N/A ; 77= Refused ; 88= Missing,
+disgust_07,Integer,,Recommended,,To what degree did you feel disgusted during the scan?,1::7;-99;77;94,-99= N/A ; 77= Refused ; 88= Missing,
+excitement_08,Integer,,Recommended,,To what degree did you feel excited during the scan?,1::7;-99;77;95,-99= N/A ; 77= Refused ; 88= Missing,
+fear_09,Integer,,Recommended,,To what degree did you feel fear during the scan?,1::7;-99;77;96,-99= N/A ; 77= Refused ; 88= Missing,
+horror_10,Integer,,Recommended,,To what degree did you feel horrified during the scan?,1::7;-99;77;97,-99= N/A ; 77= Refused ; 88= Missing,
+interest_11,Integer,,Recommended,,To what degree did you feel interested during the scan?,1::7;-99;77;98,-99= N/A ; 77= Refused ; 88= Missing,
+joy_12,Integer,,Recommended,,To what degree did you feel joy during the scan?,1::7;-99;77;99,-99= N/A ; 77= Refused ; 88= Missing,
+neutral_13,Integer,,Recommended,,To what degree did you feel neutral during the scan?,1::7;-99;77;100,-99= N/A ; 77= Refused ; 88= Missing,
+romantic_love_14,Integer,,Recommended,,To what degree did you feel romantic love during the scan?,1::7;-99;77;101,-99= N/A ; 77= Refused ; 88= Missing,
+sadness_15,Integer,,Recommended,,To what degree did you feel sad during the scan?,1::7;-99;77;102,-99= N/A ; 77= Refused ; 88= Missing,
+surprise_16,Integer,,Recommended,,To what degree did you feel surprised during the scan?,1::7;-99;77;103,-99= N/A ; 77= Refused ; 88= Missing,
+valence_17,Integer,,Recommended,,"How did you feel during the scan, on a scale from very negative to very positive?",1::7;-99;77;104,-99= N/A ; 77= Refused ; 88= Missing,
+arousal_18,Integer,,Recommended,,How emotionally engaged did you feel during the scan?,1::7;-99;77;105,-99= N/A ; 77= Refused ; 88= Missing,
+time_assess,String,20,Recommended,,Time of day the assessment was taken. Hour:minutes,,,time
+visit,String,60,Recommended,,Visit name,,,
+fspgod,String,70,Recommended,,Subject's gender OTHER describe,,,
+site,String,101,Recommended,,Site,,Study Site,
+study,String,100,Recommended,,Study,,,
+comments_misc,String,4000,Recommended,,"Miscellaneous comments on study, interview, methodology relevant to this form data",,,
