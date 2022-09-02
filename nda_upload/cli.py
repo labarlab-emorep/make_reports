@@ -12,11 +12,14 @@ cli.py \
 import os
 import sys
 import textwrap
-import importlib.resources as pkg_resources
-import pandas as pd
+
+# import importlib.resources as pkg_resources
+# import pandas as pd
 from argparse import ArgumentParser, RawTextHelpFormatter
-from nda_upload import request_redcap
-from nda_upload import dataset_definitions
+from nda_upload import general_info
+
+# from nda_upload import request_redcap
+# from nda_upload import dataset_definitions
 
 # %%
 def _get_args():
@@ -59,7 +62,6 @@ def main():
     args = _get_args().parse_args()
     proj_dir = args.proj_dir
     api_token = args.api_redcap
-    # api_token = os.environ["PAT_REDCAP_EMOREP"]
 
     # Setup output directories
     deriv_dir = os.path.join(proj_dir, "derivatives/nda_upload")
@@ -67,14 +69,24 @@ def main():
         os.makedirs(deriv_dir)
 
     # Setup report references
-    report_keys = {"demographics": "48944"}
-    df_test = request_redcap.pull_data(api_token, report_keys["demographics"])
+    report_keys = {
+        "demographics": "48944",
+        "guid": "48959",
+        "consent_new": "48960",
+    }
+    gen_info = general_info.DetermineSubjs(report_keys, api_token)
+    subjs_consented = gen_info.make_complete()
+    print(gen_info.df_demo)
+    print(gen_info.df_consent)
+    print(gen_info.df_guid)
 
-    # Get dataset definition
-    test_demo = pkg_resources.open_text(
-        dataset_definitions, "demo_info01_definitions.csv"
-    )
-    df_demo = pd.read_csv(test_demo)
+    # df_test = request_redcap.pull_data(api_token, report_keys["demographics"])
+
+    # # Get dataset definition
+    # test_demo = pkg_resources.open_text(
+    #     dataset_definitions, "demo_info01_definitions.csv"
+    # )
+    # df_demo = pd.read_csv(test_demo)
 
 
 if __name__ == "__main__":
