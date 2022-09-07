@@ -23,5 +23,5 @@ def pull_data(api_token, report_id, content="report", return_format="csv"):
         "returnFormat": return_format,
     }
     r = requests.post("https://redcap.duke.edu/redcap/api/", data)
-    df = pd.read_csv(io.StringIO(r.text), low_memory=False, na_values="None")
+    df = pd.read_csv(io.StringIO(r.text), low_memory=False, na_values=None)
     return df

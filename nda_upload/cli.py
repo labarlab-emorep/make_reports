@@ -59,6 +59,9 @@ def _get_args():
 def main():
     "Title."
 
+    # For testing
+    proj_dir = "/mnt/keoki/experiments2/EmoRep/Emorep_BIDS"
+
     args = _get_args().parse_args()
     proj_dir = args.proj_dir
     api_token = args.api_redcap
@@ -74,19 +77,6 @@ def main():
         "guid": "48959",
         "consent_new": "48960",
     }
-    gen_info = general_info.DetermineSubjs(report_keys, api_token)
-    subjs_consented = gen_info.make_complete()
-    print(gen_info.df_demo)
-    print(gen_info.df_consent)
-    print(gen_info.df_guid)
-
-    # df_test = request_redcap.pull_data(api_token, report_keys["demographics"])
-
-    # # Get dataset definition
-    # test_demo = pkg_resources.open_text(
-    #     dataset_definitions, "demo_info01_definitions.csv"
-    # )
-    # df_demo = pd.read_csv(test_demo)
 
 
 if __name__ == "__main__":
