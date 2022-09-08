@@ -5,7 +5,11 @@ Desc.
 # %%
 import pandas as pd
 import numpy as np
+import json
+from datetime import datetime
+import importlib.resources as pkg_resources
 from nda_upload import request_redcap
+from nda_upload import reference_files
 
 
 # class DetermineSubjs:
@@ -14,7 +18,7 @@ from nda_upload import request_redcap
 #     Desc.
 #     """
 
-# def __init__(self, report_keys, api_token):
+# def __init__(self, api_token):
 #     """Title.
 
 #     Desc.
@@ -23,7 +27,7 @@ from nda_upload import request_redcap
 #     self.report_keys = report_keys
 
 # %%
-def _get_basic():
+def _get_basic(api_token, report_keys):
     """Title.
 
     Desc.
@@ -136,13 +140,55 @@ def _get_age_mo(subj_dob, subj_consent_date):
 
 
 # %%
-def make_complete():
+def _get_educate(df_demo, idx_demo):
+    """Title.
+
+    Desc.
+    """
+    educate_switch = {2: 12, 4: 14, 5: 16, 7: 18, 8: 20}
+    edu_year = df_demo.loc[idx_demo, "years_education"].tolist()
+    edu_level = df_demo.loc[idx_demo, "level_education"].tolist()
+    subj_educate = []
+    for h_year, h_level in zip(edu_year, edu_level):
+        if h_year.isnumeric():
+            subj_educate.append(int(h_year))
+        else:
+            subj_educate.append(educate_switch[h_level])
+    return subj_educate
+
+
+# %%
+def _get_ethnic_minority(df_demo, idx_demo, subj_race):
+    """Title.
+
+    Desc.
+    """
+    # Get ethnicity
+    h_ethnic = df_demo.loc[idx_demo, "ethnicity"].tolist()
+    ethnic_switch = {1.0: "Hispanic or Latino", 2.0: "Not Hispanic or Latino"}
+    subj_ethnic = [ethnic_switch[x] for x in h_ethnic]
+
+    # Determine if minority - not white or hispanic
+    subj_minor = []
+    for race, ethnic in zip(subj_race, subj_ethnic):
+        if race != "White" and ethnic == "Not Hispanic or Latino":
+            subj_minor.append("Minority")
+        else:
+            subj_minor.append("Not Minority")
+    return (subj_ethnic, subj_minor)
+
+
+# %%
+def make_complete(api_token):
     """Title.
 
     Desc.
     """
     # self._get_basic()
-    df_consent, df_guid, df_demo = _get_basic()
+    with pkg_resources.open_text(reference_files, "report_keys.json") as jf:
+        report_keys = json.load(jf)
+
+    df_consent, df_guid, df_demo = _get_basic(api_token, report_keys)
 
     # Determine who consented
     idx_consent = df_consent.index[df_consent["consent_v2"] == 1.0].tolist()
@@ -169,27 +215,16 @@ def make_complete():
     sex_switch = {1.0: "male", 2.0: "female", 3.0: "neither"}
     subj_sex = [sex_switch[x] for x in h_sex]
 
-    # Get DOB, age in months, race
+    # Get DOB, age in months, education
     subj_dob = _get_dob(df_demo, idx_demo)
     subj_age_mo = _get_age_mo(subj_dob, subj_consent_date)
+    subj_educate = _get_educate(df_demo, idx_demo)
+
+    # Get race, ethnicity, minority status
     subj_race = _get_race(df_demo, idx_demo)
-
-    # Get ethnicity
-    h_ethnic = df_demo.loc[idx_demo, "ethnicity"].tolist()
-    ethnic_switch = {1.0: "Hispanic or Latino", 2.0: "Not Hispanic or Latino"}
-    subj_ethnic = [ethnic_switch[x] for x in h_ethnic]
-
-    # Determine if minority - not white or hispanic
-    subj_minor = []
-    for race, ethnic in zip(subj_race, subj_ethnic):
-        if race != "White" and ethnic == "Not Hispanic or Latino":
-            subj_minor.append("Minority")
-        else:
-            subj_minor.append("Not Minority")
-
-    # Get education
-    # TODO enforce int
-    subj_educate = df_demo.loc[idx_demo, "years_education"].tolist()
+    subj_ethnic, subj_minor = _get_ethnic_minority(
+        df_demo, idx_demo, subj_race
+    )
 
     # Write dataframe
     out_dict = {

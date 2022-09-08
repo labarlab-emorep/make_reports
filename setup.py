@@ -10,5 +10,7 @@ setup(
         ]
     },
     include_package_data=True,
-    package_data={"": ["dataset_definitions/*.csv"]},
+    package_data={
+        "": ["reference_files/*template.csv", "reference_files/*.json"]
+    },
 )

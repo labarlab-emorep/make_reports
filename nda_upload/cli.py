@@ -12,14 +12,9 @@ cli.py \
 import os
 import sys
 import textwrap
-
-# import importlib.resources as pkg_resources
-# import pandas as pd
 from argparse import ArgumentParser, RawTextHelpFormatter
 from nda_upload import general_info
 
-# from nda_upload import request_redcap
-# from nda_upload import dataset_definitions
 
 # %%
 def _get_args():
@@ -72,11 +67,11 @@ def main():
         os.makedirs(deriv_dir)
 
     # Setup report references
-    report_keys = {
-        "demographics": "48944",
-        "guid": "48959",
-        "consent_new": "48960",
-    }
+    # report_keys = {
+    #     "demographics": "48944",
+    #     "guid": "48959",
+    #     "consent_new": "48960",
+    # }
 
 
 if __name__ == "__main__":
