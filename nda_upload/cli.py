@@ -66,12 +66,9 @@ def main():
     if not os.path.exists(deriv_dir):
         os.makedirs(deriv_dir)
 
-    # Setup report references
-    # report_keys = {
-    #     "demographics": "48944",
-    #     "guid": "48959",
-    #     "consent_new": "48960",
-    # }
+    info_general = general_info.MakeDemo(api_token)
+    info_general.make_complete()
+    print(info_general.final_demo)
 
 
 if __name__ == "__main__":
