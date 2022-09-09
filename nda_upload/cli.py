@@ -12,9 +12,9 @@ cli.py \
 import os
 import sys
 import textwrap
-from datetime import date
+from datetime import datetime, date
 from argparse import ArgumentParser, RawTextHelpFormatter
-from nda_upload import general_info
+from nda_upload import general_info, reports
 
 
 # %%
@@ -101,10 +101,15 @@ def main():
 
     # For testing
     proj_dir = "/mnt/keoki/experiments2/EmoRep/Emorep_BIDS"
+    query_date = datetime.strptime("2022-07-29", "%Y-%m-%d").date()
 
     args = _get_args().parse_args()
     proj_dir = args.proj_dir
     api_token = args.api_redcap
+    query_date = args.query_date
+    do_nih4 = args.report_nih_4mo
+    do_nih12 = args.report_nih_12mo
+    do_duke3 = args.report_duke_3mo
 
     # Setup output directories
     deriv_dir = os.path.join(proj_dir, "derivatives/nda_upload")
@@ -114,6 +119,45 @@ def main():
     info_general = general_info.MakeDemo(api_token)
     info_general.make_complete()
     print(info_general.final_demo)
+
+    # Test nih_4mo
+    if do_nih4:
+        (
+            num_minority,
+            num_hispanic,
+            num_total,
+            range_start,
+            range_end,
+        ) = reports.nih_4mo(info_general.final_demo, query_date)
+        print(
+            f"""
+            Query date: {query_date}
+            Query range: {range_start} - {range_end}
+            Num Minority: {num_minority}
+            Num Hispanic: {num_hispanic}
+            Num Total: {num_total}
+        """
+        )
+
+    # Test duke_3mo
+    if do_duke3:
+        pass
+
+    # Test nih_annual
+    if do_nih12:
+        (
+            df_report,
+            range_start,
+            range_end,
+        ) = reports.nih_annual(info_general.final_demo, query_date)
+        print(
+            f"""
+            Query date: {query_date}
+            Query range: {range_start} - {range_end}
+            Dataframe:
+            {df_report}
+        """
+        )
 
 
 if __name__ == "__main__":

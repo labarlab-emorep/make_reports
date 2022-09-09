@@ -190,6 +190,7 @@ class MakeDemo:
         list
             number of years completed of education (int)
         """
+        # TODO solve 1984 education issue
         educate_switch = {2: 12, 4: 14, 5: 16, 7: 18, 8: 20}
         edu_year = self.df_demo.loc[self.idx_demo, "years_education"].tolist()
         edu_level = self.df_demo.loc[self.idx_demo, "level_education"].tolist()
