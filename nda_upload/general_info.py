@@ -12,28 +12,77 @@ from nda_upload import reference_files
 
 
 class MakeDemo:
-    """Title.
+    """Make a dataframe of demographic info.
 
-    Desc.
+    Gather information from consent, guid, and demographic reports,
+    combine relevant info for NDA submission and NIH/Duke reports.
+
+    Parameters
+    ----------
+    api_token : str
+        RedCap API token
+
+    Attributes
+    ----------
+    report_keys
+    df_consent
+    df_guid
+    df_demo
+    idx_consent
+    idx_guid
+    idx_demo
     """
 
     def __init__(self, api_token):
-        """Title.
+        """Get RedCap reports, setup class.
 
-        Desc.
+        Uses report_keys.json from reference_files to match
+        report name to report ID.
+
+        Parameters
+        ----------
+        api_token : str
+            RedCap API token
+
+        Attributes
+        ----------
+        report_keys
+        df_consent
+        df_guid
+        df_demo
+        idx_consent
+        idx_guid
+        idx_demo
         """
-        # self.api_token = api_token
+        # Load report keys
         with pkg_resources.open_text(
             reference_files, "report_keys.json"
         ) as jf:
             self.report_keys = json.load(jf)
 
-        # Get consent dataframe, index, subjects
-        self.df_consent = request_redcap.pull_data(
+        # Get original/new consent dataframes
+        df_consent_orig = request_redcap.pull_data(
+            api_token, self.report_keys["consent_orig"]
+        )
+        df_consent_new = request_redcap.pull_data(
             api_token, self.report_keys["consent_new"]
         )
+
+        # Update consent_new names, merge
+        cols_new = df_consent_new.columns.tolist()
+        cols_orig = df_consent_orig.columns.tolist()
+        cols_replace = {}
+        for h_new, h_orig in zip(cols_new, cols_orig):
+            cols_replace[h_new] = h_orig
+        df_consent_new = df_consent_new.rename(columns=cols_replace)
+        self.df_consent = df_consent_new.combine_first(df_consent_orig)
+
+        # Get original consent dataframe, index, subjects
+        # self.df_consent = request_redcap.pull_data(
+        #     api_token, self.report_keys["consent_new"]
+        # )
         self.idx_consent = self.df_consent.index[
-            self.df_consent["consent_v2"] == 1.0
+            self.df_consent["consent"] == 1.0
         ].tolist()
         self.subj_consent = self.df_consent.loc[
             self.idx_consent, "record_id"
@@ -56,12 +105,29 @@ class MakeDemo:
         ].index.tolist()
 
     def _get_dob(self):
-        """Title.
+        """Get participants' date of birth.
 
-        Desc.
+        Get date-of-birth info from df_demo column "dob", and
+        convert to datetime. Account for forward slash, dash,
+        only numeric, and alpha numeric response methods.
+
+        Returns
+        -------
+        list
+            subject dob datetimes
+
+        Raises
+        ------
+        TypeError
+            If dob value is not slash, dash, numeric, or in dob_switch
         """
+        # Set switch for special cases
         dob_switch = {"October 6 2000": "2000-10-06"}
+
+        # Get column values
         dob_orig = self.df_demo.loc[self.idx_demo, "dob"].tolist()
+
+        # Solve column values, append list
         subj_dob = []
         for dob in dob_orig:
             if "/" in dob or "-" in dob:
@@ -77,14 +143,22 @@ class MakeDemo:
             else:
                 raise TypeError(
                     f"Unrecognized datetime str: {dob}. "
-                    + "Check general_info.make_complete."
+                    + "Check general_info._get_dob."
                 )
         return subj_dob
 
     def _get_age_mo(self, subj_dob, subj_consent_date):
-        """Title.
+        """Calculate age in months.
 
-        Desc.
+        Convert each participant's age at consent into
+        age in months. Use the John day method for dealing
+        with number of days, for consistency with previous
+        submissions.
+
+        Returns
+        -------
+        list
+            participant ages in months (int)
         """
         subj_age_mo = []
         for dob, doc in zip(subj_dob, subj_consent_date):
@@ -105,9 +179,16 @@ class MakeDemo:
         return subj_age_mo
 
     def _get_educate(self):
-        """Title.
+        """Get participant education level.
 
-        Desc.
+        Use info from years_education column of df_demo when they are numeric,
+        otherwise use the educate_switch to convert from level of education
+        to number of years.
+
+        Returns
+        -------
+        list
+            number of years completed of education (int)
         """
         educate_switch = {2: 12, 4: 14, 5: 16, 7: 18, 8: 20}
         edu_year = self.df_demo.loc[self.idx_demo, "years_education"].tolist()
@@ -191,10 +272,8 @@ class MakeDemo:
         """
         # TODO Something here for subjs who withdraw consent
 
-        # Get consent date
-        self.df_consent["datetime"] = pd.to_datetime(
-            self.df_consent["date_v2"]
-        )
+        # Get consent date - solve for multiple consent forms
+        self.df_consent["datetime"] = pd.to_datetime(self.df_consent["date"])
         self.df_consent["datetime"] = self.df_consent["datetime"].dt.date
         subj_consent_date = self.df_consent.loc[
             self.idx_consent, "datetime"

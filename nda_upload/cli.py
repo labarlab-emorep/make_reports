@@ -12,6 +12,7 @@ cli.py \
 import os
 import sys
 import textwrap
+from datetime import date
 from argparse import ArgumentParser, RawTextHelpFormatter
 from nda_upload import general_info
 
@@ -21,6 +22,36 @@ def _get_args():
     """Get and parse arguments."""
     parser = ArgumentParser(
         description=__doc__, formatter_class=RawTextHelpFormatter
+    )
+    parser.add_argument(
+        "--report-duke-3mo",
+        action="store_true",
+        help=textwrap.dedent(
+            """\
+            Whether to generate Duke figures submitted every 3 months.
+            True if "--report-duke-3mo" else False.
+            """
+        ),
+    )
+    parser.add_argument(
+        "--report-nih-4mo",
+        action="store_true",
+        help=textwrap.dedent(
+            """\
+            Whether to generate NIH figures submitted every 4 months.
+            True if "--report-nih-4mo" else False.
+            """
+        ),
+    )
+    parser.add_argument(
+        "--report-nih-12mo",
+        action="store_true",
+        help=textwrap.dedent(
+            """\
+            Whether to generate NIH figures submitted every 12 months.
+            True if "--report-nih-12mo" else False.
+            """
+        ),
     )
     parser.add_argument(
         "--proj-dir",
@@ -33,11 +64,25 @@ def _get_args():
             """
         ),
     )
+    parser.add_argument(
+        "--query-date",
+        type=str,
+        default=date.today().strftime("%Y-%m-%d"),
+        help=textwrap.dedent(
+            """\
+            Required if report options are used.
+            A Y-m-d formatted date used to find a submission window
+            e.g. 2021-06-06 would find all data between 2021-01-01
+            and 2021-12-31 when doing an annual report.
+            (default : today's date (%(default)s))
+            """
+        ),
+    )
 
     required_args = parser.add_argument_group("Required Arguments")
     required_args.add_argument(
         "-a",
-        "--api_redcap",
+        "--api-redcap",
         type=str,
         required=True,
         help="API Token for RedCap project",
