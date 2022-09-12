@@ -176,17 +176,8 @@ class MakeRegularReports:
 
         # Get gender/ethnicity/race values
         self.df_report = self.df_range[
-            ["src_subject_id", "race", "ethnicity", "sex", "age"]
+            ["src_subject_id", "race", "ethnicity", "sex"]
         ]
-        col_names = {
-            "src_subject_id": "Record_ID",
-            "race": "Race",
-            "ethnicity": "Ethnicity",
-            "sex": "Gender",
-            "age": "Age",
-        }
-        self.df_report = self.df_report.rename(columns=col_names)
-        self.df_report["Age Unit"] = "Years"
 
     def nih_12mo(self):
         """Title.
@@ -206,11 +197,18 @@ class MakeRegularReports:
 
         cols_desired = [
             "src_subject_id",
-            "ethnicity",
             "race",
+            "ethnicity",
             "sex",
-            "years_education",
             "age",
         ]
         self.df_report = self.df_range[cols_desired]
-        self.df_report["age_unit"] = "Years"
+        col_names = {
+            "src_subject_id": "Record_ID",
+            "race": "Race",
+            "ethnicity": "Ethnicity",
+            "sex": "Gender",
+            "age": "Age",
+        }
+        self.df_report = self.df_report.rename(columns=col_names)
+        self.df_report["Age Units"] = "Years"

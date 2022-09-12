@@ -193,13 +193,15 @@ class MakeDemo:
         list
             number of years completed of education (int)
         """
-        # TODO solve 1984 education issue
         educate_switch = {2: 12, 4: 14, 5: 16, 7: 18, 8: 20}
         edu_year = self.df_demo.loc[self.idx_demo, "years_education"].tolist()
         edu_level = self.df_demo.loc[self.idx_demo, "level_education"].tolist()
         subj_educate = []
         for h_year, h_level in zip(edu_year, edu_level):
-            if h_year.isnumeric():
+            # Patch for 1984 education issue
+            if h_year == "1984":
+                subj_educate.append(educate_switch[8])
+            elif h_year.isnumeric():
                 subj_educate.append(int(h_year))
             else:
                 subj_educate.append(educate_switch[h_level])
