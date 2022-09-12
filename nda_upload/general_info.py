@@ -104,6 +104,9 @@ class MakeDemo:
             self.df_demo["record_id"].isin(self.subj_consent)
         ].index.tolist()
 
+        # Run methods
+        self.make_complete()
+
     def _get_dob(self):
         """Get participants' date of birth.
 
@@ -207,14 +210,14 @@ class MakeDemo:
 
         Desc.
         """
-        # Get race
+        # Get race response - deal with "More than one" (6) and
+        # "Other" (8) separately.
         race_switch = {
             1: "American Indian or Alaska Native",
             2: "Asian",
             3: "Black or African-American",
             4: "White",
             5: "Native Hawaiian or Other Pacific Islander",
-            6: "More than one race",
             7: "Unknown or not reported",
         }
         get_race_resp = [
@@ -223,7 +226,6 @@ class MakeDemo:
             (self.df_demo["race___3"] == 1),
             (self.df_demo["race___4"] == 1),
             (self.df_demo["race___5"] == 1),
-            (self.df_demo["race___6"] == 1),
             (self.df_demo["race___7"] == 1),
         ]
         set_race_str = [
@@ -232,17 +234,44 @@ class MakeDemo:
             race_switch[3],
             race_switch[4],
             race_switch[5],
-            race_switch[6],
             race_switch[7],
         ]
-        self.df_demo["race_str"] = np.select(get_race_resp, set_race_str)
+        self.df_demo["race_resp"] = np.select(get_race_resp, set_race_str)
+
+        # Capture "Other" responses
         idx_other = self.df_demo.index[self.df_demo["race___8"] == 1].tolist()
         race_other = [
             f"Other - {x}"
             for x in self.df_demo.loc[idx_other, "race_other"].tolist()
         ]
-        self.df_demo.loc[idx_other, "race_str"] = race_other
-        return self.df_demo.loc[self.idx_demo, "race_str"].tolist()
+        self.df_demo.loc[idx_other, "race_resp"] = race_other
+
+        # Capture "More than one race" responses
+        idx_more = self.df_demo.index[self.df_demo["race___6"] == 1].tolist()
+        self.df_demo["race_more"] = np.nan
+        self.df_demo.loc[idx_more, "race_more"] = "More"
+
+        # Capture multiple race responses (in case option 6 not selected)
+        col_list = [
+            "race___1",
+            "race___2",
+            "race___3",
+            "race___4",
+            "race___5",
+            "race___7",
+            "race___8",
+        ]
+        self.df_demo["race_sum"] = self.df_demo[col_list].sum(axis=1)
+        idx_mult = self.df_demo.index[self.df_demo["race_sum"] > 1].tolist()
+        self.df_demo.loc[idx_mult, "race_more"] = "More"
+
+        # Update race_resp col with race_more
+        idx_more = self.df_demo.index[
+            self.df_demo["race_more"] == "More"
+        ].tolist()
+        self.df_demo.loc[idx_more, "race_resp"] = "More than one race"
+        race_resp = self.df_demo.loc[self.idx_demo, "race_resp"].tolist()
+        return race_resp
 
     def _get_ethnic_minority(self, subj_race):
         """Title.
@@ -287,7 +316,7 @@ class MakeDemo:
         # Get age, sex
         subj_age = self.df_demo.loc[self.idx_demo, "age"].tolist()
         h_sex = self.df_demo.loc[self.idx_demo, "gender"].tolist()
-        sex_switch = {1.0: "male", 2.0: "female", 3.0: "neither"}
+        sex_switch = {1.0: "Male", 2.0: "Female", 3.0: "Unknown"}
         subj_sex = [sex_switch[x] for x in h_sex]
 
         # Get DOB, age in months, education

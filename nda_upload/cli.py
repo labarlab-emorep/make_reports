@@ -24,32 +24,19 @@ def _get_args():
         description=__doc__, formatter_class=RawTextHelpFormatter
     )
     parser.add_argument(
-        "--report-duke-3mo",
-        action="store_true",
+        "--manager-reports",
+        type=str,
+        nargs="+",
         help=textwrap.dedent(
             """\
-            Whether to generate Duke figures submitted every 3 months.
-            True if "--report-duke-3mo" else False.
-            """
-        ),
-    )
-    parser.add_argument(
-        "--report-nih-4mo",
-        action="store_true",
-        help=textwrap.dedent(
-            """\
-            Whether to generate NIH figures submitted every 4 months.
-            True if "--report-nih-4mo" else False.
-            """
-        ),
-    )
-    parser.add_argument(
-        "--report-nih-12mo",
-        action="store_true",
-        help=textwrap.dedent(
-            """\
-            Whether to generate NIH figures submitted every 12 months.
-            True if "--report-nih-12mo" else False.
+            [nih4 | nih12 | duke3]
+
+            List of lab manager reports to generate. Acceptable
+            args are "nih4", "nih12", and "duke3" for the reports
+            submitted to the NIH every 4 months, NIH every 12 months,
+            and Duke every 3 months, respectively.
+
+            e.g. "--manager-reports nih4 duke3"
             """
         ),
     )
@@ -102,14 +89,14 @@ def main():
     # For testing
     proj_dir = "/mnt/keoki/experiments2/EmoRep/Emorep_BIDS"
     query_date = datetime.strptime("2022-07-29", "%Y-%m-%d").date()
+    manager_reports = ["duke3"]
+    report = manager_reports[0]
 
     args = _get_args().parse_args()
     proj_dir = args.proj_dir
     api_token = args.api_redcap
     query_date = args.query_date
-    do_nih4 = args.report_nih_4mo
-    do_nih12 = args.report_nih_12mo
-    do_duke3 = args.report_duke_3mo
+    manager_reports = args.manager_reports
 
     # Setup output directories
     deriv_dir = os.path.join(proj_dir, "derivatives/nda_upload")
@@ -117,48 +104,28 @@ def main():
         os.makedirs(deriv_dir)
 
     info_general = general_info.MakeDemo(api_token)
-    info_general.make_complete()
-    print(info_general.final_demo)
+    # print(info_general.final_demo)
 
-    # Test nih_4mo
-    if do_nih4:
-        (
-            num_minority,
-            num_hispanic,
-            num_total,
-            range_start,
-            range_end,
-        ) = reports.nih_4mo(info_general.final_demo, query_date)
-        print(
-            f"""
-            Query date: {query_date}
-            Query range: {range_start} - {range_end}
-            Num Minority: {num_minority}
-            Num Hispanic: {num_hispanic}
-            Num Total: {num_total}
-        """
-        )
+    # TODO validate manager_reports args
 
-    # Test duke_3mo
-    if do_duke3:
-        pass
-
-    # Test nih_annual
-    if do_nih12:
-        (
-            df_report,
-            range_start,
-            range_end,
-        ) = reports.nih_annual(info_general.final_demo, query_date)
-        print(
-            f"""
-            Query date: {query_date}
-            Query range: {range_start} - {range_end}
-            Dataframe:
-            {df_report}
-        """
-        )
+    if manager_reports:
+        manager_dir = os.path.join(proj_dir, "derivatives/manager_reports")
+        if not os.path.exists(manager_dir):
+            os.makedirs(manager_dir)
+        for report in manager_reports:
+            mr = reports.MakeRegularReports(
+                query_date, info_general.final_demo, report
+            )
+            start_date = mr.range_start.strftime("%Y-%m-%d")
+            end_date = mr.range_end.strftime("%Y-%m-%d")
+            out_file = os.path.join(
+                manager_dir, f"report_{report}_{start_date}_{end_date}.csv"
+            )
+            mr.df_report.to_csv(out_file, index=False, na_rep="NaN")
+            del mr
 
 
 if __name__ == "__main__":
     main()
+
+# %%
