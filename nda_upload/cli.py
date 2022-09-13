@@ -2,19 +2,24 @@ r"""Title.
 
 Desc.
 
-Example
--------
-cli.py \
+Examples
+--------
+nda_upload \
     -a $PAT_REDCAP_EMOREP
+
+nda_upload \
+    -a $PAT_REDCAP_EMOREP \
+    --manager-reports nih4 nih12 duke3 \
+    --query-date 2022-06-29
 """
 
 # %%
 import os
 import sys
 import textwrap
-from datetime import datetime, date
+from datetime import date
 from argparse import ArgumentParser, RawTextHelpFormatter
-from nda_upload import general_info, reports
+from nda_upload import general_info, workflow
 
 
 # %%
@@ -30,13 +35,11 @@ def _get_args():
         help=textwrap.dedent(
             """\
             [nih4 | nih12 | duke3]
-
             List of lab manager reports to generate. Acceptable
             args are "nih4", "nih12", and "duke3" for the reports
             submitted to the NIH every 4 months, NIH every 12 months,
             and Duke every 3 months, respectively.
-
-            e.g. "--manager-reports nih4 duke3"
+            e.g. --manager-reports nih4 duke3
             """
         ),
     )
@@ -58,9 +61,10 @@ def _get_args():
         help=textwrap.dedent(
             """\
             Required if report options are used.
-            A Y-m-d formatted date used to find a submission window
-            e.g. 2021-06-06 would find all data between 2021-01-01
-            and 2021-12-31 when doing an annual report.
+            A Y-m-d formatted date AFTER 2022-04-01 used to find a
+            submission window e.g. 2022-06-06 would find all data
+            between 2022-01-01 and 2022-12-31 when doing an annual
+            report.
             (default : today's date (%(default)s))
             """
         ),
@@ -88,9 +92,9 @@ def main():
 
     # For testing
     proj_dir = "/mnt/keoki/experiments2/EmoRep/Emorep_BIDS"
-    query_date = datetime.strptime("2022-07-29", "%Y-%m-%d").date()
-    manager_reports = ["nih12", "nih4", "duke3"]
-    report = manager_reports[2]
+    query_date = "2021-10-30"
+    # "nih12", "nih4", "duke3"
+    manager_reports = ["nih4"]
 
     args = _get_args().parse_args()
     proj_dir = args.proj_dir
@@ -103,36 +107,15 @@ def main():
     if not os.path.exists(deriv_dir):
         os.makedirs(deriv_dir)
 
+    # Get demographic info for consented subjs
     info_demographic = general_info.MakeDemo(api_token)
-    # print(info_demographic.final_demo)
 
-    # TODO validate manager_reports args
-
-    test = reports.MakeRegularReports(
-        query_date, info_demographic.final_demo, "duke3"
-    )
-    df_range = test.df_range
-    df_hold = df_range[["src_subject_id", "sex", "ethnicity", "race"]]
-    df_hold["comb"] = (
-        df_hold["sex"] + "," + df_hold["ethnicity"] + "," + df_hold["race"]
-    )
-    df_report = df_hold["comb"].value_counts()
+    # Validate manager_reports & query_date
 
     if manager_reports:
-        manager_dir = os.path.join(proj_dir, "derivatives/manager_reports")
-        if not os.path.exists(manager_dir):
-            os.makedirs(manager_dir)
-        for report in manager_reports:
-            mr = reports.MakeRegularReports(
-                query_date, info_demographic.final_demo, report
-            )
-            start_date = mr.range_start.strftime("%Y-%m-%d")
-            end_date = mr.range_end.strftime("%Y-%m-%d")
-            out_file = os.path.join(
-                manager_dir, f"report_{report}_{start_date}_{end_date}.csv"
-            )
-            mr.df_report.to_csv(out_file, index=False, na_rep="NaN")
-            del mr
+        workflow.make_manager_reports(
+            manager_reports, info_demographic.final_demo, query_date, proj_dir
+        )
 
 
 if __name__ == "__main__":

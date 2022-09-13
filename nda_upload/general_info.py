@@ -54,6 +54,7 @@ class MakeDemo:
         idx_guid
         idx_demo
         """
+        print("Starting demographic, guid, consent pull ...")
         # Load report keys
         with pkg_resources.open_text(
             reference_files, "report_keys.json"

@@ -4,8 +4,7 @@ Desc.
 """
 # %%
 import pandas as pd
-from datetime import datetime, date
-from nda_upload import reference_files
+from datetime import datetime
 
 
 class MakeRegularReports:
@@ -27,6 +26,7 @@ class MakeRegularReports:
         ----------
 
         """
+        print(f"Buiding manager report : {report} ...")
         self.query_date = query_date
         self.final_demo = final_demo
 
@@ -69,8 +69,10 @@ class MakeRegularReports:
         self.df_range = self.final_demo.loc[range_bool]
         if self.df_range.empty:
             raise ValueError(
-                f"No data collected for query date {self.query_date}"
+                "No data collected for query range : "
+                + f"{self.range_start} - {self.range_end}"
             )
+        print(f"\tReport range : {self.range_start} - {self.range_end}")
 
     def nih_4mo(self):
         """Title.
@@ -175,9 +177,35 @@ class MakeRegularReports:
         self._get_data_range(duke_3mo_ranges)
 
         # Get gender/ethnicity/race values
-        self.df_report = self.df_range[
-            ["src_subject_id", "race", "ethnicity", "sex"]
-        ]
+        df_hold = self.df_range[["src_subject_id", "sex", "ethnicity", "race"]]
+        pd.options.mode.chained_assignment = None
+        df_hold["comb"] = (
+            df_hold["sex"] + "," + df_hold["ethnicity"] + "," + df_hold["race"]
+        )
+        pd.options.mode.chained_assignment = "warn"
+        self.df_report = (
+            df_hold["comb"]
+            .value_counts()
+            .rename_axis("Groups")
+            .reset_index(name="Counts")
+        )
+        self.df_report = pd.concat(
+            [
+                self.df_report["Groups"].str.split(",", expand=True),
+                self.df_report["Counts"],
+            ],
+            axis=1,
+        )
+        col_rename = {
+            0: "Gender",
+            1: "Ethnicity",
+            2: "Race",
+            "Counts": "Total",
+        }
+        self.df_report = self.df_report.rename(columns=col_rename)
+        self.df_report = self.df_report.sort_values(
+            by=["Gender", "Ethnicity", "Race"]
+        )
 
     def nih_12mo(self):
         """Title.
