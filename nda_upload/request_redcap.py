@@ -1,16 +1,27 @@
-"""Title.
-
-Desc.
-"""
+"""Request RedCap reports."""
 import io
 import requests
 import pandas as pd
 
 
 def pull_data(api_token, report_id, content="report", return_format="csv"):
-    """Title.
+    """Pull a RedCap report and make a pandas dataframe.
 
-    Desc.
+    Parameters
+    ----------
+    api_token : str
+        RedCap API token
+    report_id : str, int
+        RedCap Report ID
+    content : string
+        Data export type
+    return_format : str
+        Data export format
+
+    Returns
+    -------
+    pandas.DataFrame
+
     """
     data = {
         "token": api_token,

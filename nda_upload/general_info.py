@@ -1,8 +1,4 @@
-"""Title.
-
-Desc.
-"""
-# %%
+"""Get general participant information."""
 import pandas as pd
 import numpy as np
 import json
@@ -11,7 +7,7 @@ from nda_upload import request_redcap
 from nda_upload import reference_files
 
 
-class MakeDemo:
+class MakeDemographic:
     """Make a dataframe of demographic info.
 
     Gather information from consent, guid, and demographic reports,
@@ -24,20 +20,32 @@ class MakeDemo:
 
     Attributes
     ----------
-    report_keys
-    df_consent
-    df_guid
-    df_demo
-    idx_consent
-    idx_guid
-    idx_demo
+    df_consent : pd.DataFrame
+        Merged dataframe of original and new consent report
+    df_demo : pd.DataFrame
+        Participant demographic information
+    df_guid : pd.DataFrame
+        Participant GUID information
+    idx_consent : list
+        Indices of consent responses in df_consent
+    idx_demo : list
+        Indices of consented subjects in df_demo
+    idx_guid : list
+        Indices of consented subjects in df_guid
+    subj_consent : list
+        Subjects who consented
+    final_demo : pd.DataFrame
+        Complete report containing demographic info for NDA submission
+
     """
 
     def __init__(self, api_token):
-        """Get RedCap reports, setup class.
+        """Get RedCap reports, combine.
 
         Uses report_keys.json from reference_files to match
-        report name to report ID.
+        report name to report ID. Pull consent, GUID, and
+        demographic reports. Find consented subjects.
+        Trigger make_complete method.
 
         Parameters
         ----------
@@ -46,30 +54,40 @@ class MakeDemo:
 
         Attributes
         ----------
-        report_keys
-        df_consent
-        df_guid
-        df_demo
-        idx_consent
-        idx_guid
-        idx_demo
+        df_consent : pd.DataFrame
+            Merged dataframe of original and new consent report
+        df_demo : pd.DataFrame
+            Participant demographic information
+        df_guid : pd.DataFrame
+            Participant GUID information
+        idx_consent : list
+            Indices of consent responses in df_consent
+        idx_demo : list
+            Indices of consented subjects in df_demo
+        idx_guid : list
+            Indices of consented subjects in df_guid
+        subj_consent : list
+            Subjects who consented
+
         """
+        # Communicate
         print("Starting demographic, guid, consent pull ...")
+
         # Load report keys
         with pkg_resources.open_text(
             reference_files, "report_keys.json"
         ) as jf:
-            self.report_keys = json.load(jf)
+            report_keys = json.load(jf)
 
-        # Get original/new consent dataframes
+        # Get original & new consent dataframes
         df_consent_orig = request_redcap.pull_data(
-            api_token, self.report_keys["consent_orig"]
+            api_token, report_keys["consent_orig"]
         )
         df_consent_new = request_redcap.pull_data(
-            api_token, self.report_keys["consent_new"]
+            api_token, report_keys["consent_new"]
         )
 
-        # Update consent_new names, merge
+        # Update consent_new column names, merge
         cols_new = df_consent_new.columns.tolist()
         cols_orig = df_consent_orig.columns.tolist()
         cols_replace = {}
@@ -78,10 +96,7 @@ class MakeDemo:
         df_consent_new = df_consent_new.rename(columns=cols_replace)
         self.df_consent = df_consent_new.combine_first(df_consent_orig)
 
-        # Get original consent dataframe, index, subjects
-        # self.df_consent = request_redcap.pull_data(
-        #     api_token, self.report_keys["consent_new"]
-        # )
+        # Get index, subjects that consented
         self.idx_consent = self.df_consent.index[
             self.df_consent["consent"] == 1.0
         ].tolist()
@@ -90,16 +105,14 @@ class MakeDemo:
         ].tolist()
 
         # Get guid dataframe, index of consented
-        self.df_guid = request_redcap.pull_data(
-            api_token, self.report_keys["guid"]
-        )
+        self.df_guid = request_redcap.pull_data(api_token, report_keys["guid"])
         self.idx_guid = self.df_guid[
             self.df_guid["record_id"].isin(self.subj_consent)
         ].index.tolist()
 
         # Get demographic dataframe, index of consented
         self.df_demo = request_redcap.pull_data(
-            api_token, self.report_keys["demographics"]
+            api_token, report_keys["demographics"]
         )
         self.idx_demo = self.df_demo[
             self.df_demo["record_id"].isin(self.subj_consent)
@@ -118,7 +131,7 @@ class MakeDemo:
         Returns
         -------
         list
-            subject dob datetimes
+            Subject dob datetimes
 
         Raises
         ------
@@ -159,23 +172,38 @@ class MakeDemo:
         with number of days, for consistency with previous
         submissions.
 
+        Parameters
+        ----------
+        subj_dob : list
+            Subjects' date-of-birth datetimes
+        subj_consent_date : list
+            Subjects' date-of-consent datetimes
+
         Returns
         -------
         list
-            participant ages in months (int)
+            Participant ages in months (int)
         """
         subj_age_mo = []
         for dob, doc in zip(subj_dob, subj_consent_date):
+
+            # Calculate years and months
             num_years = doc.year - dob.year
             num_months = doc.month - dob.month
+
+            # Avoid including current partial month
             if doc.day < dob.day:
                 num_months -= 1
+
+            # Adjust months, years to account for partial years
             while num_months < 0:
                 num_months += 12
                 num_years -= 1
+
+            # Convert all to months
             total_months = (12 * num_years) + num_months
 
-            # Use John's day method
+            # Use John's day method to deal with half months
             diff_days = doc.day - dob.day
             if diff_days < 0:
                 total_months -= 1
@@ -192,11 +220,16 @@ class MakeDemo:
         Returns
         -------
         list
-            number of years completed of education (int)
+            Number of years completed of education (int)
         """
+        # Convert education level to years
         educate_switch = {2: 12, 4: 14, 5: 16, 7: 18, 8: 20}
+
+        # Get education level, and self-report of years educated
         edu_year = self.df_demo.loc[self.idx_demo, "years_education"].tolist()
         edu_level = self.df_demo.loc[self.idx_demo, "level_education"].tolist()
+
+        # Convert into years (deal with self-reports)
         subj_educate = []
         for h_year, h_level in zip(edu_year, edu_level):
             # Patch for 1984 education issue
@@ -209,9 +242,16 @@ class MakeDemo:
         return subj_educate
 
     def _get_race(self):
-        """Title.
+        """Get participant race response.
 
-        Desc.
+        Account for single response, single response of
+        multiple, multiple responses (which may not include
+        the multiple option), and "other" responses.
+
+        Returns
+        -------
+        list
+            Participant responses to race question
         """
         # Get race response - deal with "More than one" (6) and
         # "Other" (8) separately.
@@ -239,9 +279,11 @@ class MakeDemo:
             race_switch[5],
             race_switch[7],
         ]
+
+        # Get race responses, set to new column
         self.df_demo["race_resp"] = np.select(get_race_resp, set_race_str)
 
-        # Capture "Other" responses
+        # Capture "Other" responses, stitch response together
         idx_other = self.df_demo.index[self.df_demo["race___8"] == 1].tolist()
         race_other = [
             f"Other - {x}"
@@ -249,7 +291,7 @@ class MakeDemo:
         ]
         self.df_demo.loc[idx_other, "race_resp"] = race_other
 
-        # Capture "More than one race" responses
+        # Capture "More than one race" responses, write to df_demo["race_more"]
         idx_more = self.df_demo.index[self.df_demo["race___6"] == 1].tolist()
         self.df_demo["race_more"] = np.nan
         self.df_demo.loc[idx_more, "race_more"] = "More"
@@ -268,7 +310,7 @@ class MakeDemo:
         idx_mult = self.df_demo.index[self.df_demo["race_sum"] > 1].tolist()
         self.df_demo.loc[idx_mult, "race_more"] = "More"
 
-        # Update race_resp col with race_more
+        # Update race_resp col with responses in df_demo["race_more"]
         idx_more = self.df_demo.index[
             self.df_demo["race_more"] == "More"
         ].tolist()
@@ -277,9 +319,18 @@ class MakeDemo:
         return race_resp
 
     def _get_ethnic_minority(self, subj_race):
-        """Title.
+        """Determine if participant is considered a minority.
 
-        Desc.
+        Parameters
+        ----------
+        subj_race : list
+            Participant race responses
+
+        Returns
+        -------
+        tuple
+            [0] list of participants' ethnicity status
+            [1] list of whether participants' are minority
         """
         # Get ethnicity
         h_ethnic = self.df_demo.loc[self.idx_demo, "ethnicity"].tolist()
@@ -299,9 +350,15 @@ class MakeDemo:
         return (subj_ethnic, subj_minor)
 
     def make_complete(self):
-        """Title.
+        """Make a demographic dataframe with all needed information.
 
-        Desc.
+        Pull relevant data from consent, GUID, and demographic reports
+        to compile data for all participants in RedCap who have consented.
+
+        Attributes
+        ----------
+        final_demo : pd.DataFrame
+            Complete report containing demographic info for NDA submission
         """
         # TODO Something here for subjs who withdraw consent
 

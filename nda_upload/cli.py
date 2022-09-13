@@ -108,7 +108,7 @@ def main():
         os.makedirs(deriv_dir)
 
     # Get demographic info for consented subjs
-    info_demographic = general_info.MakeDemo(api_token)
+    info_demographic = general_info.MakeDemographic(api_token)
 
     # Validate manager_reports & query_date
 
