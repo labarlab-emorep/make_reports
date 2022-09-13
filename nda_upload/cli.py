@@ -19,7 +19,7 @@ import sys
 import textwrap
 from datetime import date
 from argparse import ArgumentParser, RawTextHelpFormatter
-from nda_upload import general_info, workflow
+from nda_upload import general_info, workflow, reports
 
 
 # %%
@@ -90,11 +90,11 @@ def _get_args():
 def main():
     "Title."
 
-    # For testing
-    proj_dir = "/mnt/keoki/experiments2/EmoRep/Emorep_BIDS"
-    query_date = "2021-10-30"
-    # "nih12", "nih4", "duke3"
-    manager_reports = ["nih4"]
+    # # For testing
+    # proj_dir = "/mnt/keoki/experiments2/EmoRep/Emorep_BIDS"
+    # query_date = "2021-10-30"
+    # # "nih12", "nih4", "duke3"
+    # manager_reports = ["nih4"]
 
     args = _get_args().parse_args()
     proj_dir = args.proj_dir
@@ -110,12 +110,15 @@ def main():
     # Get demographic info for consented subjs
     info_demographic = general_info.MakeDemographic(api_token)
 
-    # Validate manager_reports & query_date
-
+    # Generate lab manager reports
     if manager_reports:
         workflow.make_manager_reports(
             manager_reports, info_demographic.final_demo, query_date, proj_dir
         )
+
+    # Test
+    test_demo = reports.DemoInfo(info_demographic.final_demo)
+    test_demo.make_demo()
 
 
 if __name__ == "__main__":

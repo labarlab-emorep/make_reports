@@ -1,6 +1,8 @@
 """Make reports of various types."""
 import pandas as pd
+import numpy as np
 from datetime import datetime
+from nda_upload import report_helper
 
 
 class MakeRegularReports:
@@ -357,3 +359,94 @@ class MakeRegularReports:
         }
         self.df_report = self.df_report.rename(columns=col_names)
         self.df_report["Age Units"] = "Years"
+
+
+class DemoInfo:
+    """Title.
+
+    Desc.
+
+    Attributes
+    ----------
+    final_demo : pd.DataFrame
+        Compiled demographic information, attribute of
+        by general_info.MakeDemographic
+
+    """
+
+    def __init__(self, final_demo):
+        """Title.
+
+        Desc.
+
+        Parameters
+        ----------
+        final_demo : pd.DataFrame
+            Compiled demographic information, attribute of
+            by general_info.MakeDemographic
+
+        Attributes
+        ----------
+        final_demo : pd.DataFrame
+            Compiled demographic information, attribute of
+            by general_info.MakeDemographic
+
+        """
+        self.final_demo = final_demo
+        self.nda_label, self.nda_cols = report_helper.mine_template(
+            "demo_info01_template.csv"
+        )
+        self.df_report = pd.DataFrame(columns=self.nda_cols)
+
+    def make_demo(self):
+        """Title.
+
+        Desc.
+        """
+        # Get subject key, src_id
+        subj_key = self.final_demo["subjectkey"]
+        subj_src_id = self.final_demo["src_subject_id"]
+
+        # Get inverview age, date
+        subj_inter_date = [
+            x.strftime("%m/%d/%Y") for x in self.final_demo["interview_date"]
+        ]
+        subj_inter_age = self.final_demo["interview_age"]
+
+        # Get subject sex, race
+        # TODO deal with other race responses
+        subj_sex = [x[:1] for x in self.final_demo["sex"]]
+        subj_sex = list(map(lambda x: x.replace("N", "O"), subj_sex))
+        subj_race = self.final_demo["race"]
+        subj_race = list(
+            map(
+                lambda x: x.replace("African-American", "African American"),
+                subj_race,
+            )
+        )
+
+        # Get education lavel
+        subj_educat = self.final_demo["years_education"]
+
+        # Make comments for pilot subjs
+        pilot_list = ["ER0001", "ER0002", "ER0003", "ER0004", "ER0005"]
+        subj_comments_misc = []
+        for subj in subj_src_id:
+            if subj in pilot_list:
+                subj_comments_misc.append("PILOT PARTICIPANT")
+            else:
+                subj_comments_misc.append(np.nan)
+
+        # Organize values, add to report
+        report_dict = {
+            "subjectkey": subj_key,
+            "src_subject_id": subj_src_id,
+            "interview_date": subj_inter_date,
+            "interview_age": subj_inter_age,
+            "sex": subj_sex,
+            "race": subj_race,
+            "educat": subj_educat,
+            "comments_misc": subj_comments_misc,
+        }
+        for h_col, h_value in report_dict.items():
+            self.df_report[h_col] = h_value

@@ -3,7 +3,7 @@ import pandas as pd
 import numpy as np
 import json
 import importlib.resources as pkg_resources
-from nda_upload import request_redcap
+from nda_upload import report_helper
 from nda_upload import reference_files
 
 
@@ -80,10 +80,10 @@ class MakeDemographic:
             report_keys = json.load(jf)
 
         # Get original & new consent dataframes
-        df_consent_orig = request_redcap.pull_data(
+        df_consent_orig = report_helper.pull_data(
             api_token, report_keys["consent_orig"]
         )
-        df_consent_new = request_redcap.pull_data(
+        df_consent_new = report_helper.pull_data(
             api_token, report_keys["consent_new"]
         )
 
@@ -105,13 +105,13 @@ class MakeDemographic:
         ].tolist()
 
         # Get guid dataframe, index of consented
-        self.df_guid = request_redcap.pull_data(api_token, report_keys["guid"])
+        self.df_guid = report_helper.pull_data(api_token, report_keys["guid"])
         self.idx_guid = self.df_guid[
             self.df_guid["record_id"].isin(self.subj_consent)
         ].index.tolist()
 
         # Get demographic dataframe, index of consented
-        self.df_demo = request_redcap.pull_data(
+        self.df_demo = report_helper.pull_data(
             api_token, report_keys["demographics"]
         )
         self.idx_demo = self.df_demo[

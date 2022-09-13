@@ -44,8 +44,8 @@ def make_manager_reports(manager_reports, final_demo, query_date, proj_dir):
     # Validate query date
     if isinstance(query_date, str):
         query_date = datetime.strptime(query_date, "%Y-%m-%d").date()
-    if query_date < datetime.strptime("2022-04-01", "%Y-%m-%d").date():
-        raise ValueError(f"Query date {query_date} precedes 2022-04-01.")
+    if query_date < datetime.strptime("2022-03-31", "%Y-%m-%d").date():
+        raise ValueError(f"Query date {query_date} precedes 2022-03-31.")
 
     # Setup output location
     manager_dir = os.path.join(proj_dir, "derivatives/manager_reports")
