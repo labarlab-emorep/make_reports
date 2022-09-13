@@ -1,35 +1,74 @@
-"""Title.
-
-Desc.
-"""
-# %%
+"""Make reports of various types."""
 import pandas as pd
 from datetime import datetime
 
 
 class MakeRegularReports:
-    """Title.
+    """Make reports regularly submitted by lab manager.
 
-    Desc.
+    Query data from the appropriate period for the period, and
+    construct a dataframe containing the required information
+    for the report.
+
+    Parameters
+    ----------
+    query_date : datetime
+        Date for finding report range
+    final_demo : pd.DataFrame
+        Compiled demographic information, attribute of
+        by general_info.MakeDemographic
+    report : str
+        Type of report e.g. nih4 or duke3
 
     Attributes
     ----------
+    query_date : datetime
+        Date for finding report range
+    final_demo : pd.DataFrame
+        Compiled demographic information, attribute of
+        by general_info.MakeDemographic
+    report : str
+        Type of report e.g. nih4 or duke3
+    range_start : datetime
+        Start of period for report
+    range_end : datetime
+        End of period for report
+    df_range : pd.DataFrame
+        Data found within the range_start, range_end period
+    df_report : pd.DataFrame
+        Relevant info, format for requested report
 
     """
 
     def __init__(self, query_date, final_demo, report):
-        """Title.
+        """Make desired report.
 
-        Desc.
+        Parameters
+        ----------
+        query_date : datetime
+            Date for finding report range
+        final_demo : pd.DataFrame
+            Compiled demographic information, attribute of
+            by general_info.MakeDemographic
+        report : str
+            Type of report e.g. nih4 or duke3
 
         Attributes
         ----------
+        query_date : datetime
+            Date for finding report range
+        final_demo : pd.DataFrame
+            Compiled demographic information, attribute of
+            by general_info.MakeDemographic
+        report : str
+            Type of report e.g. nih4 or duke3
 
         """
         print(f"Buiding manager report : {report} ...")
         self.query_date = query_date
         self.final_demo = final_demo
 
+        # Trigger appropriate method
         if report == "nih4":
             self.nih_4mo()
         elif report == "nih12":
@@ -40,14 +79,32 @@ class MakeRegularReports:
             raise ValueError("Incorrect report arguments specified.")
 
     def _find_start_end(self, range_list):
-        """Title.
+        """Find the period start and end date.
 
-        Desc.
+        Parameters
+        ----------
+        range_list : list
+            Tuples of start (0) and end (1) dates
+
+        Returns
+        -------
+        start_end : tuple
+            [0] start date
+            [1] end date
+
+        Raises
+        ------
+        ValueError
+            When a range cannot be found for query_date
+
         """
         start_end = None
         for h_ranges in range_list:
             h_start = datetime.strptime(h_ranges[0], "%Y-%m-%d").date()
             h_end = datetime.strptime(h_ranges[1], "%Y-%m-%d").date()
+
+            # Check if query_date is found in range, allow for
+            # first/last days.
             if h_start <= self.query_date <= h_end:
                 start_end = (h_start, h_end)
                 break
@@ -56,16 +113,44 @@ class MakeRegularReports:
         return start_end
 
     def _get_data_range(self, range_list, start_date=None):
-        """Title.
+        """Get data from date range.
 
-        Desc.
+        Make a dataframe of the data from final_demo that
+        is found within the date range.
+
+        Parameters
+        ----------
+        range_list : list
+            Tuples of start (0) and end (1) dates
+        start_date : datetime, optional
+            Known start date
+
+        Attributes
+        ----------
+        range_start : datetime
+            Start of period for report
+        range_end : datetime
+            End of period for report
+        df_range : pd.DataFrame
+            Data found within the range_start, range_end period
+
+        Raises
+        ------
+        ValueError
+            df_range is empty, meaning no participants were consented
+            within the period range
+
         """
-        # find data within range
+        # Get date ranges, use known start date if supplied
         h_start, self.range_end = self._find_start_end(range_list)
         self.range_start = start_date if start_date else h_start
+
+        # Mask the dataframe for the dates of interest
         range_bool = (
             self.final_demo["interview_date"] >= self.range_start
         ) & (self.final_demo["interview_date"] <= self.range_end)
+
+        # Subset final_demo according to mask, check if data exist
         self.df_range = self.final_demo.loc[range_bool]
         if self.df_range.empty:
             raise ValueError(
@@ -75,19 +160,26 @@ class MakeRegularReports:
         print(f"\tReport range : {self.range_start} - {self.range_end}")
 
     def nih_4mo(self):
-        """Title.
+        """Create report submitted to NIH every 4 months.
 
-        Desc.
+        Count the total number of participants who identify
+        as minority or Hispanic, and total number of participants,
+        since the beginning of the experiment.
+
+        Attributes
+        ----------
+        df_report : pd.DataFrame
+            Relevant info, format for requested report
+
         """
-
-        #
+        # Hardcode mturk values
         mturk_nums = {
             "minority": 122,
             "hispanic": 67,
             "total": 659,
         }
 
-        #
+        # Set start, end dates for report periods
         nih_4mo_ranges = [
             ("2020-12-01", "2021-03-31"),
             ("2021-04-01", "2021-07-31"),
@@ -106,15 +198,16 @@ class MakeRegularReports:
             ("2025-08-01", "2025-11-30"),
         ]
 
+        # Set project start date (approximately)
         proj_start = datetime.strptime("2020-06-30", "%Y-%m-%d").date()
 
-        # find data within range
+        # Find data within range
         self._get_data_range(
             nih_4mo_ranges,
             start_date=proj_start,
         )
 
-        # num minority, num hispanic, num total
+        # Calculate number of minority, hispanic, and total recruited
         num_minority = len(
             self.df_range.index[self.df_range["is_minority"] == "Minority"]
         )
@@ -125,7 +218,7 @@ class MakeRegularReports:
         )
         num_total = len(self.df_range.index)
 
-        # update with mturk
+        # Update calculations with mturk values
         num_minority += mturk_nums["minority"]
         num_hispanic += mturk_nums["hispanic"]
         num_total += mturk_nums["total"]
@@ -141,14 +234,20 @@ class MakeRegularReports:
         }
         self.df_report = pd.DataFrame(report_dict)
 
-    # %%
     def duke_3mo(self):
-        """Title.
+        """Create report submitted to Duke every 3 months.
 
-        Desc.
+        Determine the number of participants that belong to
+        gender * ethnicity * race group combinations which have
+        been recruited in the current period.
+
+        Attributes
+        ----------
+        df_report : pd.DataFrame
+            Relevant info, format for requested report
+
         """
-
-        # Setup date ranges for report
+        # Set start, end dates for report periods
         duke_3mo_ranges = [
             ("2020-11-01", "2020-12-31"),
             ("2021-01-01", "2021-03-31"),
@@ -173,22 +272,28 @@ class MakeRegularReports:
             ("2025-10-01", "2025-12-31"),
         ]
 
-        # find data within range
+        # Find data within range
         self._get_data_range(duke_3mo_ranges)
 
-        # Get gender/ethnicity/race values
+        # Get gender, ethnicity, race responses
         df_hold = self.df_range[["src_subject_id", "sex", "ethnicity", "race"]]
+
+        # Combine responses for easy tabulation, deal with pd warnings
         pd.options.mode.chained_assignment = None
         df_hold["comb"] = (
             df_hold["sex"] + "," + df_hold["ethnicity"] + "," + df_hold["race"]
         )
         pd.options.mode.chained_assignment = "warn"
+
+        # Count number of unique groups, convert to dataframe
         self.df_report = (
             df_hold["comb"]
             .value_counts()
             .rename_axis("Groups")
             .reset_index(name="Counts")
         )
+
+        # Reformat dataframe into desired format
         self.df_report = pd.concat(
             [
                 self.df_report["Groups"].str.split(",", expand=True),
@@ -208,11 +313,18 @@ class MakeRegularReports:
         )
 
     def nih_12mo(self):
-        """Title.
+        """Create report submitted to NIH every 12 months.
 
-        Desc.
+        Pull participant-level information those recruited
+        within the report period.
+
+        Attributes
+        ----------
+        df_report : pd.DataFrame
+            Relevant info, format for requested report
+
         """
-
+        # Set start, end dates for report periods
         nih_annual_ranges = [
             ("2020-04-01", "2020-03-31"),
             ("2021-04-01", "2022-03-31"),
@@ -221,8 +333,11 @@ class MakeRegularReports:
             ("2024-04-01", "2025-03-31"),
             ("2025-04-01", "2026-03-31"),
         ]
+
+        # Get data from query range
         self._get_data_range(nih_annual_ranges)
 
+        # Extract relevant columns for the report
         cols_desired = [
             "src_subject_id",
             "race",
@@ -231,6 +346,8 @@ class MakeRegularReports:
             "age",
         ]
         self.df_report = self.df_range[cols_desired]
+
+        # Reformat dataframe into desired format
         col_names = {
             "src_subject_id": "Record_ID",
             "race": "Race",

@@ -1,16 +1,36 @@
-"""Title.
-
-Desc.
-"""
+"""Setup workflows for specific types of reports."""
 import os
 from datetime import datetime
 from nda_upload import reports
 
 
 def make_manager_reports(manager_reports, final_demo, query_date, proj_dir):
-    """Title.
+    """Make reports for the lab manager.
 
-    Desc.
+    Coordinate the use of reports.MakeRegularReports to generate
+    desired nih12, nih4, or duke3 report.
+
+    Parameters
+    ----------
+    manager_reports : list
+        Desired reports
+        e.g. nih4, nih12
+    final_demo : pd.DataFrame
+        Compiled demographic information, attribute of
+        by general_info.MakeDemographic
+    query_date : str, datetime
+        Date for finding report range
+    proj_dir : path
+        Project directory, used for output
+
+    Returns
+    -------
+    None
+
+    Notes
+    -----
+    Writes dataframes to <proj_dir>/manager_reports.
+
     """
     # Validate manager_reports arguments
     valid_mr_args = ["nih12", "nih4", "duke3"]
@@ -21,7 +41,7 @@ def make_manager_reports(manager_reports, final_demo, query_date, proj_dir):
                 + f"argument : {report}"
             )
 
-    # TODO validate query date
+    # Validate query date
     if isinstance(query_date, str):
         query_date = datetime.strptime(query_date, "%Y-%m-%d").date()
     if query_date < datetime.strptime("2022-04-01", "%Y-%m-%d").date():
