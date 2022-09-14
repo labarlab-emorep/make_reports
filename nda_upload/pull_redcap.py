@@ -1,4 +1,4 @@
-"""Get general participant information."""
+"""Pull RedCap reports and make dataframes."""
 import pandas as pd
 import numpy as np
 import json
@@ -207,6 +207,8 @@ class MakeDemographic:
             diff_days = doc.day - dob.day
             if diff_days < 0:
                 total_months -= 1
+
+            # TODO perhaps -= 1 months if modulo total_days/12 > 15
             subj_age_mo.append(total_months)
         return subj_age_mo
 

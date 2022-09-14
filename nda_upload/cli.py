@@ -5,12 +5,13 @@ Desc.
 Examples
 --------
 nda_upload \
-    -a $PAT_REDCAP_EMOREP
-
-nda_upload \
     -a $PAT_REDCAP_EMOREP \
     --manager-reports nih4 nih12 duke3 \
     --query-date 2022-06-29
+
+nda_upload \
+    -a $PAT_REDCAP_EMOREP \
+    --nda-reports demo_info01
 """
 
 # %%
@@ -19,7 +20,7 @@ import sys
 import textwrap
 from datetime import date
 from argparse import ArgumentParser, RawTextHelpFormatter
-from nda_upload import general_info, workflow, reports
+from nda_upload import pull_redcap, workflow
 
 
 # %%
@@ -40,6 +41,17 @@ def _get_args():
             submitted to the NIH every 4 months, NIH every 12 months,
             and Duke every 3 months, respectively.
             e.g. --manager-reports nih4 duke3
+            """
+        ),
+    )
+    parser.add_argument(
+        "--nda-reports",
+        type=str,
+        nargs="+",
+        help=textwrap.dedent(
+            """\
+            [demo_info01]
+
             """
         ),
     )
@@ -101,14 +113,10 @@ def main():
     api_token = args.api_redcap
     query_date = args.query_date
     manager_reports = args.manager_reports
-
-    # Setup output directories
-    deriv_dir = os.path.join(proj_dir, "derivatives/nda_upload")
-    if not os.path.exists(deriv_dir):
-        os.makedirs(deriv_dir)
+    nda_reports = args.nda_reports
 
     # Get demographic info for consented subjs
-    info_demographic = general_info.MakeDemographic(api_token)
+    info_demographic = pull_redcap.MakeDemographic(api_token)
 
     # Generate lab manager reports
     if manager_reports:
@@ -116,9 +124,11 @@ def main():
             manager_reports, info_demographic.final_demo, query_date, proj_dir
         )
 
-    # Test
-    test_demo = reports.DemoInfo(info_demographic.final_demo)
-    test_demo.make_demo()
+    # Generate NDA reports
+    if nda_reports:
+        workflow.make_nda_reports(
+            nda_reports, info_demographic.final_demo, proj_dir
+        )
 
 
 if __name__ == "__main__":

@@ -54,7 +54,7 @@ def make_manager_reports(manager_reports, final_demo, query_date, proj_dir):
 
     # Generate reports
     for report in manager_reports:
-        mr = reports.MakeRegularReports(query_date, final_demo, report)
+        mr = reports.RegularReports(query_date, final_demo, report)
 
         # Setup file name, write csv
         start_date = mr.range_start.strftime("%Y-%m-%d")
@@ -63,5 +63,41 @@ def make_manager_reports(manager_reports, final_demo, query_date, proj_dir):
             manager_dir, f"report_{report}_{start_date}_{end_date}.csv"
         )
         print(f"\tWriting : {out_file}")
-        mr.df_report.to_csv(out_file, index=False, na_rep="NaN")
+        mr.df_report.to_csv(out_file, index=False, na_rep="")
         del mr
+
+
+def make_nda_reports(nda_reports, final_demo, proj_dir):
+    """Title.
+
+    Desc.
+    """
+    # Setup output directories
+    report_dir = os.path.join(proj_dir, "derivatives/nda_upload/reports")
+    if not os.path.exists(report_dir):
+        os.makedirs(report_dir)
+
+    # Set switch to find appropriate class: key = user-specified
+    # argument, value = relevant class.
+    nda_switch = {"demo_info01": "nda_upload.reports.DemoInfo"}
+
+    # Make requested reports
+    for report in nda_reports:
+
+        # Validate nda_reports arguments
+        if report not in nda_switch.keys():
+            raise ValueError(
+                f"Inappropriate --nda-reports argument : {report}"
+            )
+
+        # Get appropriate class for report
+        h_pkg, h_mod, h_class = nda_switch[report].split(".")
+        mod = __import__(f"{h_pkg}.{h_mod}", fromlist=[h_class])
+        rep_class = getattr(mod, h_class)
+
+        # Make report, write out
+        rep_obj = rep_class(final_demo)
+        out_file = os.path.join(report_dir, f"{report}_dataset.csv")
+        print(f"\tWriting : {out_file}")
+        rep_obj.df_report.to_csv(out_file, index=False, na_rep="")
+        del rep_obj

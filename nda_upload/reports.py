@@ -5,7 +5,7 @@ from datetime import datetime
 from nda_upload import report_helper
 
 
-class MakeRegularReports:
+class RegularReports:
     """Make reports regularly submitted by lab manager.
 
     Query data from the appropriate period for the period, and
@@ -392,11 +392,13 @@ class DemoInfo:
             by general_info.MakeDemographic
 
         """
+        print("Buiding NDA report : demo_info01 ...")
         self.final_demo = final_demo
         self.nda_label, self.nda_cols = report_helper.mine_template(
             "demo_info01_template.csv"
         )
         self.df_report = pd.DataFrame(columns=self.nda_cols)
+        self.make_demo()
 
     def make_demo(self):
         """Title.
