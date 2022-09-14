@@ -102,12 +102,6 @@ def _get_args():
 def main():
     "Title."
 
-    # # For testing
-    # proj_dir = "/mnt/keoki/experiments2/EmoRep/Emorep_BIDS"
-    # query_date = "2021-10-30"
-    # # "nih12", "nih4", "duke3"
-    # manager_reports = ["nih4"]
-
     args = _get_args().parse_args()
     proj_dir = args.proj_dir
     api_token = args.api_redcap

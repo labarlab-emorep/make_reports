@@ -1,5 +1,6 @@
 """Setup workflows for specific types of reports."""
 import os
+import csv
 from datetime import datetime
 from nda_upload import reports
 
@@ -100,4 +101,15 @@ def make_nda_reports(nda_reports, final_demo, proj_dir):
         out_file = os.path.join(report_dir, f"{report}_dataset.csv")
         print(f"\tWriting : {out_file}")
         rep_obj.df_report.to_csv(out_file, index=False, na_rep="")
+
+        # Preprend header
+        dummy_file = f"{out_file}.bak"
+        with open(out_file, "r") as read_obj, open(
+            dummy_file, "w"
+        ) as write_obj:
+            write_obj.write(f"{','.join(rep_obj.nda_label)}\n")
+            for line in read_obj:
+                write_obj.write(line)
+        os.remove(out_file)
+        os.rename(dummy_file, out_file)
         del rep_obj

@@ -71,7 +71,7 @@ class MakeDemographic:
 
         """
         # Communicate
-        print("Starting demographic, guid, consent pull ...")
+        print("Pulling RedCap demographic, guid, consent reports ...")
 
         # Load report keys
         with pkg_resources.open_text(
@@ -119,6 +119,7 @@ class MakeDemographic:
         ].index.tolist()
 
         # Run methods
+        print("Compiling needed demographic info ...")
         self.make_complete()
 
     def _get_dob(self):
@@ -187,28 +188,31 @@ class MakeDemographic:
         subj_age_mo = []
         for dob, doc in zip(subj_dob, subj_consent_date):
 
-            # Calculate years and months
+            # Calculate years, months, and days
             num_years = doc.year - dob.year
             num_months = doc.month - dob.month
+            num_days = doc.day - dob.day
+
+            # Adjust for day-month wrap around
+            if num_days < 0:
+                num_days += 30
 
             # Avoid including current partial month
             if doc.day < dob.day:
                 num_months -= 1
 
-            # Adjust months, years to account for partial years
+            # Adjust including current partial year
             while num_months < 0:
                 num_months += 12
                 num_years -= 1
 
-            # Convert all to months
+            # Add month if participant is older than num_months
+            # plus 15 days.
+            if num_days >= 15:
+                num_months += 1
+
+            # Convert all to months, add to list
             total_months = (12 * num_years) + num_months
-
-            # Use John's day method to deal with half months
-            diff_days = doc.day - dob.day
-            if diff_days < 0:
-                total_months -= 1
-
-            # TODO perhaps -= 1 months if modulo total_days/12 > 15
             subj_age_mo.append(total_months)
         return subj_age_mo
 
@@ -378,7 +382,7 @@ class MakeDemographic:
         # Get age, sex
         subj_age = self.df_demo.loc[self.idx_demo, "age"].tolist()
         h_sex = self.df_demo.loc[self.idx_demo, "gender"].tolist()
-        sex_switch = {1.0: "Male", 2.0: "Female", 3.0: "Unknown"}
+        sex_switch = {1.0: "Male", 2.0: "Female", 3.0: "Neither"}
         subj_sex = [sex_switch[x] for x in h_sex]
 
         # Get DOB, age in months, education

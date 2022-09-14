@@ -394,10 +394,10 @@ class DemoInfo:
         """
         print("Buiding NDA report : demo_info01 ...")
         self.final_demo = final_demo
-        self.nda_label, self.nda_cols = report_helper.mine_template(
+        self.nda_label, nda_cols = report_helper.mine_template(
             "demo_info01_template.csv"
         )
-        self.df_report = pd.DataFrame(columns=self.nda_cols)
+        self.df_report = pd.DataFrame(columns=nda_cols)
         self.make_demo()
 
     def make_demo(self):
@@ -415,10 +415,11 @@ class DemoInfo:
         ]
         subj_inter_age = self.final_demo["interview_age"]
 
-        # Get subject sex, race
-        # TODO deal with other race responses
+        # Get subject sex
         subj_sex = [x[:1] for x in self.final_demo["sex"]]
         subj_sex = list(map(lambda x: x.replace("N", "O"), subj_sex))
+
+        # Get subject race
         subj_race = self.final_demo["race"]
         subj_race = list(
             map(
@@ -426,6 +427,13 @@ class DemoInfo:
                 subj_race,
             )
         )
+        subj_race_other = []
+        for idx, resp in enumerate(subj_race):
+            if "Other" in resp:
+                subj_race[idx] = "Other"
+                subj_race_other.append(resp.split(" - ")[1])
+            else:
+                subj_race_other.append(np.nan)
 
         # Get education lavel
         subj_educat = self.final_demo["years_education"]
@@ -447,6 +455,7 @@ class DemoInfo:
             "interview_age": subj_inter_age,
             "sex": subj_sex,
             "race": subj_race,
+            "otherrace": subj_race_other,
             "educat": subj_educat,
             "comments_misc": subj_comments_misc,
         }
