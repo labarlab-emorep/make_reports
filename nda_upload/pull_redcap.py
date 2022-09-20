@@ -42,7 +42,7 @@ class MakeDemographic:
     def __init__(self, redcap_token):
         """Get RedCap reports, combine.
 
-        Uses report_keys.json from reference_files to match
+        Uses report_keys_redcap.json from reference_files to match
         report name to report ID. Pull consent, GUID, and
         demographic reports. Find consented subjects.
         Trigger make_complete method.
@@ -75,16 +75,16 @@ class MakeDemographic:
 
         # Load report keys
         with pkg_resources.open_text(
-            reference_files, "report_keys.json"
+            reference_files, "report_keys_redcap.json"
         ) as jf:
-            report_keys = json.load(jf)
+            report_keys_redcap = json.load(jf)
 
         # Get original & new consent dataframes
         df_consent_orig = report_helper.pull_redcap_data(
-            redcap_token, report_keys["consent_orig"]
+            redcap_token, report_keys_redcap["consent_orig"]
         )
         df_consent_new = report_helper.pull_redcap_data(
-            redcap_token, report_keys["consent_new"]
+            redcap_token, report_keys_redcap["consent_new"]
         )
 
         # Update consent_new column names, merge
@@ -106,7 +106,7 @@ class MakeDemographic:
 
         # Get guid dataframe, index of consented
         self.df_guid = report_helper.pull_redcap_data(
-            redcap_token, report_keys["guid"]
+            redcap_token, report_keys_redcap["guid"]
         )
         self.idx_guid = self.df_guid[
             self.df_guid["record_id"].isin(self.subj_consent)
@@ -114,7 +114,7 @@ class MakeDemographic:
 
         # Get demographic dataframe, index of consented
         self.df_demo = report_helper.pull_redcap_data(
-            redcap_token, report_keys["demographics"]
+            redcap_token, report_keys_redcap["demographics"]
         )
         self.idx_demo = self.df_demo[
             self.df_demo["record_id"].isin(self.subj_consent)

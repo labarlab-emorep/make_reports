@@ -1,7 +1,9 @@
 """Report-agnostic methods."""
+# %%
 import io
 import requests
 import csv
+import zipfile
 import pandas as pd
 import importlib.resources as pkg_resources
 from nda_upload import reference_files
@@ -43,14 +45,89 @@ def pull_redcap_data(
     return df
 
 
-def pull_qualtrics_data():
-    """Title.
+# %%
+def pull_qualtrics_data(
+    qualtrics_token,
+    report_id,
+    organization_id,
+    datacenter_id,
+    survey_name,
+):
+    """Pull a Qualtrics report and make a pandas dataframe.
 
-    Desc.
+    Parameters
+    ----------
+    qualtrics_token : str
+        Qualtrics API token
+    report_id : str
+        Qualtrics survey ID
+    organization_id : str
+        Qualtrics organization ID
+    datacenter_id : str
+        Qualtrics datacenter ID
+    survey_name : str
+        Qualtrics survey name
+
+    Returns
+    -------
+    pd.DataFrame
+
+    Raises
+    ------
+    TimeoutError
+        If response export progress takes too long
+
     """
-    pass
+    # Create response export
+    print(f"Pulling Qualtrics report : '{survey_name}.csv'")
+    base_url = (
+        f"https://{organization_id}.{datacenter_id}.qualtrics.com"
+        + "/API/v3/responseexports/"
+    )
+    headers = {
+        "content-type": "application/json",
+        "x-api-token": qualtrics_token,
+    }
+    req_payload = f"""{{"format": "csv", "surveyId": "{report_id}"}}"""
+    req_response = requests.request(
+        "POST",
+        base_url,
+        data=req_payload,
+        headers=headers,
+    )
+    progress_id = req_response.json()["result"]["id"]
+    # print(req_response.text)
+
+    # Get response export progress
+    req_progress = 0
+    stat_progress = None
+    while req_progress < 100 and stat_progress != "complete":
+        req_check_url = base_url + progress_id
+        req_check_resp = requests.request(
+            "GET", req_check_url, headers=headers
+        )
+        req_progress = req_check_resp.json()["result"]["percentComplete"]
+        stat_progress = req_check_resp.json()["result"]["status"]
+
+    if stat_progress != "complete":
+        raise TimeoutError(
+            f"Pulling Qualtrics report failed for '{survey_name}.csv'."
+        )
+
+    # Get response export file and unzip
+    req_download_url = f"{base_url}{progress_id}/file"
+    req_download = requests.request(
+        "GET", req_download_url, headers=headers, stream=True
+    )
+    req_file_zipped = io.BytesIO(req_download.content)
+    with zipfile.ZipFile(req_file_zipped) as req_file:
+        with req_file.open(f"{survey_name}.csv") as f:
+            df = pd.read_csv(f)
+
+    return df
 
 
+# %%
 def mine_template(template_file):
     """Extract row values from NDA template.
 
