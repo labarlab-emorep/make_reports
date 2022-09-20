@@ -1,6 +1,5 @@
 """Setup workflows for specific types of reports."""
 import os
-import csv
 from datetime import datetime
 from nda_upload import reports
 
@@ -9,7 +8,8 @@ def make_manager_reports(manager_reports, final_demo, query_date, proj_dir):
     """Make reports for the lab manager.
 
     Coordinate the use of reports.MakeRegularReports to generate
-    desired nih12, nih4, or duke3 report.
+    desired nih12, nih4, or duke3 report. Write dataframes to
+    <proj_dir>/documents/manager_reports.
 
     Parameters
     ----------
@@ -22,15 +22,11 @@ def make_manager_reports(manager_reports, final_demo, query_date, proj_dir):
     query_date : str, datetime
         Date for finding report range
     proj_dir : path
-        Project directory, used for output
+        Project's experiment directory
 
     Returns
     -------
     None
-
-    Notes
-    -----
-    Writes dataframes to <proj_dir>/manager_reports.
 
     """
     # Validate manager_reports arguments
@@ -49,7 +45,7 @@ def make_manager_reports(manager_reports, final_demo, query_date, proj_dir):
         raise ValueError(f"Query date {query_date} precedes 2022-03-31.")
 
     # Setup output location
-    manager_dir = os.path.join(proj_dir, "derivatives/manager_reports")
+    manager_dir = os.path.join(proj_dir, "documents/manager_reports")
     if not os.path.exists(manager_dir):
         os.makedirs(manager_dir)
 
@@ -74,7 +70,7 @@ def make_nda_reports(nda_reports, final_demo, proj_dir):
     Desc.
     """
     # Setup output directories
-    report_dir = os.path.join(proj_dir, "derivatives/nda_upload/reports")
+    report_dir = os.path.join(proj_dir, "ndar_upload/reports")
     if not os.path.exists(report_dir):
         os.makedirs(report_dir)
 

@@ -5,12 +5,12 @@ Desc.
 Examples
 --------
 nda_upload \
-    -a $PAT_REDCAP_EMOREP \
+    -r $PAT_REDCAP_EMOREP \
     --manager-reports nih4 nih12 duke3 \
     --query-date 2022-06-29
 
 nda_upload \
-    -a $PAT_REDCAP_EMOREP \
+    -r $PAT_REDCAP_EMOREP \
     --nda-reports demo_info01
 """
 
@@ -58,10 +58,10 @@ def _get_args():
     parser.add_argument(
         "--proj-dir",
         type=str,
-        default="/mnt/keoki/experiments2/EmoRep/Emorep_BIDS",
+        default="/mnt/keoki/experiments2/EmoRep/Exp2_Compute_Emotion",
         help=textwrap.dedent(
             """\
-            Path to BIDS-formatted project directory
+            Path to project's experiment directory
             (default : %(default)s)
             """
         ),
@@ -81,14 +81,20 @@ def _get_args():
             """
         ),
     )
+    parser.add_argument(
+        "--qualtrics-token",
+        type=str,
+        default=None,
+        help="API token for Qualtrics project",
+    )
 
     required_args = parser.add_argument_group("Required Arguments")
     required_args.add_argument(
-        "-a",
-        "--api-redcap",
+        "-r",
+        "--redcap-token",
         type=str,
         required=True,
-        help="API Token for RedCap project",
+        help="API token for RedCap project",
     )
 
     if len(sys.argv) <= 1:
@@ -104,13 +110,18 @@ def main():
 
     args = _get_args().parse_args()
     proj_dir = args.proj_dir
-    api_token = args.api_redcap
+    redcap_token = args.redcap_token
+    qualtrics_token = args.qualtrics_token
     query_date = args.query_date
     manager_reports = args.manager_reports
     nda_reports = args.nda_reports
 
+    #
+    # survey_raw = os.path.join(proj_dir, "survey/rawdata")
+    # survey_clean = os.path.join(proj_dir, "survey/cleandata")
+
     # Get demographic info for consented subjs
-    info_demographic = pull_redcap.MakeDemographic(api_token)
+    info_demographic = pull_redcap.MakeDemographic(redcap_token)
 
     # Generate lab manager reports
     if manager_reports:

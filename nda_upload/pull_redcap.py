@@ -15,7 +15,7 @@ class MakeDemographic:
 
     Parameters
     ----------
-    api_token : str
+    redcap_token : str
         RedCap API token
 
     Attributes
@@ -39,7 +39,7 @@ class MakeDemographic:
 
     """
 
-    def __init__(self, api_token):
+    def __init__(self, redcap_token):
         """Get RedCap reports, combine.
 
         Uses report_keys.json from reference_files to match
@@ -49,7 +49,7 @@ class MakeDemographic:
 
         Parameters
         ----------
-        api_token : str
+        redcap_token : str
             RedCap API token
 
         Attributes
@@ -80,11 +80,11 @@ class MakeDemographic:
             report_keys = json.load(jf)
 
         # Get original & new consent dataframes
-        df_consent_orig = report_helper.pull_data(
-            api_token, report_keys["consent_orig"]
+        df_consent_orig = report_helper.pull_redcap_data(
+            redcap_token, report_keys["consent_orig"]
         )
-        df_consent_new = report_helper.pull_data(
-            api_token, report_keys["consent_new"]
+        df_consent_new = report_helper.pull_redcap_data(
+            redcap_token, report_keys["consent_new"]
         )
 
         # Update consent_new column names, merge
@@ -105,14 +105,16 @@ class MakeDemographic:
         ].tolist()
 
         # Get guid dataframe, index of consented
-        self.df_guid = report_helper.pull_data(api_token, report_keys["guid"])
+        self.df_guid = report_helper.pull_redcap_data(
+            redcap_token, report_keys["guid"]
+        )
         self.idx_guid = self.df_guid[
             self.df_guid["record_id"].isin(self.subj_consent)
         ].index.tolist()
 
         # Get demographic dataframe, index of consented
-        self.df_demo = report_helper.pull_data(
-            api_token, report_keys["demographics"]
+        self.df_demo = report_helper.pull_redcap_data(
+            redcap_token, report_keys["demographics"]
         )
         self.idx_demo = self.df_demo[
             self.df_demo["record_id"].isin(self.subj_consent)

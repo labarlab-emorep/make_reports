@@ -7,12 +7,14 @@ import importlib.resources as pkg_resources
 from nda_upload import reference_files
 
 
-def pull_data(api_token, report_id, content="report", return_format="csv"):
+def pull_redcap_data(
+    redcap_token, report_id, content="report", return_format="csv"
+):
     """Pull a RedCap report and make a pandas dataframe.
 
     Parameters
     ----------
-    api_token : str
+    redcap_token : str
         RedCap API token
     report_id : str, int
         RedCap Report ID
@@ -27,7 +29,7 @@ def pull_data(api_token, report_id, content="report", return_format="csv"):
 
     """
     data = {
-        "token": api_token,
+        "token": redcap_token,
         "content": content,
         "format": return_format,
         "report_id": report_id,
@@ -39,6 +41,14 @@ def pull_data(api_token, report_id, content="report", return_format="csv"):
     r = requests.post("https://redcap.duke.edu/redcap/api/", data)
     df = pd.read_csv(io.StringIO(r.text), low_memory=False, na_values=None)
     return df
+
+
+def pull_qualtrics_data():
+    """Title.
+
+    Desc.
+    """
+    pass
 
 
 def mine_template(template_file):
