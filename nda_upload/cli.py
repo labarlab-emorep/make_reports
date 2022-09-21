@@ -20,7 +20,7 @@ import sys
 import textwrap
 from datetime import date
 from argparse import ArgumentParser, RawTextHelpFormatter
-from nda_upload import pull_redcap, pull_qualtrics, workflow
+from nda_upload import pull_redcap, workflow
 
 
 # %%
@@ -108,6 +108,9 @@ def _get_args():
 def main():
     "Title."
 
+    # For testing
+    proj_dir = "/mnt/keoki/experiments2/EmoRep/Exp2_Compute_Emotion"
+
     args = _get_args().parse_args()
     proj_dir = args.proj_dir
     redcap_token = args.redcap_token
@@ -128,8 +131,8 @@ def main():
             manager_reports, info_demographic.final_demo, query_date, proj_dir
         )
 
-    # Get qualtrics reports
-    rep_qualtrics = pull_qualtrics.MakeQualtrics(qualtrics_token)
+    # Generate qualtrics reports
+    workflow.make_qualtrics_reports(survey_par, qualtrics_token)
 
     # Generate NDA reports
     if nda_reports:
