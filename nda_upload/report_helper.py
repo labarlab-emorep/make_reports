@@ -1,5 +1,6 @@
 """Report-agnostic methods."""
 # %%
+import sys
 import io
 import requests
 import csv
@@ -120,6 +121,108 @@ def pull_qualtrics_data(
         "GET", req_download_url, headers=headers, stream=True
     )
     req_file_zipped = io.BytesIO(req_download.content)
+    with zipfile.ZipFile(req_file_zipped) as req_file:
+        with req_file.open(f"{survey_name}.csv") as f:
+            df = pd.read_csv(f)
+
+    return df
+
+
+# %%
+def pull_qualtrics_data_new(
+    qualtrics_token, report_id, organization_id, datacenter_id, survey_name
+):
+    """Pull a Qualtrics report and make a pandas dataframe.
+
+    Parameters
+    ----------
+    qualtrics_token : str
+        Qualtrics API token
+    report_id : str
+        Qualtrics survey ID
+    organization_id : str
+        Qualtrics organization ID
+    datacenter_id : str
+        Qualtrics datacenter ID
+    survey_name : str
+        Qualtrics survey name
+
+    Returns
+    -------
+    pd.DataFrame
+
+    Raises
+    ------
+    TimeoutError
+        If response export progress takes too long
+
+    """
+
+    # Setting static parameters
+    requestCheckProgress = 0.0
+    progressStatus = "inProgress"
+    url = "https://{0}.qualtrics.com/API/v3/surveys/{1}/export-responses/".format(
+        datacenter_id, report_id
+    )
+    headers = {
+        "content-type": "application/json",
+        "x-api-token": qualtrics_token,
+    }
+
+    # Step 1: Creating Data Export
+    data = {"format": "csv", "seenUnansweredRecode": 999}
+    downloadRequestResponse = requests.request(
+        "POST", url, json=data, headers=headers
+    )
+    print(downloadRequestResponse.json())
+
+    try:
+        progressId = downloadRequestResponse.json()["result"]["progressId"]
+    except KeyError:
+        print(downloadRequestResponse.json())
+        sys.exit(2)
+
+    isFile = None
+
+    # Step 2: Checking on Data Export Progress and waiting until export is ready
+    while (
+        progressStatus != "complete"
+        and progressStatus != "failed"
+        and isFile is None
+    ):
+        if isFile is None:
+            print("file not ready")
+        else:
+            print("progressStatus=", progressStatus)
+
+        requestCheckUrl = url + progressId
+        requestCheckResponse = requests.request(
+            "GET", requestCheckUrl, headers=headers
+        )
+        try:
+            isFile = requestCheckResponse.json()["result"]["fileId"]
+        except KeyError:
+            1 == 1
+
+        print(requestCheckResponse.json())
+        requestCheckProgress = requestCheckResponse.json()["result"][
+            "percentComplete"
+        ]
+        print("Download is " + str(requestCheckProgress) + " complete")
+        progressStatus = requestCheckResponse.json()["result"]["status"]
+
+    # step 2.1: Check for error
+    if progressStatus == "failed":
+        raise Exception("export failed")
+    fileId = requestCheckResponse.json()["result"]["fileId"]
+
+    # Step 3: Downloading file
+    requestDownloadUrl = url + fileId + "/file"
+    requestDownload = requests.request(
+        "GET", requestDownloadUrl, headers=headers, stream=True
+    )
+
+    req_file_zipped = io.BytesIO(requestDownload.content)
     with zipfile.ZipFile(req_file_zipped) as req_file:
         with req_file.open(f"{survey_name}.csv") as f:
             df = pd.read_csv(f)

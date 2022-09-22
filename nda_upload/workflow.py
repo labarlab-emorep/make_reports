@@ -84,42 +84,19 @@ def make_qualtrics_reports(survey_par, qualtrics_token):
     ]:
         rep_qualtrics.write_raw_reports(visit)
 
-    # Clean reports
-    df_raw_visit1 = rep_qualtrics.df_raw_visit1
-    df_raw_visit1.rename({"RecipientLastName": "SubjID"}, axis=1, inplace=True)
-    col_names = df_raw_visit1.columns
+    # Clean data
+    rep_qualtrics.write_clean_reports("visit_day1")
 
-    visit1_surveys = ["ALS", "AIM", "ERQ", "PSWQ", "RRS", "STAI", "TAS"]
-    subj_cols = ["SubjID"]
-
-    # for sur_key in visit1_surveys:
-    sur_key = visit1_surveys[0]
-    sur_cols = [x for x in col_names if sur_key in x]
-    ext_cols = subj_cols + sur_cols
-    df_sub = df_raw_visit1[ext_cols]
-
-    # Clean header info
-    df_sub = df_sub.fillna("NaN")
-    df_clean = df_sub[df_sub["SubjID"].str.contains("ER")]
-    df_clean = df_clean.sort_values(by=["SubjID"])
-    out_df = os.path.join(
-        survey_par,
-        "visit_day1/data_clean",
-        f"df_{sur_key}.csv",
+    # Test - day2
+    df_raw_visit23 = rep_qualtrics.df_raw_visit23
+    day = "day2"
+    subj_col = ["SubID"]
+    df_raw_visit23.rename(
+        {"RecipientLastName": subj_col[0]}, axis=1, inplace=True
     )
-    df_clean.to_csv(out_df, index=False, na_rep="")
+    col_names = df_raw_visit23.columns
 
-    # Make item: question key
-    df_label = df_sub.head(1)
-    df_label = df_label.iloc[:, 1:]
-    out_dict = df_label.to_dict(orient="list")
-    out_json = os.path.join(
-        survey_par,
-        "visit_day1/data_clean",
-        f"item_key_{sur_key}.json",
-    )
-    with open(out_json, "w") as jf:
-        json.dump(out_dict, jf)
+    visit23_surveys = ["PANAS", "STAI_State"]
 
 
 def make_nda_reports(nda_reports, final_demo, proj_dir):

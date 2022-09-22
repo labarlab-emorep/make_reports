@@ -45,7 +45,7 @@ class MakeQualtrics:
         Desc.
         """
         report_id = self.report_keys_qualtrics[survey_name]
-        df = report_helper.pull_qualtrics_data(
+        df = report_helper.pull_qualtrics_data_new(
             self.qualtrics_token,
             report_id,
             self.report_keys_qualtrics["organization_ID"],
@@ -77,12 +77,65 @@ class MakeQualtrics:
         df_out = getattr(self, visit_dict[visit_name][0])
         df_out.to_csv(out_file, index=False, na_rep="")
 
-    def write_clean_reports(self):
+    def _clean_visit_day1(self, visit_name):
         """Title
 
         Desc.
         """
-        pass
+        # Setup and identify column names
+        print(f"Cleaning raw survey data : {self.name_visit1}")
+        subj_col = ["SubID"]
+        self.df_raw_visit1.rename(
+            {"RecipientLastName": subj_col[0]}, axis=1, inplace=True
+        )
+        col_names = self.df_raw_visit1.columns
+
+        # Subset dataframe by survey key
+        visit1_surveys = ["ALS", "AIM", "ERQ", "PSWQ", "RRS", "STAI", "TAS"]
+        for sur_key in visit1_surveys:
+            out_file = os.path.join(
+                self.survey_par, visit_name, "data_clean", f"df_{sur_key}.csv"
+            )
+            print(f"\tWriting clean survey data : {out_file}")
+            sur_cols = [x for x in col_names if sur_key in x]
+            ext_cols = subj_col + sur_cols
+            df_sub = self.df_raw_visit1[ext_cols]
+            df_sub = df_sub.fillna("NaN")
+
+            # Clean subset dataframe, writeout
+            df_clean = df_sub[df_sub[subj_col[0]].str.contains("ER")]
+            df_clean = df_clean.sort_values(by=[subj_col[0]])
+            df_clean.to_csv(out_file, index=False, na_rep="")
+            del df_sub, df_clean
+
+    def _clean_visit_day23(self, visit_name):
+        """Title
+
+        Desc.
+        """
+        day = f"day{visit_name[-1]}"
+
+        # Setup and identify column names
+        print(f"Cleaning raw survey data : {self.name_visit23}, {day}")
+        subj_col = ["SubID"]
+        self.df_raw_visit23.rename(
+            {"RecipientLastName": subj_col[0]}, axis=1, inplace=True
+        )
+        col_names = self.df_raw_visit23.columns
+
+        # Subset dataframe by survey key
+        visit23_surveys = ["PANAS", "STAI_State"]
+
+    def write_clean_reports(self, visit_name):
+        """Title
+
+        Desc.
+        """
+        if visit_name == "visit_day2" or visit_name == "visit_day3":
+            self._clean_visit_day23(visit_name)
+        else:
+            clean_method = getattr(self, f"_clean_{visit_name}")
+            clean_method(visit_name)
 
 
 # %%
