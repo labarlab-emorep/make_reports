@@ -67,6 +67,18 @@ def _get_args():
         ),
     )
     parser.add_argument(
+        "--pull-surveys",
+        action="store_true",
+        help=textwrap.dedent(
+            """\
+            Requres --qualtrics-token and --redcap-token.
+            Pull Qualtrics, RedCap surveys and write
+            raw and clean versions.
+            True if "--pull-surveys" else False.
+            """
+        ),
+    )
+    parser.add_argument(
         "--query-date",
         type=str,
         default=date.today().strftime("%Y-%m-%d"),
@@ -114,6 +126,7 @@ def main():
     args = _get_args().parse_args()
     proj_dir = args.proj_dir
     redcap_token = args.redcap_token
+    pull_surveys = args.pull_surveys
     qualtrics_token = args.qualtrics_token
     query_date = args.query_date
     manager_reports = args.manager_reports
@@ -122,23 +135,19 @@ def main():
     # Set paths
     survey_par = os.path.join(proj_dir, "data_survey")
 
-    # # Get demographic info for consented subjs
-    # info_demographic = pull_redcap.MakeDemographic(redcap_token)
-
     # Generate lab manager reports
     if manager_reports:
         workflow.make_manager_reports(
             manager_reports, query_date, proj_dir, redcap_token
         )
 
+    # if pull_surveys:
     # # Generate qualtrics reports
     # workflow.make_qualtrics_reports(survey_par, qualtrics_token)
 
-    # # Generate NDA reports
-    # if nda_reports:
-    #     workflow.make_nda_reports(
-    #         nda_reports, info_demographic.final_demo, proj_dir
-    #     )
+    # Generate NDA reports
+    if nda_reports:
+        workflow.make_nda_reports(nda_reports, proj_dir, redcap_token)
 
 
 if __name__ == "__main__":

@@ -69,13 +69,15 @@ def make_manager_reports(manager_reports, query_date, proj_dir, redcap_token):
 
 
 # %%
-def make_qualtrics_reports(survey_par, qualtrics_token):
+def make_survey_reports(survey_par, qualtrics_token, redcap_token):
     """Title.
 
     Desc.
     """
     # Get qualtrics reports
-    rep_qualtrics = pull_qualtrics.MakeQualtrics(qualtrics_token, survey_par)
+    qual_data = survey_download.GetQualtricsSurveys(
+        qualtrics_token, survey_par
+    )
 
     # Write raw data
     for visit in [
@@ -84,24 +86,24 @@ def make_qualtrics_reports(survey_par, qualtrics_token):
         "visit_day3",
         "post_scan_ratings",
     ]:
-        rep_qualtrics.write_raw_reports(visit)
+        qual_data.write_raw_reports(visit)
 
     # Clean data
-    rep_qualtrics.write_clean_reports("visit_day1")
+    qual_data.write_clean_reports("visit_day1")
 
-    # Test - day2
-    df_raw_visit23 = rep_qualtrics.df_raw_visit23
-    day = "day2"
-    subj_col = ["SubID"]
-    df_raw_visit23.rename(
-        {"RecipientLastName": subj_col[0]}, axis=1, inplace=True
-    )
-    col_names = df_raw_visit23.columns
+    # # Test - day2
+    # df_raw_visit23 = qual_data.df_raw_visit23
+    # day = "day2"
+    # subj_col = ["SubID"]
+    # df_raw_visit23.rename(
+    #     {"RecipientLastName": subj_col[0]}, axis=1, inplace=True
+    # )
+    # col_names = df_raw_visit23.columns
 
-    visit23_surveys = ["PANAS", "STAI_State"]
+    # visit23_surveys = ["PANAS", "STAI_State"]
 
 
-def make_nda_reports(nda_reports, final_demo, proj_dir):
+def make_nda_reports(nda_reports, proj_dir, redcap_token):
     """Title.
 
     Desc.
@@ -113,7 +115,12 @@ def make_nda_reports(nda_reports, final_demo, proj_dir):
 
     # Set switch to find appropriate class: key = user-specified
     # argument, value = relevant class.
-    nda_switch = {"demo_info01": "nda_upload.reports.DemoInfo"}
+    nda_switch = {"demo_info01": "nda_upload.build_reports.NdarDemoInfo01"}
+
+    # Get RedCap demographic info
+    redcap_demo = survey_download.GetRedcapDemographic(redcap_token)
+
+    # Get Qualtrics surveys
 
     # Make requested reports
     for report in nda_reports:
@@ -130,7 +137,7 @@ def make_nda_reports(nda_reports, final_demo, proj_dir):
         rep_class = getattr(mod, h_class)
 
         # Make report, write out
-        rep_obj = rep_class(final_demo)
+        rep_obj = rep_class(redcap_demo.final_demo)
         out_file = os.path.join(report_dir, f"{report}_dataset.csv")
         print(f"\tWriting : {out_file}")
         rep_obj.df_report.to_csv(out_file, index=False, na_rep="")
