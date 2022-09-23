@@ -3,6 +3,7 @@
 import os
 import json
 from datetime import datetime
+import numpy as np
 from nda_upload import survey_download, build_reports
 
 
@@ -79,7 +80,7 @@ def make_survey_reports(survey_par, qualtrics_token, redcap_token):
         qualtrics_token, survey_par
     )
 
-    # Write raw data
+    # Make raw and clean dataframes
     for visit in [
         "visit_day1",
         "visit_day2",
@@ -87,20 +88,8 @@ def make_survey_reports(survey_par, qualtrics_token, redcap_token):
         "post_scan_ratings",
     ]:
         qual_data.write_raw_reports(visit)
-
-    # Clean data
-    qual_data.write_clean_reports("visit_day1")
-
-    # # Test - day2
-    # df_raw_visit23 = qual_data.df_raw_visit23
-    # day = "day2"
-    # subj_col = ["SubID"]
-    # df_raw_visit23.rename(
-    #     {"RecipientLastName": subj_col[0]}, axis=1, inplace=True
-    # )
-    # col_names = df_raw_visit23.columns
-
-    # visit23_surveys = ["PANAS", "STAI_State"]
+        if visit != "post_scan_ratings":
+            qual_data.write_clean_reports(visit)
 
 
 def make_nda_reports(nda_reports, proj_dir, redcap_token):

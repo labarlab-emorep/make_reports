@@ -546,8 +546,7 @@ class GetQualtricsSurveys:
             try:
                 is_file = request_check_response.json()["result"]["fileId"]
             except KeyError:
-                1 == 1
-                # True
+                pass
 
             print(request_check_response.json())
             request_check_progress = request_check_response.json()["result"][
@@ -572,7 +571,7 @@ class GetQualtricsSurveys:
         with zipfile.ZipFile(req_file_zipped) as req_file:
             with req_file.open(f"{survey_name}.csv") as f:
                 df = pd.read_csv(f)
-        print(f"\n\t Successfully downloaded : {survey_name}.csv")
+        print(f"\n\t Successfully downloaded : {survey_name}.csv\n")
         return df
 
     def write_raw_reports(self, visit_name):
@@ -606,9 +605,9 @@ class GetQualtricsSurveys:
         """
         # Setup and identify column names
         print(f"Cleaning raw survey data : {self.name_visit1}")
-        subj_col = ["SubID"]
+        subj_cols = ["SubID"]
         self.df_raw_visit1.rename(
-            {"RecipientLastName": subj_col[0]}, axis=1, inplace=True
+            {"RecipientLastName": subj_cols[0]}, axis=1, inplace=True
         )
         col_names = self.df_raw_visit1.columns
 
@@ -620,33 +619,52 @@ class GetQualtricsSurveys:
             )
             print(f"\tWriting clean survey data : {out_file}")
             sur_cols = [x for x in col_names if sur_key in x]
-            ext_cols = subj_col + sur_cols
+            ext_cols = subj_cols + sur_cols
             df_sub = self.df_raw_visit1[ext_cols]
             df_sub = df_sub.fillna("NaN")
 
             # Clean subset dataframe, writeout
-            df_clean = df_sub[df_sub[subj_col[0]].str.contains("ER")]
-            df_clean = df_clean.sort_values(by=[subj_col[0]])
-            df_clean.to_csv(out_file, index=False, na_rep="")
-            del df_sub, df_clean
+            df_sub = df_sub[df_sub[subj_cols[0]].str.contains("ER")]
+            df_sub = df_sub.sort_values(by=[subj_cols[0]])
+            df_sub.to_csv(out_file, index=False, na_rep="")
+            del df_sub
 
     def _clean_visit_day23(self, visit_name):
         """Title
 
         Desc.
         """
-        day = f"day{visit_name[-1]}"
+        day_str = visit_name.split("_")[1]
+        print(f"Cleaning raw survey data : {day_str}")
+        day_dict = {"day2": "1", "day3": "2"}
+        day_code = day_dict[day_str]
+        subj_cols = ["SubID", "Session_Num"]
+        df_raw_visit23 = self.df_raw_visit23
+        col_names = df_raw_visit23.columns
 
-        # Setup and identify column names
-        print(f"Cleaning raw survey data : {self.name_visit23}, {day}")
-        subj_col = ["SubID"]
-        self.df_raw_visit23.rename(
-            {"RecipientLastName": subj_col[0]}, axis=1, inplace=True
-        )
-        col_names = self.df_raw_visit23.columns
-
-        # Subset dataframe by survey key
         visit23_surveys = ["PANAS", "STAI_State"]
+        for sur_key in visit23_surveys:
+            out_file = os.path.join(
+                self.survey_par,
+                visit_name,
+                "data_clean",
+                f"df_{sur_key}.csv",
+            )
+            print(f"\tWriting clean survey data : {out_file}")
+            sur_cols = [x for x in col_names if sur_key in x]
+            ext_cols = subj_cols + sur_cols
+            df_sub = df_raw_visit23[ext_cols]
+            df_sub = df_sub.fillna("NaN")
+
+            df_sub = df_sub[df_sub[subj_cols[0]].str.contains("ER")]
+            df_sub[subj_cols[1]] = np.where(
+                df_sub[subj_cols[1]] == day_code, day_str, df_sub[subj_cols[1]]
+            )
+            df_sub = df_sub[df_sub[subj_cols[1]].str.contains(day_str)]
+            df_sub = df_sub.sort_values(by=[subj_cols[0]])
+            df_sub.to_csv(out_file, index=False, na_rep="")
+            del df_sub
+        del df_raw_visit23
 
     def write_clean_reports(self, visit_name):
         """Title
