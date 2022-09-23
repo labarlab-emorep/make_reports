@@ -170,6 +170,7 @@ def pull_qualtrics_data_new(
     }
 
     # Step 1: Creating Data Export
+    # TODO unanswered = empty
     data = {"format": "csv", "seenUnansweredRecode": 999}
     downloadRequestResponse = requests.request(
         "POST", url, json=data, headers=headers

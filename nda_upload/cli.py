@@ -20,7 +20,7 @@ import sys
 import textwrap
 from datetime import date
 from argparse import ArgumentParser, RawTextHelpFormatter
-from nda_upload import pull_redcap, workflow
+from nda_upload import workflow
 
 
 # %%
@@ -122,23 +122,23 @@ def main():
     # Set paths
     survey_par = os.path.join(proj_dir, "data_survey")
 
-    # Get demographic info for consented subjs
-    info_demographic = pull_redcap.MakeDemographic(redcap_token)
+    # # Get demographic info for consented subjs
+    # info_demographic = pull_redcap.MakeDemographic(redcap_token)
 
     # Generate lab manager reports
     if manager_reports:
         workflow.make_manager_reports(
-            manager_reports, info_demographic.final_demo, query_date, proj_dir
+            manager_reports, query_date, proj_dir, redcap_token
         )
 
-    # Generate qualtrics reports
-    workflow.make_qualtrics_reports(survey_par, qualtrics_token)
+    # # Generate qualtrics reports
+    # workflow.make_qualtrics_reports(survey_par, qualtrics_token)
 
-    # Generate NDA reports
-    if nda_reports:
-        workflow.make_nda_reports(
-            nda_reports, info_demographic.final_demo, proj_dir
-        )
+    # # Generate NDA reports
+    # if nda_reports:
+    #     workflow.make_nda_reports(
+    #         nda_reports, info_demographic.final_demo, proj_dir
+    #     )
 
 
 if __name__ == "__main__":

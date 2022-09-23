@@ -3,10 +3,10 @@
 import os
 import json
 from datetime import datetime
-from nda_upload import reports, pull_qualtrics
+from nda_upload import survey_download, build_reports
 
 
-def make_manager_reports(manager_reports, final_demo, query_date, proj_dir):
+def make_manager_reports(manager_reports, query_date, proj_dir, redcap_token):
     """Make reports for the lab manager.
 
     Coordinate the use of reports.MakeRegularReports to generate
@@ -18,9 +18,6 @@ def make_manager_reports(manager_reports, final_demo, query_date, proj_dir):
     manager_reports : list
         Desired reports
         e.g. nih4, nih12
-    final_demo : pd.DataFrame
-        Compiled demographic information, attribute of
-        by general_info.MakeDemographic
     query_date : str, datetime
         Date for finding report range
     proj_dir : path
@@ -51,9 +48,14 @@ def make_manager_reports(manager_reports, final_demo, query_date, proj_dir):
     if not os.path.exists(manager_dir):
         os.makedirs(manager_dir)
 
+    # Query RedCap demographic info
+    redcap_demo = survey_download.GetRedcapDemographic(redcap_token)
+
     # Generate reports
     for report in manager_reports:
-        mr = reports.RegularReports(query_date, final_demo, report)
+        mr = build_reports.ManagerRegular(
+            query_date, redcap_demo.final_demo, report
+        )
 
         # Setup file name, write csv
         start_date = mr.range_start.strftime("%Y-%m-%d")

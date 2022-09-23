@@ -1,11 +1,18 @@
-"""Make reports of various types."""
+"""Title.
+
+Desc.
+"""
+
 import pandas as pd
 import numpy as np
+import json
 from datetime import datetime
+import importlib.resources as pkg_resources
 from nda_upload import report_helper
+from nda_upload import reference_files
 
 
-class RegularReports:
+class ManagerRegular:
     """Make reports regularly submitted by lab manager.
 
     Query data from the appropriate period for the period, and
@@ -361,7 +368,23 @@ class RegularReports:
         self.df_report["Age Units"] = "Years"
 
 
-class DemoInfo:
+class NdarAffim01:
+    pass
+
+
+class NdarAls01:
+    pass
+
+
+class NdarBdi01:
+    pass
+
+
+class NdarBrd01:
+    pass
+
+
+class NdarDemoInfo01:
     """Title.
 
     Desc.
@@ -461,3 +484,47 @@ class DemoInfo:
         }
         for h_col, h_value in report_dict.items():
             self.df_report[h_col] = h_value
+
+
+class NdarEmoEndo01:
+    pass
+
+
+class NdarEmrq01:
+    pass
+
+
+class NdarImage03:
+    pass
+
+
+class NdarInclExcl01:
+    pass
+
+
+class NdarSubject01:
+    pass
+
+
+class NdarPanas01:
+    pass
+
+
+class NdarPhysioRec01:
+    pass
+
+
+class NdarPswq01:
+    pass
+
+
+class NdarRrs01:
+    pass
+
+
+class NdarStai01:
+    pass
+
+
+class NdarTas01:
+    pass
