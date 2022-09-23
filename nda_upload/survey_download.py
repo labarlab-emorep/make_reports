@@ -2,7 +2,7 @@
 
 Desc.
 """
-
+# %%
 import os
 import sys
 import json
@@ -17,8 +17,68 @@ from nda_upload import report_helper
 from nda_upload import reference_files
 
 
+# %%
 class GetRedcapSurveys:
-    pass
+    """Title.
+
+    Desc.
+
+    """
+
+    def __init__(self, redcap_token):
+        """Title.
+
+        Desc.
+        """
+        # Communicate
+        print("Pulling RedCap surveys ...")
+
+        # Get BDI dataframes
+        self.df_raw_bdi2 = report_helper.pull_redcap_data(
+            redcap_token, self.report_keys_redcap["bdi_day2"]
+        )
+        self.df_raw_bdi3 = report_helper.pull_redcap_data(
+            redcap_token, self.report_keys_redcap["bdi_day3"]
+        )
+
+    @property
+    def report_keys_redcap(self):
+        with pkg_resources.open_text(
+            reference_files, "report_keys_redcap.json"
+        ) as jf:
+            return json.load(jf)
+
+    def make_raw_reports(self, visit_name):
+        """Title
+
+        Desc.
+        """
+        visit_dict = {
+            "visit_day2": "df_raw_bdi2",
+            "visit_day3": "df_raw_bdi3",
+        }
+        return getattr(self, visit_dict[visit_name])
+
+    def make_clean_reports(self, visit_name, subj_consent):
+        """Title
+
+        Desc.
+        """
+        visit_dict = {
+            "visit_day2": "df_raw_bdi2",
+            "visit_day3": "df_raw_bdi3",
+        }
+        df_raw = getattr(self, visit_dict[visit_name])
+        idx_consent = df_raw[
+            df_raw["record_id"].isin(subj_consent)
+        ].index.tolist()
+        df_raw = df_raw.loc[idx_consent]
+        df_raw = df_raw.drop("record_id", axis=1)
+        col_names = df_raw.columns.tolist()
+        col_reorder = col_names[-1:] + col_names[-2:-1] + col_names[:-2]
+        df_raw = df_raw[col_reorder]
+        df_raw = df_raw[df_raw["study_id"].notna()]
+        self.df_clean_bdi = df_raw
 
 
 class GetRedcapDemographic:
@@ -433,44 +493,53 @@ class GetQualtricsSurveys:
     Desc.
     """
 
-    def __init__(self, qualtrics_token, survey_par):
+    # Set class-level attributes for projects
+    name_visit1 = "EmoRep_Session_1"
+    name_visit23 = "Session 2 & 3 Survey"
+    name_post = "FINAL - EmoRep Stimulus Ratings - fMRI Study"
+
+    def __init__(self, qualtrics_token):
         """Title.
 
         Desc.
         """
         self.qualtrics_token = qualtrics_token
-        self.survey_par = survey_par
 
-        # Load report keys
-        with pkg_resources.open_text(
-            reference_files, "report_keys_qualtrics.json"
-        ) as jf:
-            self.report_keys_qualtrics = json.load(jf)
-
-        # Specify survey names
-        self.name_visit1 = "EmoRep_Session_1"
-        self.name_visit23 = "Session 2 & 3 Survey"
-        self.name_post = "FINAL - EmoRep Stimulus Ratings - fMRI Study"
+        # Specify visit survey keys
+        self.surveys_visit1 = [
+            "ALS",
+            "AIM",
+            "ERQ",
+            "PSWQ",
+            "RRS",
+            "STAI",
+            "TAS",
+        ]
+        self.surveys_visit23 = ["PANAS", "STAI_State"]
 
         # Get visit dataframes
         self.df_raw_visit1 = self._pull_qualtrics_data(self.name_visit1)
         self.df_raw_visit23 = self._pull_qualtrics_data(self.name_visit23)
         self.df_raw_post = self._pull_qualtrics_data(self.name_post)
 
-    # def _pull_df(self, survey_name):
-    #     """Title
+    @property
+    def name_visit1(self):
+        return "EmoRep_Session_1"
 
-    #     Desc.
-    #     """
-    #     report_id = self.report_keys_qualtrics[survey_name]
-    #     df = report_helper.pull_qualtrics_data_new(
-    #         self.qualtrics_token,
-    #         report_id,
-    #         self.report_keys_qualtrics["organization_ID"],
-    #         self.report_keys_qualtrics["datacenter_ID"],
-    #         survey_name,
-    #     )
-    #     return df
+    @property
+    def name_visit23(self):
+        return "Session 2 & 3 Survey"
+
+    @property
+    def name_post(self):
+        return "FINAL - EmoRep Stimulus Ratings - fMRI Study"
+
+    @property
+    def report_keys_qualtrics(self):
+        with pkg_resources.open_text(
+            reference_files, "report_keys_qualtrics.json"
+        ) as jf:
+            return json.load(jf)
 
     def _pull_qualtrics_data(
         self,
@@ -574,7 +643,7 @@ class GetQualtricsSurveys:
         print(f"\n\t Successfully downloaded : {survey_name}.csv\n")
         return df
 
-    def write_raw_reports(self, visit_name):
+    def make_raw_reports(self, visit_name):
         """Title
 
         Desc.
@@ -585,20 +654,11 @@ class GetQualtricsSurveys:
             "visit_day3": ["df_raw_visit23", "name_visit23"],
             "post_scan_ratings": ["df_raw_post", "name_post"],
         }
-        report_name = getattr(self, visit_dict[visit_name][1])
+        survey_name = getattr(self, visit_dict[visit_name][1])
         df_out = getattr(self, visit_dict[visit_name][0])
+        return (survey_name, df_out)
 
-        # today_date = date.today().strftime("%Y-%m-%d")
-        out_file = os.path.join(
-            self.survey_par,
-            visit_name,
-            "data_raw",
-            f"{report_name}_latest.csv",
-        )
-        print(f"Writing raw survey data : \n\t{out_file}")
-        df_out.to_csv(out_file, index=False, na_rep="")
-
-    def _clean_visit_day1(self, visit_name):
+    def _clean_visit_day1(self):
         """Title
 
         Desc.
@@ -612,12 +672,9 @@ class GetQualtricsSurveys:
         col_names = self.df_raw_visit1.columns
 
         # Subset dataframe by survey key
-        visit1_surveys = ["ALS", "AIM", "ERQ", "PSWQ", "RRS", "STAI", "TAS"]
-        for sur_key in visit1_surveys:
-            out_file = os.path.join(
-                self.survey_par, visit_name, "data_clean", f"df_{sur_key}.csv"
-            )
-            print(f"\tWriting clean survey data : {out_file}")
+        data_clean = {}
+        for sur_key in self.surveys_visit1:
+            print(f"\tCleaning survey data : day1, {sur_key}")
             sur_cols = [x for x in col_names if sur_key in x]
             ext_cols = subj_cols + sur_cols
             df_sub = self.df_raw_visit1[ext_cols]
@@ -626,10 +683,11 @@ class GetQualtricsSurveys:
             # Clean subset dataframe, writeout
             df_sub = df_sub[df_sub[subj_cols[0]].str.contains("ER")]
             df_sub = df_sub.sort_values(by=[subj_cols[0]])
-            df_sub.to_csv(out_file, index=False, na_rep="")
+            data_clean[sur_key] = df_sub
             del df_sub
+        self.clean_visit = data_clean
 
-    def _clean_visit_day23(self, visit_name):
+    def _clean_visit_day23(self, visit_name, survey_list=None):
         """Title
 
         Desc.
@@ -642,15 +700,9 @@ class GetQualtricsSurveys:
         df_raw_visit23 = self.df_raw_visit23
         col_names = df_raw_visit23.columns
 
-        visit23_surveys = ["PANAS", "STAI_State"]
-        for sur_key in visit23_surveys:
-            out_file = os.path.join(
-                self.survey_par,
-                visit_name,
-                "data_clean",
-                f"df_{sur_key}.csv",
-            )
-            print(f"\tWriting clean survey data : {out_file}")
+        data_clean = {}
+        for sur_key in self.surveys_visit23:
+            print(f"\tCleaning survey data : {day_str}, {sur_key}")
             sur_cols = [x for x in col_names if sur_key in x]
             ext_cols = subj_cols + sur_cols
             df_sub = df_raw_visit23[ext_cols]
@@ -662,11 +714,19 @@ class GetQualtricsSurveys:
             )
             df_sub = df_sub[df_sub[subj_cols[1]].str.contains(day_str)]
             df_sub = df_sub.sort_values(by=[subj_cols[0]])
-            df_sub.to_csv(out_file, index=False, na_rep="")
+            data_clean[sur_key] = df_sub
             del df_sub
         del df_raw_visit23
+        self.clean_visit = data_clean
 
-    def write_clean_reports(self, visit_name):
+    def _clean_post_scan_ratings(self):
+        """Title
+
+        Desc.
+        """
+        pass
+
+    def make_clean_reports(self, visit_name):
         """Title
 
         Desc.
@@ -675,4 +735,4 @@ class GetQualtricsSurveys:
             self._clean_visit_day23(visit_name)
         else:
             clean_method = getattr(self, f"_clean_{visit_name}")
-            clean_method(visit_name)
+            clean_method()

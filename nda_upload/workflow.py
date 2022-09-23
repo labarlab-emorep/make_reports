@@ -75,21 +75,50 @@ def make_survey_reports(survey_par, qualtrics_token, redcap_token):
 
     Desc.
     """
-    # Get qualtrics reports
-    qual_data = survey_download.GetQualtricsSurveys(
-        qualtrics_token, survey_par
-    )
-
-    # Make raw and clean dataframes
+    # Make raw and clean dataframes from qualtrics surveys
+    qual_data = survey_download.GetQualtricsSurveys(qualtrics_token)
     for visit in [
         "visit_day1",
         "visit_day2",
         "visit_day3",
         "post_scan_ratings",
     ]:
-        qual_data.write_raw_reports(visit)
-        if visit != "post_scan_ratings":
-            qual_data.write_clean_reports(visit)
+        # Write raw dataframes
+        survey_name, df_raw = qual_data.make_raw_reports(visit)
+        out_raw = os.path.join(
+            survey_par, visit, "data_raw", f"{survey_name}_latest.csv"
+        )
+        print(f"Writing raw {visit} survey data : \n\t{out_raw}")
+        df_raw.to_csv(out_raw, index=False, na_rep="")
+
+        # Write cleaned dataframes
+        print(f"Making clean day for visit : {visit}")
+        if visit == "post_scan_ratings":
+            continue
+        qual_data.make_clean_reports(visit)
+        for sur_name, sur_df in qual_data.clean_visit.items():
+            out_clean = os.path.join(
+                survey_par, visit, "data_clean", f"df_{sur_name}.csv"
+            )
+            print(f"\tWriting clean survey data : \n\t{out_clean}")
+            sur_df.to_csv(out_clean, index=False, na_rep="")
+
+    # Make raw and clean dataframes from redcap
+    redcap_demo = survey_download.GetRedcapDemographic(redcap_token)
+    redcap_data = survey_download.GetRedcapSurveys(redcap_token)
+    for visit in ["visit_day2", "visit_day3"]:
+
+        # Write raw dataframes
+        df_bdi_raw = redcap_data.make_raw_reports(visit)
+        out_raw = os.path.join(survey_par, visit, "data_raw/df_BDI_latest.csv")
+        print(f"Writing raw {visit} BDI data : \n\t {out_raw}")
+        df_bdi_raw.to_csv(out_raw, index=False, na_rep="")
+
+        # Write cleaned dataframes
+        redcap_data.make_clean_reports(visit, redcap_demo.subj_consent)
+        out_clean = os.path.join(survey_par, visit, "data_clean/df_BDI.csv")
+        print(f"Writing clean {visit} BDI data : \n\t {out_clean}")
+        redcap_data.df_clean_bdi.to_csv(out_clean, index=False, na_rep="")
 
 
 def make_nda_reports(nda_reports, proj_dir, redcap_token):

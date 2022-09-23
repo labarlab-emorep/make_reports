@@ -71,7 +71,7 @@ def _get_args():
         action="store_true",
         help=textwrap.dedent(
             """\
-            Requres --qualtrics-token and --redcap-token.
+            Requires --qualtrics-token and --redcap-token.
             Pull Qualtrics, RedCap surveys and write
             raw and clean versions.
             True if "--pull-surveys" else False.
@@ -141,9 +141,9 @@ def main():
             manager_reports, query_date, proj_dir, redcap_token
         )
 
-    # if pull_surveys:
-    # # Generate qualtrics reports
-    # workflow.make_qualtrics_reports(survey_par, qualtrics_token)
+    # Get survey data, make raw and cleaned dataframes
+    if pull_surveys:
+        workflow.make_survey_reports(survey_par, qualtrics_token, redcap_token)
 
     # Generate NDA reports
     if nda_reports:
