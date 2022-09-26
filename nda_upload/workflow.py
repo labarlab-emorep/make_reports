@@ -149,7 +149,11 @@ def make_nda_reports(nda_reports, proj_dir, qualtrics_token, redcap_token):
 
     # Set switch to find appropriate class: key = user-specified
     # argument, value = relevant class.
-    nda_switch = {"demo_info01": "nda_upload.build_reports.NdarDemoInfo01"}
+    mod_build = "nda_upload.build_reports"
+    nda_switch = {
+        "demo_info01": f"{mod_build}.NdarDemoInfo01",
+        "affim01": f"{mod_build}.NdarAffim01",
+    }
 
     # Validate nda_reports arguments
     for report in nda_reports:
@@ -168,16 +172,16 @@ def make_nda_reports(nda_reports, proj_dir, qualtrics_token, redcap_token):
     redcap_data = survey_download.GetRedcapSurveys(redcap_token)
     qualtrics_data = survey_download.GetQualtricsSurveys(qualtrics_token)
 
-    # Make clean dataframes from reports
-    for visit in [
-        "visit_day1",
-        "visit_day2",
-        "visit_day3",
-    ]:
-        qualtrics_data.make_clean_reports(visit)
-        if visit == "visit_day1":
-            continue
-        redcap_data.make_clean_reports(visit, redcap_demo.subj_consent)
+    # # Make clean dataframes from reports
+    # for visit in [
+    #     "visit_day1",
+    #     "visit_day2",
+    #     "visit_day3",
+    # ]:
+    #     qualtrics_data.make_clean_reports(visit)
+    #     if visit == "visit_day1":
+    #         continue
+    #     redcap_data.make_clean_reports(visit, redcap_demo.subj_consent)
 
     # Make requested reports
     for report in nda_reports:
@@ -188,7 +192,7 @@ def make_nda_reports(nda_reports, proj_dir, qualtrics_token, redcap_token):
         rep_class = getattr(mod, h_class)
 
         # Make report, write out
-        rep_obj = rep_class(redcap_demo.final_demo)
+        rep_obj = rep_class(qualtrics_data, redcap_data, redcap_demo)
         out_file = os.path.join(report_dir, f"{report}_dataset.csv")
         print(f"\tWriting : {out_file}")
         rep_obj.df_report.to_csv(out_file, index=False, na_rep="")

@@ -17,7 +17,8 @@ nda_upload \
 nda_upload \
     --redcap-token $PAT_REDCAP_EMOREP \
     --qualtrics-token $PAT_QUALTRICS_EMOREP \
-    --nda-reports demo_info01
+    --nda-reports demo_info01 affim01
+
 """
 
 # %%
@@ -56,7 +57,8 @@ def _get_args():
         nargs="+",
         help=textwrap.dedent(
             """\
-            [demo_info01], requires --redcap-token and --qualtrics-token.
+            [demo_info01 | affim01],
+            requires --redcap-token and --qualtrics-token.
 
             """
         ),
@@ -133,6 +135,7 @@ def main():
 
     # For testing
     proj_dir = "/mnt/keoki/experiments2/EmoRep/Exp2_Compute_Emotion"
+    nda_reports = ["demo_info01", "affim01"]
 
     args = _get_args().parse_args()
     manager_reports = args.manager_reports

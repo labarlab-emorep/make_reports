@@ -2,13 +2,14 @@
 
 Desc.
 """
-
+# %%
 import pandas as pd
 import numpy as np
 from datetime import datetime
 from nda_upload import report_helper
 
 
+# %%
 class ManagerRegular:
     """Make reports regularly submitted by lab manager.
 
@@ -366,7 +367,59 @@ class ManagerRegular:
 
 
 class NdarAffim01:
-    pass
+    """Title.
+
+    Desc.
+
+    Attributes
+    ----------
+    final_demo : pd.DataFrame
+        Compiled demographic information, attribute of
+        by general_info.MakeDemographic
+
+    """
+
+    def __init__(self, qualtrics_data, redcap_data, redcap_demo):
+        """Title.
+
+        Desc.
+        """
+        print("Buiding NDA report : affim01 ...")
+        # Read in template
+        self.nda_label, nda_cols = report_helper.mine_template(
+            "affim01_template.csv"
+        )
+
+        # Get survey data
+        qualtrics_data.surveys_visit1 = ["AIM"]
+        qualtrics_data.make_clean_reports("visit_day1")
+        df_aim = qualtrics_data.clean_visit["AIM"]
+        df_aim = df_aim.rename(columns={"SubID": "src_subject_id"})
+        df_aim.columns = df_aim.columns.str.lower()
+        self.df_aim = df_aim.replace("NaN", np.nan)
+
+        # get final demographics
+        final_demo = redcap_demo.final_demo
+        final_demo = final_demo.replace("NaN", np.nan)
+        self.final_demo = final_demo.dropna(subset=["subjectkey"])
+
+        self._make_aim()
+
+    def _make_aim(self):
+        """Title.
+
+        Desc.
+        """
+        # Get final_demo cols
+        df_final = self.final_demo.iloc[:, 0:4]
+
+        # Sum aim responses
+        aim_list = [x for x in self.df_aim.columns if "aim" in x]
+        self.df_aim[aim_list] = self.df_aim[aim_list].astype("Int64")
+        self.df_aim["aimtot"] = self.df_aim[aim_list].sum(axis=1)
+
+        # Merge final_demo with aim
+        self.df_report = pd.merge(df_final, self.df_aim, on="src_subject_id")
 
 
 class NdarAls01:
@@ -394,7 +447,7 @@ class NdarDemoInfo01:
 
     """
 
-    def __init__(self, final_demo):
+    def __init__(self, qualtrics_data, redcap_data, redcap_demo):
         """Title.
 
         Desc.
@@ -413,14 +466,14 @@ class NdarDemoInfo01:
 
         """
         print("Buiding NDA report : demo_info01 ...")
-        self.final_demo = final_demo
+        self.final_demo = redcap_demo.final_demo
         self.nda_label, nda_cols = report_helper.mine_template(
             "demo_info01_template.csv"
         )
         self.df_report = pd.DataFrame(columns=nda_cols)
-        self.make_demo()
+        self._make_demo()
 
-    def make_demo(self):
+    def _make_demo(self):
         """Title.
 
         Desc.
