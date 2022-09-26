@@ -1,8 +1,4 @@
-"""Title.
-
-Desc.
-"""
-# %%
+"""Download and clean survey data."""
 import sys
 import json
 import io
@@ -15,21 +11,51 @@ from nda_upload import report_helper
 from nda_upload import reference_files
 
 
-# %%
 class GetRedcapSurveys:
-    """Title.
+    """Download and clean RedCap surveys.
 
-    Desc.
+    Currently querries only the BDI reports from each scanning session.
+
+    Parameters
+    ----------
+    redcap_token : str
+        RedCap API token
+
+    Attributes
+    ----------
+    df_clean_bdi = pd.DataFrame
+        Cleaned BDI dataframe of specified visit/session
+    df_raw_bdi2 = pd.DataFrame
+        Raw BDI responses for session day2
+    df_raw_bdi3 = pd.DataFrame
+        Raw BDI responses for session day3
+    report_keys_redcap : dict
+        Survey name - key mappings
+
+    Notes
+    -----
+    Requires reference_files.report_keys_redcap.json
 
     """
 
     def __init__(self, redcap_token):
-        """Title.
+        """Download RedCap BDI survey data.
 
-        Desc.
+        Parameters
+        ----------
+        redcap_token : str
+            RedCap API token
+
+        Attributes
+        ----------
+        df_raw_bdi2 = pd.DataFrame
+            Raw BDI responses for session day2
+        df_raw_bdi3 = pd.DataFrame
+            Raw BDI responses for session day3
+
         """
         # Communicate
-        print("Pulling RedCap surveys ...")
+        print("\nPulling RedCap surveys ...")
 
         # Get BDI dataframes
         self.df_raw_bdi2 = report_helper.pull_redcap_data(
@@ -39,6 +65,7 @@ class GetRedcapSurveys:
             redcap_token, self.report_keys_redcap["bdi_day3"]
         )
 
+    # Make self.report_keys_redcap immutable
     @property
     def report_keys_redcap(self):
         with pkg_resources.open_text(
@@ -47,30 +74,70 @@ class GetRedcapSurveys:
             return json.load(jf)
 
     def make_raw_reports(self, visit_name):
-        """Title
+        """Find specified raw dataframe.
 
-        Desc.
+        Parameters
+        ----------
+        visit_name : str
+            Name of session visit, e.g. "visit_day1"
+
+        Returns
+        -------
+        pd.DataFrame
+            Raw BDI dataframe of visit/session
+
+        Raises
+        ------
+        ValueError
+            If visit_name is not key in visit_dict
+
         """
+        # Setup for finding raw dataframe
         visit_dict = {
             "visit_day2": "df_raw_bdi2",
             "visit_day3": "df_raw_bdi3",
         }
+        if visit_name not in visit_dict.keys():
+            raise ValueError(
+                f"Inappropriate visit_name specified : {visit_name}"
+            )
+
+        # Get, return requested dataframe
         return getattr(self, visit_dict[visit_name])
 
     def make_clean_reports(self, visit_name, subj_consent):
-        """Title
+        """Clean dataframes and organize.
 
-        Desc.
+        Dataframe reflects participants who have consented.
+
+        Parameters
+        ----------
+        visit_name : str
+            Name of session visit, e.g. "visit_day1"
+        subj_consent : list
+            List of participant IDs who have consented, see
+            survey_download.GetRedcapDemographic.subj_consent
+
+        Attributes
+        ----------
+        df_clean : pd.DataFrame
+            Final dataframe of consented BDI data
+
         """
+        # Get requested raw dataframe
         visit_dict = {
             "visit_day2": "df_raw_bdi2",
             "visit_day3": "df_raw_bdi3",
         }
         df_raw = getattr(self, visit_dict[visit_name])
+
+        # Keep data for consented participants
         idx_consent = df_raw[
             df_raw["record_id"].isin(subj_consent)
         ].index.tolist()
         df_raw = df_raw.loc[idx_consent]
+
+        # Reorganize columns and drop missing subject IDs
         df_raw = df_raw.drop("record_id", axis=1)
         col_names = df_raw.columns.tolist()
         col_reorder = col_names[-1:] + col_names[-2:-1] + col_names[:-2]
@@ -143,7 +210,7 @@ class GetRedcapDemographic:
 
         """
         # Communicate
-        print("Pulling RedCap demographic, guid, consent reports ...")
+        print("\nPulling RedCap demographic, guid, consent reports ...")
 
         # Load report keys
         with pkg_resources.open_text(
@@ -212,6 +279,7 @@ class GetRedcapDemographic:
         ------
         TypeError
             If dob value is not slash, dash, numeric, or in dob_switch
+
         """
         # Set switch for special cases
         dob_switch = {"October 6 2000": "2000-10-06"}
@@ -258,6 +326,7 @@ class GetRedcapDemographic:
         -------
         list
             Participant ages in months (int)
+
         """
         subj_age_mo = []
         for dob, doc in zip(subj_dob, subj_consent_date):
@@ -301,6 +370,7 @@ class GetRedcapDemographic:
         -------
         list
             Number of years completed of education (int)
+
         """
         # Convert education level to years
         educate_switch = {2: 12, 4: 14, 5: 16, 7: 18, 8: 20}
@@ -332,6 +402,7 @@ class GetRedcapDemographic:
         -------
         list
             Participant responses to race question
+
         """
         # Get race response - deal with "More than one" (6) and
         # "Other" (8) separately.
@@ -411,6 +482,7 @@ class GetRedcapDemographic:
         tuple
             [0] list of participants' ethnicity status
             [1] list of whether participants' are minority
+
         """
         # Get ethnicity
         h_ethnic = self.df_demo.loc[self.idx_demo, "ethnicity"].tolist()
@@ -439,6 +511,7 @@ class GetRedcapDemographic:
         ----------
         final_demo : pd.DataFrame
             Complete report containing demographic info for NDA submission
+
         """
         # TODO Something here for subjs who withdraw consent
 
@@ -486,20 +559,60 @@ class GetRedcapDemographic:
 
 
 class GetQualtricsSurveys:
-    """Title.
+    """Download and clean Qualtrics surveys.
 
-    Desc.
+    Download, organize, and clean Qualtrics surveys for each visit. Write
+    original (raw) session dataframes, and cleaned dataframes for each
+    individual survey.
+
+    Parameters
+    ----------
+    qualtrics_token : str
+        Qualtrics API token
+
+    Attributes
+    ----------
+    clean_visit : dict
+        Keys = name of survey
+        Values = survey dataframe
+    df_raw_visit1 : pd.DataFrame
+        Original dataframe for session/visit 1
+    df_raw_visit23 : pd.DataFrame
+        Original dataframe for sessions/visits 2 & 3
+    df_raw_post : pd.DataFrame
+        Original dataframe for post-scan
+    surveys_visit1 : list
+        Survey names for session/visit 1
+    surveys_visit23 : list
+        Survey names for sessions/visits 2 & 3
+    qualtrics_token : str
+        Qualtrics API token
+
     """
 
-    # Set class-level attributes for projects
-    name_visit1 = "EmoRep_Session_1"
-    name_visit23 = "Session 2 & 3 Survey"
-    name_post = "FINAL - EmoRep Stimulus Ratings - fMRI Study"
-
     def __init__(self, qualtrics_token):
-        """Title.
+        """Download Qualtrics surveys.
 
-        Desc.
+        Parameters
+        ----------
+        qualtrics_token : str
+            Qualtrics API token
+
+        Attributes
+        ----------
+        df_raw_visit1 : pd.DataFrame
+            Original dataframe for session/visit 1
+        df_raw_visit23 : pd.DataFrame
+            Original dataframe for sessions/visits 2 & 3
+        df_raw_post : pd.DataFrame
+            Original dataframe for post-scan
+        surveys_visit1 : list
+            Survey names for session/visit 1
+        surveys_visit23 : list
+            Survey names for sessions/visits 2 & 3
+        qualtrics_token : str
+            Qualtrics API token
+
         """
         self.qualtrics_token = qualtrics_token
 
@@ -520,6 +633,15 @@ class GetQualtricsSurveys:
         self.df_raw_visit23 = self._pull_qualtrics_data(self.name_visit23)
         self.df_raw_post = self._pull_qualtrics_data(self.name_post)
 
+        # Setup mapping to find attributes by visit name
+        self.visit_map = {
+            "visit_day1": ["df_raw_visit1", "name_visit1"],
+            "visit_day2": ["df_raw_visit23", "name_visit23"],
+            "visit_day3": ["df_raw_visit23", "name_visit23"],
+            "post_scan_ratings": ["df_raw_post", "name_post"],
+        }
+
+    # Make survey names, report keys immutable
     @property
     def name_visit1(self):
         return "EmoRep_Session_1"
@@ -570,21 +692,23 @@ class GetQualtricsSurveys:
         # Setting static parameters
         request_check_progress = 0.0
         progress_status = "inProgress"
-        url = f"https://{dc_id}.qualtrics.com/API/v3/surveys/{survey_id}/export-responses/"
+        url = (
+            f"https://{dc_id}.qualtrics.com/API/v3/surveys/{survey_id}"
+            + "/export-responses/"
+        )
         headers = {
             "content-type": "application/json",
             "x-api-token": self.qualtrics_token,
         }
 
-        # Creating Data Export
+        # Create data export
+        #   "useLabels": True
+        #   "seenUnansweredRecode": 999
         data = {"format": "csv"}
-        # "useLabels": True
-        # "seenUnansweredRecode": 999
         download_request_response = requests.request(
             "POST", url, json=data, headers=headers
         )
-        print(download_request_response.json())
-
+        # print(download_request_response.json())
         try:
             progressId = download_request_response.json()["result"][
                 "progressId"
@@ -593,19 +717,18 @@ class GetQualtricsSurveys:
             print(download_request_response.json())
             sys.exit(2)
 
-        # Checking on Data Export Progress and
-        # waiting until export is ready.
+        # Check on data export progress and wait until export is ready.
+        # TODO beautify print out
         is_file = None
         while (
             progress_status != "complete"
             and progress_status != "failed"
             and is_file is None
         ):
-            if is_file is None:
-                print("file not ready")
-            else:
-                print("progress_status=", progress_status)
+            if not is_file:
+                print(f"Progress status for {survey_name} : {progress_status}")
 
+            # Check progress
             request_check_url = url + progressId
             request_check_response = requests.request(
                 "GET", request_check_url, headers=headers
@@ -615,11 +738,12 @@ class GetQualtricsSurveys:
             except KeyError:
                 pass
 
-            print(request_check_response.json())
+            # Print out progress, update progress_status
+            # print(request_check_response.json())
             request_check_progress = request_check_response.json()["result"][
                 "percentComplete"
             ]
-            print("Download is " + str(request_check_progress) + " complete")
+            print(f"Download is {str(request_check_progress)} complete")
             progress_status = request_check_response.json()["result"]["status"]
 
         # Check for error
@@ -627,7 +751,7 @@ class GetQualtricsSurveys:
             raise Exception("export failed")
         file_id = request_check_response.json()["result"]["fileId"]
 
-        # Downloading file
+        # Download requested survey file
         request_download_url = url + file_id + "/file"
         request_download = requests.request(
             "GET", request_download_url, headers=headers, stream=True
@@ -642,27 +766,52 @@ class GetQualtricsSurveys:
         return df
 
     def make_raw_reports(self, visit_name):
-        """Title
+        """Access the requested raw dataframe.
 
-        Desc.
+        Parameters
+        ----------
+        visit_name : str
+            [visit_day1 | visit_day2 | visit_day3 | post_scan_ratings]
+            Session/day of visit corresponds to EmoRep data_survey
+            directory organization.
+
+        Returns
+        -------
+        tuple
+            [0] = name of master session survey
+            [1] = pd.DataFrame
+
+        Raises
+        ------
+        ValueError
+            If visit_name is not a key in visit_dict
+
         """
-        visit_dict = {
-            "visit_day1": ["df_raw_visit1", "name_visit1"],
-            "visit_day2": ["df_raw_visit23", "name_visit23"],
-            "visit_day3": ["df_raw_visit23", "name_visit23"],
-            "post_scan_ratings": ["df_raw_post", "name_post"],
-        }
+        # Setup switch for accessing appropriate attribute given visit_name.
+        if visit_name not in self.visit_map.keys():
+            raise ValueError(f"Inappropriate visit name : {visit_name}")
+
+        # Get appropriate survey name, dataframe
+        visit_dict = self.visit_map
         survey_name = getattr(self, visit_dict[visit_name][1])
         df_out = getattr(self, visit_dict[visit_name][0])
         return (survey_name, df_out)
 
     def _clean_visit_day1(self):
-        """Title
+        """Make clean dataframes of visit 1 surveys.
 
-        Desc.
+        Split master session dataframe into individual surveys, clean up
+        and setup dictionary of dataframes.
+
+        Attributes
+        ----------
+        clean_visit : dict
+            Keys = name of survey, from surveys_visit1 attribute
+            Values = survey dataframe
+
         """
         # Setup and identify column names
-        print(f"Cleaning raw survey data : {self.name_visit1}")
+        print(f"\nCleaning raw survey data : {self.name_visit1}")
         subj_cols = ["SubID"]
         self.df_raw_visit1.rename(
             {"RecipientLastName": subj_cols[0]}, axis=1, inplace=True
@@ -685,19 +834,45 @@ class GetQualtricsSurveys:
             del df_sub
         self.clean_visit = data_clean
 
-    def _clean_visit_day23(self, visit_name, survey_list=None):
-        """Title
+    def _clean_visit_day23(self, visit_name):
+        """Make clean dataframes of visits 2 & 3 surveys.
 
-        Desc.
+        Split master session dataframe into individual surveys, clean up
+        and setup dictionary of dataframes.
+
+        Parameters
+        ----------
+        visit_name : str
+            [visit_day2 | visit_day3]
+            Session/day of visit corresponds to EmoRep data_survey
+            directory organization.
+
+        Attributes
+        ----------
+        clean_visit : dict
+            Keys = name of survey, from surveys_visit23 attribute
+            Values = survey dataframe
+
+        Raises
+        ------
+        ValueError
+            If visit_name is not visit_day2 or visit_day3
+
         """
-        day_str = visit_name.split("_")[1]
-        print(f"Cleaning raw survey data : {day_str}")
+        # Identify session, how session is coded in raw data
         day_dict = {"day2": "1", "day3": "2"}
+        day_str = visit_name.split("_")[1]
+        if day_str not in day_dict.keys():
+            raise ValueError(f"Inapproproiate visit_name : {visit_name}")
+        print(f"Cleaning raw survey data : {day_str}")
         day_code = day_dict[day_str]
+
+        # Get dataframe and setup output column names
         subj_cols = ["SubID", "Session_Num"]
         df_raw_visit23 = self.df_raw_visit23
         col_names = df_raw_visit23.columns
 
+        # Get relevant info from dataframe
         data_clean = {}
         for sur_key in self.surveys_visit23:
             print(f"\tCleaning survey data : {day_str}, {sur_key}")
@@ -706,6 +881,7 @@ class GetQualtricsSurveys:
             df_sub = df_raw_visit23[ext_cols]
             df_sub = df_sub.fillna("NaN")
 
+            # Organize rows and columns, get visit-specific responses
             df_sub = df_sub[df_sub[subj_cols[0]].str.contains("ER")]
             df_sub[subj_cols[1]] = np.where(
                 df_sub[subj_cols[1]] == day_code, day_str, df_sub[subj_cols[1]]
@@ -717,18 +893,46 @@ class GetQualtricsSurveys:
         del df_raw_visit23
         self.clean_visit = data_clean
 
-    def _clean_post_scan_ratings(self):
+    def _clean_post_scan_ratings(self, visit_name):
         """Title
 
         Desc.
+
+        Parameters
+        ----------
+        visit_name : str
+            [post_scan_ratings]
+            Session/day of visit corresponds to EmoRep data_survey
+            directory organization.
+
+        Attributes
+        ----------
+        clean_visit : dict
+            Keys = name of survey
+            Values = survey dataframe
+
         """
         pass
 
     def make_clean_reports(self, visit_name):
-        """Title
+        """Clean survey data for visit.
 
-        Desc.
+        Identify and use appropriate cleaning method for visit name.
+        Private cleaning methods construct clean_data attribute.
+
+        Parameters
+        ----------
+        visit_name : str
+            [visit_day1 | visit_day2 | visit_day3 | post_scan_ratings]
+            Session/day of visit corresponds to EmoRep data_survey
+            directory organization.
+
         """
+        # Check visit name
+        if visit_name not in self.visit_map.keys():
+            raise ValueError(f"Inapproproiate visit_name : {visit_name}")
+
+        # Use appropriate cleaning method
         if visit_name == "visit_day2" or visit_name == "visit_day3":
             self._clean_visit_day23(visit_name)
         else:

@@ -1,30 +1,37 @@
 """Setup workflows for specific types of reports."""
-# %%
 import os
 from datetime import datetime
 from nda_upload import survey_download, build_reports
 
-# %%
+
 def make_manager_reports(manager_reports, query_date, proj_dir, redcap_token):
     """Make reports for the lab manager.
 
-    Coordinate the use of reports.MakeRegularReports to generate
+    Coordinate the use of build_reports.ManagerRegular to generate
     desired nih12, nih4, or duke3 report. Write dataframes to
     <proj_dir>/documents/manager_reports.
 
     Parameters
     ----------
     manager_reports : list
-        Desired reports
-        e.g. nih4, nih12
+        Desired report names e.g. ["nih4", "nih12"]
     query_date : str, datetime
         Date for finding report range
     proj_dir : path
         Project's experiment directory
+    redcap_token : str
+        RedCap API token
 
     Returns
     -------
     None
+
+    Raises
+    ------
+    ValueError
+        If redcap api token not supplied
+        If report requested is not found in valid_mr_args
+        If query_date occures before 2022-03-31
 
     """
     # Validate redcap token
@@ -74,10 +81,35 @@ def make_manager_reports(manager_reports, query_date, proj_dir, redcap_token):
         del mr
 
 
-def make_survey_reports(survey_par, qualtrics_token, redcap_token):
-    """Title.
+def make_survey_reports(proj_dir, qualtrics_token, redcap_token):
+    """Make raw and clean dataframes from RedCap, Qualtrics data.
 
-    Desc.
+    Download data from Qualtrics and RedCap, organize according to
+    visit/session type, and write both original (raw) and cleaned
+    dataframes.
+
+    Parameters
+    ----------
+    proj_dir : path
+        Project's experiment directory
+    qualtrics_token : str
+        Qualtrics API token
+    redcap_token : str
+        RedCap API token
+
+    Returns
+    -------
+    None
+
+    Raises
+    ------
+    ValueError
+        If both redcap and qualtrics api tokens are not provided
+
+    Notes
+    -----
+    EmoRep survey data file structure is hardcoded.
+
     """
     # Validate redcap and qualtrics tokens
     if not redcap_token and not qualtrics_token:
@@ -85,6 +117,9 @@ def make_survey_reports(survey_par, qualtrics_token, redcap_token):
             "RedCap and Qualtrics API token required for --pull-surveys."
             + " Please specify --redcap-token and --qualtrics-token."
         )
+
+    # Set output parent directory
+    survey_par = os.path.join(proj_dir, "data_survey")
 
     # Make raw and clean dataframes from qualtrics surveys
     qualtrics_data = survey_download.GetQualtricsSurveys(qualtrics_token)
@@ -99,7 +134,7 @@ def make_survey_reports(survey_par, qualtrics_token, redcap_token):
         out_raw = os.path.join(
             survey_par, visit, "data_raw", f"{survey_name}_latest.csv"
         )
-        print(f"Writing raw {visit} survey data : \n\t{out_raw}")
+        print(f"\nWriting raw {visit} survey data : \n\t{out_raw}")
         df_raw.to_csv(out_raw, index=False, na_rep="")
 
         # TODO clean post_scan_ratings
@@ -107,7 +142,7 @@ def make_survey_reports(survey_par, qualtrics_token, redcap_token):
             continue
 
         # Write cleaned dataframes
-        print(f"Making clean day for visit : {visit}")
+        print(f"\nMaking clean day for visit : {visit}")
         qualtrics_data.make_clean_reports(visit)
         for sur_name, sur_df in qualtrics_data.clean_visit.items():
             out_clean = os.path.join(
@@ -134,11 +169,33 @@ def make_survey_reports(survey_par, qualtrics_token, redcap_token):
         redcap_data.df_clean_bdi.to_csv(out_clean, index=False, na_rep="")
 
 
-# %%
 def make_nda_reports(nda_reports, proj_dir, qualtrics_token, redcap_token):
-    """Title.
+    """Make reports and organize data for NDAR upload.
 
-    Desc.
+    Generate requested NDAR reports and organize data (if required) for the
+    biannual upload.
+
+    Parameters
+    ----------
+    nda_reports : list
+        Names of desired NDA reports e.g. ["demo_info01", "affim01"]
+    proj_dir : path
+        Project's experiment directory
+    qualtrics_token : str
+        Qualtrics API token
+    redcap_token : str
+        RedCap API token
+
+    Returns
+    -------
+    None
+
+    Raises
+    ------
+    ValueError
+        If both redcap and qualtrics api tokens are not provided
+        If report name requested is not found in nda_switch
+
     """
     # Validate redcap and qualtrics tokens
     if not redcap_token and not qualtrics_token:
@@ -148,7 +205,7 @@ def make_nda_reports(nda_reports, proj_dir, qualtrics_token, redcap_token):
         )
 
     # Set switch to find appropriate class: key = user-specified
-    # argument, value = relevant class.
+    # report name, value = relevant class.
     mod_build = "nda_upload.build_reports"
     nda_switch = {
         "demo_info01": f"{mod_build}.NdarDemoInfo01",
@@ -167,21 +224,10 @@ def make_nda_reports(nda_reports, proj_dir, qualtrics_token, redcap_token):
     if not os.path.exists(report_dir):
         os.makedirs(report_dir)
 
-    # Get RedCap and qualtrics survey info
+    # Get redcap and qualtrics survey info
     redcap_demo = survey_download.GetRedcapDemographic(redcap_token)
     redcap_data = survey_download.GetRedcapSurveys(redcap_token)
     qualtrics_data = survey_download.GetQualtricsSurveys(qualtrics_token)
-
-    # # Make clean dataframes from reports
-    # for visit in [
-    #     "visit_day1",
-    #     "visit_day2",
-    #     "visit_day3",
-    # ]:
-    #     qualtrics_data.make_clean_reports(visit)
-    #     if visit == "visit_day1":
-    #         continue
-    #     redcap_data.make_clean_reports(visit, redcap_demo.subj_consent)
 
     # Make requested reports
     for report in nda_reports:
@@ -191,8 +237,15 @@ def make_nda_reports(nda_reports, proj_dir, qualtrics_token, redcap_token):
         mod = __import__(f"{h_pkg}.{h_mod}", fromlist=[h_class])
         rep_class = getattr(mod, h_class)
 
-        # Make report, write out
-        rep_obj = rep_class(qualtrics_data, redcap_data, redcap_demo)
+        # Supply appropriate dataset to report
+        if report == "demo_info01":
+            rep_obj = rep_class(redcap_demo)
+        elif report == "bdi01":
+            rep_obj = rep_class(redcap_data, redcap_demo)
+        else:
+            rep_obj = rep_class(qualtrics_data, redcap_demo)
+
+        # Write out report
         out_file = os.path.join(report_dir, f"{report}_dataset.csv")
         print(f"\tWriting : {out_file}")
         rep_obj.df_report.to_csv(out_file, index=False, na_rep="")

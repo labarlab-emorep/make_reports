@@ -1,15 +1,20 @@
-"""Title.
+"""Build requested reports.
 
-Desc.
+Each class has the attribute df_report which contains
+the class' output final report that complies to either
+the NDAR data dictionary guidelines (Ndar* classes) or
+the NIH/Duke guidelines (ManagerRegular).
+
+Ndar* classes also have the attribute nda_label that can
+be prepended to the dataframe, per NDARs double-header.
+
 """
-# %%
 import pandas as pd
 import numpy as np
 from datetime import datetime
 from nda_upload import report_helper
 
 
-# %%
 class ManagerRegular:
     """Make reports regularly submitted by lab manager.
 
@@ -29,21 +34,21 @@ class ManagerRegular:
 
     Attributes
     ----------
-    query_date : datetime
-        Date for finding report range
+    df_range : pd.DataFrame
+        Data found within the range_start, range_end period
+    df_report : pd.DataFrame
+        Relevant info and format for requested report
     final_demo : pd.DataFrame
         Compiled demographic information, attribute of
-        by general_info.MakeDemographic
-    report : str
-        Type of report e.g. nih4 or duke3
+        by survey_download.GetRedcapDemographic
+    query_date : datetime
+        Date for finding report range
     range_start : datetime
         Start of period for report
     range_end : datetime
         End of period for report
-    df_range : pd.DataFrame
-        Data found within the range_start, range_end period
-    df_report : pd.DataFrame
-        Relevant info, format for requested report
+    report : str
+        Type of report e.g. nih4 or duke3
 
     """
 
@@ -56,7 +61,7 @@ class ManagerRegular:
             Date for finding report range
         final_demo : pd.DataFrame
             Compiled demographic information, attribute of
-            by general_info.MakeDemographic
+            by nda_upload.general_info.MakeDemographic
         report : str
             Type of report e.g. nih4 or duke3
 
@@ -65,10 +70,15 @@ class ManagerRegular:
         query_date : datetime
             Date for finding report range
         final_demo : pd.DataFrame
-            Compiled demographic information, attribute of
-            by general_info.MakeDemographic
+            Compiled demographic information, from
+            general_info.MakeDemographic.final_demo
         report : str
             Type of report e.g. nih4 or duke3
+
+        Raises
+        ------
+        ValueError
+            If report is not found in valid_reports
 
         """
         print(f"Buiding manager report : {report} ...")
@@ -76,17 +86,17 @@ class ManagerRegular:
         self.final_demo = final_demo
 
         # Trigger appropriate method
-        if report == "nih4":
-            self.nih_4mo()
-        elif report == "nih12":
-            self.nih_12mo()
-        elif report == "duke3":
-            self.duke_3mo()
-        else:
-            raise ValueError("Incorrect report arguments specified.")
+        valid_reports = ["nih12", "nih4", "duke3"]
+        if report not in valid_reports:
+            raise ValueError(f"Inappropriate report requested : {report}")
+        report_method = getattr(self, f"make_{report}")
+        report_method()
 
     def _find_start_end(self, range_list):
         """Find the period start and end date.
+
+        Identfiy the start and end dates from range_list
+        given the query date.
 
         Parameters
         ----------
@@ -105,6 +115,7 @@ class ManagerRegular:
             When a range cannot be found for query_date
 
         """
+        # Search through start, end dates
         start_end = None
         for h_ranges in range_list:
             h_start = datetime.strptime(h_ranges[0], "%Y-%m-%d").date()
@@ -166,7 +177,7 @@ class ManagerRegular:
             )
         print(f"\tReport range : {self.range_start} - {self.range_end}")
 
-    def nih_4mo(self):
+    def make_nih4(self):
         """Create report submitted to NIH every 4 months.
 
         Count the total number of participants who identify
@@ -241,7 +252,7 @@ class ManagerRegular:
         }
         self.df_report = pd.DataFrame(report_dict)
 
-    def duke_3mo(self):
+    def make_duke3(self):
         """Create report submitted to Duke every 3 months.
 
         Determine the number of participants that belong to
@@ -319,7 +330,7 @@ class ManagerRegular:
             by=["Gender", "Ethnicity", "Race"]
         )
 
-    def nih_12mo(self):
+    def make_nih12(self):
         """Create report submitted to NIH every 12 months.
 
         Pull participant-level information those recruited
@@ -367,22 +378,44 @@ class ManagerRegular:
 
 
 class NdarAffim01:
-    """Title.
+    """Make affim01 report for NDAR submission.
 
-    Desc.
+    Pull subject demographic info from survey_download.GetRedcapDemographic
+    and survey data from survey_download.GetQualtricsSurveys.
 
     Attributes
     ----------
+    df_aim : pd.DataFrame
+        Cleaned AIM Qualtrics survey
+    df_report : pd.DataFrame
+        Report of AIM data that complies with NDAR data definitions
     final_demo : pd.DataFrame
-        Compiled demographic information, attribute of
-        by general_info.MakeDemographic
+        Compiled demographic information
+    nda_label : list
+        NDA report template column label
 
     """
 
-    def __init__(self, qualtrics_data, redcap_data, redcap_demo):
-        """Title.
+    def __init__(self, qualtrics_data, redcap_demo):
+        """Read in survey data and make report.
 
-        Desc.
+        Get cleaned AIM Qualtrics survey from visit_day1, and
+        finalized demographic information.
+
+        Parameters
+        ----------
+        qualtrics_data : nda_upload.survey_download.GetQualtricsSurveys
+        redcap_demo : nda_upload.survey_download.GetRedcapDemographic
+
+        Attributes
+        ----------
+        df_aim : pd.DataFrame
+            Cleaned AIM Qualtrics survey
+        final_demo : pd.DataFrame
+            Compiled demographic information
+        nda_label : list
+            NDA report template column label
+
         """
         print("Buiding NDA report : affim01 ...")
         # Read in template
@@ -398,17 +431,20 @@ class NdarAffim01:
         df_aim.columns = df_aim.columns.str.lower()
         self.df_aim = df_aim.replace("NaN", np.nan)
 
-        # get final demographics
+        # Get final demographics, make report
         final_demo = redcap_demo.final_demo
         final_demo = final_demo.replace("NaN", np.nan)
         self.final_demo = final_demo.dropna(subset=["subjectkey"])
-
         self._make_aim()
 
     def _make_aim(self):
-        """Title.
+        """Combine dataframes to generate requested report.
 
-        Desc.
+        Attributes
+        ----------
+        df_report : pd.DataFrame
+            Report of AIM data that complies with NDAR data definitions
+
         """
         # Get final_demo cols
         df_final = self.final_demo.iloc[:, 0:4]
@@ -435,34 +471,39 @@ class NdarBrd01:
 
 
 class NdarDemoInfo01:
-    """Title.
+    """Make demo_info01 report for NDAR submission.
 
-    Desc.
+    Use subject demographic info from survey_download.GetRedcapDemographic
+    to build report.
 
     Attributes
     ----------
+    df_report : pd.DataFrame
+        Report of demographic data that complies with NDAR data definitions
     final_demo : pd.DataFrame
-        Compiled demographic information, attribute of
-        by general_info.MakeDemographic
+        Compiled demographic information
+    nda_label : list
+        NDA report template column label
 
     """
 
-    def __init__(self, qualtrics_data, redcap_data, redcap_demo):
-        """Title.
+    def __init__(self, redcap_demo):
+        """Read in demographic info and make report.
 
-        Desc.
+        Get demographic info from redcap_demo, and extract required values.
 
         Parameters
         ----------
-        final_demo : pd.DataFrame
-            Compiled demographic information, attribute of
-            by general_info.MakeDemographic
+        redcap_demo : nda_upload.survey_download.GetRedcapDemographic
 
         Attributes
         ----------
+        df_report : pd.DataFrame
+            Report of demographic data that complies with NDAR data definitions
         final_demo : pd.DataFrame
-            Compiled demographic information, attribute of
-            by general_info.MakeDemographic
+            Compiled demographic information
+        nda_label : list
+            NDA report template column label
 
         """
         print("Buiding NDA report : demo_info01 ...")
@@ -474,9 +515,11 @@ class NdarDemoInfo01:
         self._make_demo()
 
     def _make_demo(self):
-        """Title.
+        """Extract relevant values and make report.
 
-        Desc.
+        Generate demo_info01 report that will comply with NDAR data
+        definition standards by mining data supplied in final_demo.
+
         """
         # Get subject key, src_id
         subj_key = self.final_demo["subjectkey"]

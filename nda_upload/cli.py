@@ -1,6 +1,23 @@
-r"""Title.
+r"""Make reports for EmoRep project.
 
-Desc.
+This package has three uses: (a) to make reports the lab manager submits
+on a regular basis, (b) download and clean survey data from RedCap and
+Qualtrics, and (c) generate reports for the NDAR submission.
+
+(a) is triggered by specifying --manager-reports and a date and will
+generate a report containing the relevenat information from the
+appropriate date range. Reports are written to
+    <proj-dir>/documents/manager_reports/report_<name>_<start>_<end>.csv
+
+(b) is triggered by --pull-surveys, and will make raw and clean
+dataframes. RedCap and Qualtrics dataframes will be written to
+    <proj-dir>/data_survey/<visit_type>/data_[clean|raw]
+where visit_type is visit_day[1|2|3] or post_scan_ratings
+
+(c) is triggered by --nda-reports or --nda-reports-all, and will make
+the requested NDAR report as well as organize data for uploads. Reports
+and written to <proj-dir>/nda_upload/reports and data will be organized
+in <proj-dir>/nda_upload/data.
 
 Examples
 --------
@@ -19,10 +36,13 @@ nda_upload \
     --qualtrics-token $PAT_QUALTRICS_EMOREP \
     --nda-reports demo_info01 affim01
 
+nda_upload \
+    --redcap-token $PAT_REDCAP_EMOREP \
+    --qualtrics-token $PAT_QUALTRICS_EMOREP \
+    --nda-reports-all
+
 """
 
-# %%
-import os
 import sys
 import textwrap
 from datetime import date
@@ -30,7 +50,6 @@ from argparse import ArgumentParser, RawTextHelpFormatter
 from nda_upload import workflow
 
 
-# %%
 def _get_args():
     """Get and parse arguments."""
     parser = ArgumentParser(
@@ -59,7 +78,19 @@ def _get_args():
             """\
             [demo_info01 | affim01],
             requires --redcap-token and --qualtrics-token.
-
+            Make specific NDA reports by name.
+            e.g. --nda-reports demo_info01 affim01
+            """
+        ),
+    )
+    parser.add_argument(
+        "--nda-reports-all",
+        action="store_true",
+        help=textwrap.dedent(
+            """\
+            Requires --redcap-token and --qualtrics-token.
+            Make all planned NDA reports.
+            True if "--nda-reports-all" else False.
             """
         ),
     )
@@ -113,15 +144,6 @@ def _get_args():
         help="API token for RedCap project",
     )
 
-    # required_args = parser.add_argument_group("Required Arguments")
-    # required_args.add_argument(
-    #     "-r",
-    #     "--redcap-token",
-    #     type=str,
-    #     required=True,
-    #     help="API token for RedCap project",
-    # )
-
     if len(sys.argv) <= 1:
         parser.print_help(sys.stderr)
         sys.exit(0)
@@ -129,25 +151,17 @@ def _get_args():
     return parser
 
 
-# %%
 def main():
-    "Title."
-
-    # For testing
-    proj_dir = "/mnt/keoki/experiments2/EmoRep/Exp2_Compute_Emotion"
-    nda_reports = ["demo_info01", "affim01"]
-
+    "Coordinate resources according to user input."
     args = _get_args().parse_args()
     manager_reports = args.manager_reports
     nda_reports = args.nda_reports
+    nda_reports_all = args.nda_reports_all
     proj_dir = args.proj_dir
     pull_surveys = args.pull_surveys
     qualtrics_token = args.qualtrics_token
     query_date = args.query_date
     redcap_token = args.redcap_token
-
-    # Set paths
-    survey_par = os.path.join(proj_dir, "data_survey")
 
     # Generate lab manager reports
     if manager_reports:
@@ -157,9 +171,11 @@ def main():
 
     # Get survey data, make raw and cleaned dataframes
     if pull_surveys:
-        workflow.make_survey_reports(survey_par, qualtrics_token, redcap_token)
+        workflow.make_survey_reports(proj_dir, qualtrics_token, redcap_token)
 
     # Generate NDA reports
+    if nda_reports_all:
+        nda_reports = ["demo_info01", "affim01"]
     if nda_reports:
         workflow.make_nda_reports(
             nda_reports, proj_dir, qualtrics_token, redcap_token

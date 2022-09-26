@@ -1,4 +1,4 @@
-"""Report-agnostic methods."""
+"""Report-agnostic supporting methods."""
 import io
 import requests
 import csv
