@@ -5,11 +5,8 @@ Desc.
 
 import pandas as pd
 import numpy as np
-import json
 from datetime import datetime
-import importlib.resources as pkg_resources
 from nda_upload import report_helper
-from nda_upload import reference_files
 
 
 class ManagerRegular:

@@ -1,10 +1,7 @@
 """Report-agnostic methods."""
-# %%
-import sys
 import io
 import requests
 import csv
-import zipfile
 import pandas as pd
 import importlib.resources as pkg_resources
 from nda_upload import reference_files
