@@ -1,7 +1,7 @@
 """Setup workflows for specific types of reports."""
 import os
 from datetime import datetime
-from nda_upload import survey_download, build_reports
+from make_reports import survey_download, build_reports
 
 
 def make_manager_reports(manager_reports, query_date, proj_dir, redcap_token):
@@ -206,7 +206,7 @@ def make_nda_reports(nda_reports, proj_dir, qualtrics_token, redcap_token):
 
     # Set switch to find appropriate class: key = user-specified
     # report name, value = relevant class.
-    mod_build = "nda_upload.build_reports"
+    mod_build = "make_reports.build_reports"
     nda_switch = {
         "demo_info01": f"{mod_build}.NdarDemoInfo01",
         "affim01": f"{mod_build}.NdarAffim01",

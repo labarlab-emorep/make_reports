@@ -7,8 +7,8 @@ import zipfile
 import pandas as pd
 import numpy as np
 import importlib.resources as pkg_resources
-from nda_upload import report_helper
-from nda_upload import reference_files
+from make_reports import report_helper
+from make_reports import reference_files
 
 
 class GetRedcapSurveys:
