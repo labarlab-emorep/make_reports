@@ -12,7 +12,7 @@ be prepended to the dataframe, per NDARs double-header.
 import pandas as pd
 import numpy as np
 from datetime import datetime
-from nda_upload import report_helper
+from make_reports import report_helper
 
 
 class ManagerRegular:
@@ -61,7 +61,7 @@ class ManagerRegular:
             Date for finding report range
         final_demo : pd.DataFrame
             Compiled demographic information, attribute of
-            by nda_upload.general_info.MakeDemographic
+            by make_reports.general_info.MakeDemographic
         report : str
             Type of report e.g. nih4 or duke3
 
@@ -404,8 +404,8 @@ class NdarAffim01:
 
         Parameters
         ----------
-        qualtrics_data : nda_upload.survey_download.GetQualtricsSurveys
-        redcap_demo : nda_upload.survey_download.GetRedcapDemographic
+        qualtrics_data : make_reports.survey_download.GetQualtricsSurveys
+        redcap_demo : make_reports.survey_download.GetRedcapDemographic
 
         Attributes
         ----------
@@ -494,7 +494,7 @@ class NdarDemoInfo01:
 
         Parameters
         ----------
-        redcap_demo : nda_upload.survey_download.GetRedcapDemographic
+        redcap_demo : make_reports.survey_download.GetRedcapDemographic
 
         Attributes
         ----------

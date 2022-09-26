@@ -16,27 +16,27 @@ where visit_type is visit_day[1|2|3] or post_scan_ratings
 
 (c) is triggered by --nda-reports or --nda-reports-all, and will make
 the requested NDAR report as well as organize data for uploads. Reports
-and written to <proj-dir>/nda_upload/reports and data will be organized
-in <proj-dir>/nda_upload/data.
+and written to <proj-dir>/make_reports/reports and data will be organized
+in <proj-dir>/make_reports/data.
 
 Examples
 --------
-nda_upload \
+make_reports \
     --redcap-token $PAT_REDCAP_EMOREP \
     --manager-reports nih4 nih12 duke3 \
     --query-date 2022-06-29
 
-nda_upload \
+make_reports \
     --redcap-token $PAT_REDCAP_EMOREP \
     --qualtrics-token $PAT_QUALTRICS_EMOREP \
     --pull-surveys
 
-nda_upload \
+make_reports \
     --redcap-token $PAT_REDCAP_EMOREP \
     --qualtrics-token $PAT_QUALTRICS_EMOREP \
     --nda-reports demo_info01 affim01
 
-nda_upload \
+make_reports \
     --redcap-token $PAT_REDCAP_EMOREP \
     --qualtrics-token $PAT_QUALTRICS_EMOREP \
     --nda-reports-all
@@ -47,7 +47,7 @@ import sys
 import textwrap
 from datetime import date
 from argparse import ArgumentParser, RawTextHelpFormatter
-from nda_upload import workflow
+from make_reports import workflow
 
 
 def _get_args():
