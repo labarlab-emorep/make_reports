@@ -251,23 +251,12 @@ class GetRedcapDemographic:
             self.df_guid["record_id"].isin(self.subj_consent)
         ].index.tolist()
 
-        # Get demographic dataframe, index of consented
-        self.df_demo = report_helper.pull_redcap_data(
-            redcap_token, report_keys_redcap["demographics"]
-        )
-        self.idx_demo = self.df_demo[
-            self.df_demo["record_id"].isin(self.subj_consent)
-        ].index.tolist()
-
-        # Purge subjects who do not have GUID
+        # Purge subjects who do not have GUID from idx, subj lists
         h_subj_guid = self.df_guid.loc[self.idx_guid, "guid"].tolist()
         idx_nan = np.where(pd.isnull(h_subj_guid))[0].tolist()
         if idx_nan:
             self.idx_guid = [
                 x for idx, x in enumerate(self.idx_guid) if idx not in idx_nan
-            ]
-            self.idx_demo = [
-                x for idx, x in enumerate(self.idx_demo) if idx not in idx_nan
             ]
             self.idx_consent = [
                 x
@@ -280,9 +269,17 @@ class GetRedcapDemographic:
                 if idx not in idx_nan
             ]
 
+        # Get demographic dataframe, index of consented
+        self.df_demo = report_helper.pull_redcap_data(
+            redcap_token, report_keys_redcap["demographics"]
+        )
+        self.idx_demo = self.df_demo[
+            self.df_demo["record_id"].isin(self.subj_consent)
+        ].index.tolist()
+
         # Run methods
         print("Compiling needed demographic info ...")
-        # self.make_complete()
+        self.make_complete()
 
     def _get_dob(self):
         """Get participants' date of birth.
@@ -534,8 +531,6 @@ class GetRedcapDemographic:
             Complete report containing demographic info for NDA submission
 
         """
-        # TODO Something here for subjs who withdraw consent
-
         # Get consent date - solve for multiple consent forms
         self.df_consent["datetime"] = pd.to_datetime(self.df_consent["date"])
         self.df_consent["datetime"] = self.df_consent["datetime"].dt.date
@@ -561,22 +556,6 @@ class GetRedcapDemographic:
         # Get race, ethnicity, minority status
         subj_race = self._get_race()
         subj_ethnic, subj_minor = self._get_ethnic_minority(subj_race)
-
-        # print(
-        #     f"""
-        #     "subjectkey": {len(subj_guid)},
-        #     "src_subject_id": {len(subj_study)},
-        #     "interview_date": {len(subj_consent_date)},
-        #     "interview_age": {len(subj_age_mo)},
-        #     "sex": {len(subj_sex)},
-        #     "age": {len(subj_age)},
-        #     "dob": {len(subj_dob)},
-        #     "ethnicity": {len(subj_ethnic)},
-        #     "race": {len(subj_race)},
-        #     "is_minority": {len(subj_minor)},
-        #     "years_education": {len(subj_educate)},
-        # """
-        # )
 
         # Write dataframe
         out_dict = {

@@ -19,6 +19,8 @@ the requested NDAR report as well as organize data for uploads. Reports
 and written to <proj-dir>/make_reports/reports and data will be organized
 in <proj-dir>/make_reports/data.
 
+Reports (a) and (c) are only constructed for those who have GUIDs.
+
 Examples
 --------
 make_reports \
