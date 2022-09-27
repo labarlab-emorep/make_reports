@@ -1,9 +1,11 @@
 """Setup workflows for specific types of reports."""
+# %%
 import os
 from datetime import datetime
 from make_reports import survey_download, build_reports
 
 
+# %%
 def make_manager_reports(manager_reports, query_date, proj_dir, redcap_token):
     """Make reports for the lab manager.
 

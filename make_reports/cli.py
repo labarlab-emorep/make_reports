@@ -19,6 +19,8 @@ the requested NDAR report as well as organize data for uploads. Reports
 and written to <proj-dir>/make_reports/reports and data will be organized
 in <proj-dir>/make_reports/data.
 
+Reports (a) and (c) are only constructed for those who have GUIDs.
+
 Examples
 --------
 make_reports \
@@ -42,7 +44,7 @@ make_reports \
     --nda-reports-all
 
 """
-
+# %%
 import sys
 import textwrap
 from datetime import date
@@ -151,6 +153,7 @@ def _get_args():
     return parser
 
 
+# %%
 def main():
     "Coordinate resources according to user input."
     args = _get_args().parse_args()

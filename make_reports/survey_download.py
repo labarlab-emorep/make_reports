@@ -251,6 +251,24 @@ class GetRedcapDemographic:
             self.df_guid["record_id"].isin(self.subj_consent)
         ].index.tolist()
 
+        # Purge subjects who do not have GUID from idx, subj lists
+        h_subj_guid = self.df_guid.loc[self.idx_guid, "guid"].tolist()
+        idx_nan = np.where(pd.isnull(h_subj_guid))[0].tolist()
+        if idx_nan:
+            self.idx_guid = [
+                x for idx, x in enumerate(self.idx_guid) if idx not in idx_nan
+            ]
+            self.idx_consent = [
+                x
+                for idx, x in enumerate(self.idx_consent)
+                if idx not in idx_nan
+            ]
+            self.subj_consent = [
+                x
+                for idx, x in enumerate(self.subj_consent)
+                if idx not in idx_nan
+            ]
+
         # Get demographic dataframe, index of consented
         self.df_demo = report_helper.pull_redcap_data(
             redcap_token, report_keys_redcap["demographics"]
@@ -513,8 +531,6 @@ class GetRedcapDemographic:
             Complete report containing demographic info for NDA submission
 
         """
-        # TODO Something here for subjs who withdraw consent
-
         # Get consent date - solve for multiple consent forms
         self.df_consent["datetime"] = pd.to_datetime(self.df_consent["date"])
         self.df_consent["datetime"] = self.df_consent["datetime"].dt.date
