@@ -42,7 +42,7 @@ make_reports \
     --nda-reports-all
 
 """
-
+# %%
 import sys
 import textwrap
 from datetime import date
@@ -151,6 +151,7 @@ def _get_args():
     return parser
 
 
+# %%
 def main():
     "Coordinate resources according to user input."
     args = _get_args().parse_args()

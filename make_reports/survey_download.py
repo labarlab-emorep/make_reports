@@ -259,9 +259,30 @@ class GetRedcapDemographic:
             self.df_demo["record_id"].isin(self.subj_consent)
         ].index.tolist()
 
+        # Purge subjects who do not have GUID
+        h_subj_guid = self.df_guid.loc[self.idx_guid, "guid"].tolist()
+        idx_nan = np.where(pd.isnull(h_subj_guid))[0].tolist()
+        if idx_nan:
+            self.idx_guid = [
+                x for idx, x in enumerate(self.idx_guid) if idx not in idx_nan
+            ]
+            self.idx_demo = [
+                x for idx, x in enumerate(self.idx_demo) if idx not in idx_nan
+            ]
+            self.idx_consent = [
+                x
+                for idx, x in enumerate(self.idx_consent)
+                if idx not in idx_nan
+            ]
+            self.subj_consent = [
+                x
+                for idx, x in enumerate(self.subj_consent)
+                if idx not in idx_nan
+            ]
+
         # Run methods
         print("Compiling needed demographic info ...")
-        self.make_complete()
+        # self.make_complete()
 
     def _get_dob(self):
         """Get participants' date of birth.
@@ -540,6 +561,22 @@ class GetRedcapDemographic:
         # Get race, ethnicity, minority status
         subj_race = self._get_race()
         subj_ethnic, subj_minor = self._get_ethnic_minority(subj_race)
+
+        # print(
+        #     f"""
+        #     "subjectkey": {len(subj_guid)},
+        #     "src_subject_id": {len(subj_study)},
+        #     "interview_date": {len(subj_consent_date)},
+        #     "interview_age": {len(subj_age_mo)},
+        #     "sex": {len(subj_sex)},
+        #     "age": {len(subj_age)},
+        #     "dob": {len(subj_dob)},
+        #     "ethnicity": {len(subj_ethnic)},
+        #     "race": {len(subj_race)},
+        #     "is_minority": {len(subj_minor)},
+        #     "years_education": {len(subj_educate)},
+        # """
+        # )
 
         # Write dataframe
         out_dict = {
