@@ -78,7 +78,7 @@ def _get_args():
         nargs="+",
         help=textwrap.dedent(
             """\
-            [demo_info01 | affim01],
+            [demo_info01 | affim01 | als01],
             requires --redcap-token and --qualtrics-token.
             Make specific NDA reports by name.
             e.g. --nda-reports demo_info01 affim01
@@ -178,7 +178,7 @@ def main():
 
     # Generate NDA reports
     if nda_reports_all:
-        nda_reports = ["demo_info01", "affim01"]
+        nda_reports = ["demo_info01", "affim01", "als01"]
     if nda_reports:
         workflow.make_nda_reports(
             nda_reports, proj_dir, qualtrics_token, redcap_token

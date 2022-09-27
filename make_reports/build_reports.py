@@ -9,6 +9,7 @@ Ndar* classes also have the attribute nda_label that can
 be prepended to the dataframe, per NDARs double-header.
 
 """
+# %%
 import pandas as pd
 import numpy as np
 from datetime import datetime
@@ -377,6 +378,7 @@ class ManagerRegular:
         self.df_report["Age Units"] = "Years"
 
 
+# %%
 class NdarAffim01:
     """Make affim01 report for NDAR submission.
 
@@ -447,7 +449,10 @@ class NdarAffim01:
 
         """
         # Get final_demo cols
-        df_final = self.final_demo.iloc[:, 0:4]
+        df_final = self.final_demo.iloc[:, 0:5]
+        df_final["sex"] = df_final["sex"].replace(
+            ["Male", "Female", "Neither"], ["M", "F", "O"]
+        )
 
         # Sum aim responses
         aim_list = [x for x in self.df_aim.columns if "aim" in x]
@@ -458,8 +463,117 @@ class NdarAffim01:
         self.df_report = pd.merge(df_final, self.df_aim, on="src_subject_id")
 
 
+# %%
 class NdarAls01:
-    pass
+    """Make als01 report for NDAR submission.
+
+    Pull subject demographic info from survey_download.GetRedcapDemographic
+    and survey data from survey_download.GetQualtricsSurveys.
+
+    Attributes
+    ----------
+
+    df_report
+    nda_label
+
+    """
+
+    def __init__(self, qualtrics_data, redcap_demo):
+        """Read in survey data and make report.
+
+        Get cleaned ALS Qualtrics survey from visit_day1, and
+        finalized demographic information.
+
+        Parameters
+        ----------
+        qualtrics_data : make_reports.survey_download.GetQualtricsSurveys
+        redcap_demo : make_reports.survey_download.GetRedcapDemographic
+
+        Attributes
+        ----------
+        df_als : pd.DataFrame
+            Cleaned ALS Qualtrics survey
+        final_demo : pd.DataFrame
+            Compiled demographic information
+        nda_label : list
+            NDA report template column label
+
+        """
+        print("Buiding NDA report : als01 ...")
+        # Read in template
+        self.nda_label, self.nda_cols = report_helper.mine_template(
+            "als01_template.csv"
+        )
+
+        # Get survey data
+        qualtrics_data.surveys_visit1 = ["ALS"]
+        qualtrics_data.make_clean_reports("visit_day1")
+        df_als = qualtrics_data.clean_visit["ALS"]
+        df_als = df_als.rename(columns={"SubID": "src_subject_id"})
+        self.df_als = df_als.replace("NaN", np.nan)
+
+        # Get final demographics, make report
+        final_demo = redcap_demo.final_demo
+        final_demo = final_demo.replace("NaN", np.nan)
+        self.final_demo = final_demo.dropna(subset=["subjectkey"])
+        self._make_als()
+
+    def _make_als(self):
+        """Title.
+
+        Desc.
+        """
+        # Remap response values and column names
+        resp_qual = ["1", "2", "3", "4"]
+        resp_ndar = [3, 2, 1, 0]
+        map_item = {
+            "ALS_1": "als5",
+            "ALS_2": "als8",
+            "ALS_3": "als12",
+            "ALS_4": "als14",
+            "ALS_5": "als16",
+            "ALS_6": "als17",
+            "ALS_7": "als20",
+            "ALS_8": "als21",
+            "ALS_9": "als23",
+            "ALS_10": "als25",
+            "ALS_11": "als33",
+            "ALS_12": "als34",
+            "ALS_13": "als36",
+            "ALS_14": "als41",
+            "ALS_15": "als42",
+            "ALS_16": "als43",
+            "ALS_17": "als45",
+            "ALS_18": "als46",
+        }
+        df_als = self.df_als.rename(columns=map_item)
+        als_cols = [x for x in df_als.columns if "als" in x]
+        df_als[als_cols] = df_als[als_cols].replace(resp_qual, resp_ndar)
+
+        # Calculate totals
+        df_als[als_cols] = df_als[als_cols].astype("Int64")
+        df_als["als_glob"] = df_als[als_cols].sum(axis=1)
+        df_als["als_sf_total"] = df_als[als_cols].sum(axis=1)
+
+        # Add pilot notes for certain subjects
+        pilot_list = ["ER0001", "ER0002", "ER0003", "ER0004", "ER0005"]
+        idx_pilot = df_als[
+            df_als["src_subject_id"].isin(pilot_list)
+        ].index.tolist()
+        df_als.loc[idx_pilot, "comments"] = "PILOT PARTICIPANT"
+
+        # Combine demographic and als dataframes
+        df_final = self.final_demo.iloc[:, 0:5]
+        df_final["sex"] = df_final["sex"].replace(
+            ["Male", "Female", "Neither"], ["M", "F", "O"]
+        )
+        df_final_als = pd.merge(df_final, df_als, on="src_subject_id")
+
+        # Build dataframe from nda columns, update with demo and als data
+        self.df_report = pd.DataFrame(
+            columns=self.nda_cols, index=df_final_als.index
+        )
+        self.df_report.update(df_final_als)
 
 
 class NdarBdi01:
