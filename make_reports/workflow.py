@@ -223,6 +223,7 @@ def make_nda_reports(
     nda_switch = {
         "demo_info01": f"{mod_build}.NdarDemoInfo01",
         "affim01": f"{mod_build}.NdarAffim01",
+        "als01": f"{mod_build}.NdarAls01",
     }
 
     # Validate nda_reports arguments
