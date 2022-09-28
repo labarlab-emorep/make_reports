@@ -31,7 +31,7 @@ make_reports \
 make_reports \
     --redcap-token $PAT_REDCAP_EMOREP \
     --qualtrics-token $PAT_QUALTRICS_EMOREP \
-    --pull-surveys
+    --pull-surveys --post-labels
 
 make_reports \
     --redcap-token $PAT_REDCAP_EMOREP \
@@ -93,6 +93,17 @@ def _get_args():
             Requires --redcap-token and --qualtrics-token.
             Make all planned NDA reports.
             True if "--nda-reports-all" else False.
+            """
+        ),
+    )
+    parser.add_argument(
+        "--post-labels",
+        action="store_true",
+        help=textwrap.dedent(
+            """\
+            Whether to use labels in pull request for
+            Qualtrics post_scan_ratings.
+            True if "--post-labels" else False.
             """
         ),
     )
@@ -160,6 +171,7 @@ def main():
     manager_reports = args.manager_reports
     nda_reports = args.nda_reports
     nda_reports_all = args.nda_reports_all
+    post_labels = args.post_labels
     proj_dir = args.proj_dir
     pull_surveys = args.pull_surveys
     qualtrics_token = args.qualtrics_token
@@ -174,14 +186,16 @@ def main():
 
     # Get survey data, make raw and cleaned dataframes
     if pull_surveys:
-        workflow.make_survey_reports(proj_dir, qualtrics_token, redcap_token)
+        workflow.make_survey_reports(
+            proj_dir, post_labels, qualtrics_token, redcap_token
+        )
 
     # Generate NDA reports
     if nda_reports_all:
         nda_reports = ["demo_info01", "affim01", "als01"]
     if nda_reports:
         workflow.make_nda_reports(
-            nda_reports, proj_dir, qualtrics_token, redcap_token
+            nda_reports, proj_dir, post_labels, qualtrics_token, redcap_token
         )
 
 
