@@ -41,7 +41,7 @@ class ManagerRegular:
         Relevant info and format for requested report
     final_demo : pd.DataFrame
         Compiled demographic information, attribute of
-        by survey_download.GetRedcapDemographic
+        by gather_surveys.GetRedcapDemographic
     query_date : datetime
         Date for finding report range
     range_start : datetime
@@ -382,8 +382,8 @@ class ManagerRegular:
 class NdarAffim01:
     """Make affim01 report for NDAR submission.
 
-    Pull subject demographic info from survey_download.GetRedcapDemographic
-    and survey data from survey_download.GetQualtricsSurveys.
+    Pull subject demographic info from gather_surveys.GetRedcapDemographic
+    and survey data from gather_surveys.GetQualtricsSurveys.
 
     Attributes
     ----------
@@ -406,8 +406,8 @@ class NdarAffim01:
 
         Parameters
         ----------
-        qualtrics_data : make_reports.survey_download.GetQualtricsSurveys
-        redcap_demo : make_reports.survey_download.GetRedcapDemographic
+        qualtrics_data : make_reports.gather_surveys.GetQualtricsSurveys
+        redcap_demo : make_reports.gather_surveys.GetRedcapDemographic
 
         Attributes
         ----------
@@ -472,8 +472,8 @@ class NdarAffim01:
 class NdarAls01:
     """Make als01 report for NDAR submission.
 
-    Pull subject demographic info from survey_download.GetRedcapDemographic
-    and survey data from survey_download.GetQualtricsSurveys.
+    Pull subject demographic info from gather_surveys.GetRedcapDemographic
+    and survey data from gather_surveys.GetQualtricsSurveys.
 
     Attributes
     ----------
@@ -491,8 +491,8 @@ class NdarAls01:
 
         Parameters
         ----------
-        qualtrics_data : make_reports.survey_download.GetQualtricsSurveys
-        redcap_demo : make_reports.survey_download.GetRedcapDemographic
+        qualtrics_data : make_reports.gather_surveys.GetQualtricsSurveys
+        redcap_demo : make_reports.gather_surveys.GetRedcapDemographic
 
         Attributes
         ----------
@@ -597,7 +597,7 @@ class NdarBrd01:
 class NdarDemoInfo01:
     """Make demo_info01 report for NDAR submission.
 
-    Use subject demographic info from survey_download.GetRedcapDemographic
+    Use subject demographic info from gather_surveys.GetRedcapDemographic
     to build report.
 
     Attributes
@@ -618,7 +618,7 @@ class NdarDemoInfo01:
 
         Parameters
         ----------
-        redcap_demo : make_reports.survey_download.GetRedcapDemographic
+        redcap_demo : make_reports.gather_surveys.GetRedcapDemographic
 
         Attributes
         ----------

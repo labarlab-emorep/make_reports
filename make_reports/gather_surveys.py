@@ -116,7 +116,7 @@ class GetRedcapSurveys:
             Name of session visit, e.g. "visit_day1"
         subj_consent : list
             List of participant IDs who have consented, see
-            survey_download.GetRedcapDemographic.subj_consent
+            gather_surveys.GetRedcapDemographic.subj_consent
 
         Attributes
         ----------
@@ -768,7 +768,7 @@ class GetQualtricsSurveys:
         if progress_status == "failed":
             raise Exception(
                 f"Export of {survey_name} failed, check "
-                + "survey_download.GetQualtricsSurveys._pull_qualtrics_data"
+                + "gather_surveys.GetQualtricsSurveys._pull_qualtrics_data"
             )
         file_id = request_check_response.json()["result"]["fileId"]
 

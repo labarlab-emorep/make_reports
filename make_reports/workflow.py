@@ -2,7 +2,7 @@
 # %%
 import os
 from datetime import datetime
-from make_reports import survey_download, build_reports
+from make_reports import gather_surveys, build_reports
 
 
 # %%
@@ -64,7 +64,7 @@ def make_manager_reports(manager_reports, query_date, proj_dir, redcap_token):
         os.makedirs(manager_dir)
 
     # Query RedCap demographic info
-    redcap_demo = survey_download.GetRedcapDemographic(redcap_token)
+    redcap_demo = gather_surveys.GetRedcapDemographic(redcap_token)
 
     # Generate reports
     for report in manager_reports:
@@ -126,7 +126,7 @@ def make_survey_reports(proj_dir, post_labels, qualtrics_token, redcap_token):
     survey_par = os.path.join(proj_dir, "data_survey")
 
     # Make raw and clean dataframes from qualtrics surveys
-    qualtrics_data = survey_download.GetQualtricsSurveys(
+    qualtrics_data = gather_surveys.GetQualtricsSurveys(
         qualtrics_token, post_labels
     )
     for visit in [
@@ -161,8 +161,8 @@ def make_survey_reports(proj_dir, post_labels, qualtrics_token, redcap_token):
             sur_df.to_csv(out_clean, index=False, na_rep="")
 
     # Make raw and clean dataframes from redcap
-    redcap_demo = survey_download.GetRedcapDemographic(redcap_token)
-    redcap_data = survey_download.GetRedcapSurveys(redcap_token)
+    redcap_demo = gather_surveys.GetRedcapDemographic(redcap_token)
+    redcap_data = gather_surveys.GetRedcapSurveys(redcap_token)
     for visit in ["visit_day2", "visit_day3"]:
 
         # Write raw dataframes
@@ -239,9 +239,9 @@ def make_nda_reports(
         os.makedirs(report_dir)
 
     # Get redcap and qualtrics survey info
-    redcap_demo = survey_download.GetRedcapDemographic(redcap_token)
-    redcap_data = survey_download.GetRedcapSurveys(redcap_token)
-    qualtrics_data = survey_download.GetQualtricsSurveys(
+    redcap_demo = gather_surveys.GetRedcapDemographic(redcap_token)
+    redcap_data = gather_surveys.GetRedcapSurveys(redcap_token)
+    qualtrics_data = gather_surveys.GetQualtricsSurveys(
         qualtrics_token, post_labels
     )
 
