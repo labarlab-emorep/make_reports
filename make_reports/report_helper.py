@@ -63,3 +63,54 @@ def mine_template(template_file):
         # label_nda = [row for idx, row in enumerate(reader) if idx == 0][0]
         # cols_nda = [row for idx, row in enumerate(reader) if idx == 1][0]
     return (row_info[0], row_info[1])
+
+
+def calc_age_mo(subj_dob, subj_dos):
+    """Calculate age in months.
+
+    Convert each participant's age at consent into
+    age in months. Account for partial years and months.
+
+    Parameters
+    ----------
+    subj_dob : list
+        Subjects' date-of-birth datetimes
+    subj_dos : list
+        Subjects' date-of-survey datetimes
+
+    Returns
+    -------
+    list
+        Participant ages in months (int)
+
+    """
+    subj_age_mo = []
+    for dob, dos in zip(subj_dob, subj_dos):
+
+        # Calculate years, months, and days
+        num_years = dos.year - dob.year
+        num_months = dos.month - dob.month
+        num_days = dos.day - dob.day
+
+        # Adjust for day-month wrap around
+        if num_days < 0:
+            num_days += 30
+
+        # Avoid including current partial month
+        if dos.day < dob.day:
+            num_months -= 1
+
+        # Adjust including current partial year
+        while num_months < 0:
+            num_months += 12
+            num_years -= 1
+
+        # Add month if participant is older than num_months
+        # plus 15 days.
+        if num_days >= 15:
+            num_months += 1
+
+        # Convert all to months, add to list
+        total_months = (12 * num_years) + num_months
+        subj_age_mo.append(total_months)
+    return subj_age_mo

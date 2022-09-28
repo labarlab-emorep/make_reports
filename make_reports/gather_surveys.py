@@ -113,14 +113,14 @@ class GetRedcapSurveys:
         Parameters
         ----------
         visit_name : str
-            Name of session visit, e.g. "visit_day1"
+            Name of session visit, [visit_day2 | visit_day3]
         subj_consent : list
             List of participant IDs who have consented, see
             gather_surveys.GetRedcapDemographic.subj_consent
 
         Attributes
         ----------
-        df_clean : pd.DataFrame
+        df_clean_bdi : pd.DataFrame
             Final dataframe of consented BDI data
 
         """
@@ -325,58 +325,6 @@ class GetRedcapDemographic:
                 )
         return subj_dob
 
-    def _get_age_mo(self, subj_dob, subj_consent_date):
-        """Calculate age in months.
-
-        Convert each participant's age at consent into
-        age in months. Use the John day method for dealing
-        with number of days, for consistency with previous
-        submissions.
-
-        Parameters
-        ----------
-        subj_dob : list
-            Subjects' date-of-birth datetimes
-        subj_consent_date : list
-            Subjects' date-of-consent datetimes
-
-        Returns
-        -------
-        list
-            Participant ages in months (int)
-
-        """
-        subj_age_mo = []
-        for dob, doc in zip(subj_dob, subj_consent_date):
-
-            # Calculate years, months, and days
-            num_years = doc.year - dob.year
-            num_months = doc.month - dob.month
-            num_days = doc.day - dob.day
-
-            # Adjust for day-month wrap around
-            if num_days < 0:
-                num_days += 30
-
-            # Avoid including current partial month
-            if doc.day < dob.day:
-                num_months -= 1
-
-            # Adjust including current partial year
-            while num_months < 0:
-                num_months += 12
-                num_years -= 1
-
-            # Add month if participant is older than num_months
-            # plus 15 days.
-            if num_days >= 15:
-                num_months += 1
-
-            # Convert all to months, add to list
-            total_months = (12 * num_years) + num_months
-            subj_age_mo.append(total_months)
-        return subj_age_mo
-
     def _get_educate(self):
         """Get participant education level.
 
@@ -550,7 +498,7 @@ class GetRedcapDemographic:
 
         # Get DOB, age in months, education
         subj_dob = self._get_dob()
-        subj_age_mo = self._get_age_mo(subj_dob, subj_consent_date)
+        subj_age_mo = report_helper.calc_age_mo(subj_dob, subj_consent_date)
         subj_educate = self._get_educate()
 
         # Get race, ethnicity, minority status
