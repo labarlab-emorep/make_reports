@@ -224,6 +224,7 @@ def make_nda_reports(
         "demo_info01": f"{mod_build}.NdarDemoInfo01",
         "affim01": f"{mod_build}.NdarAffim01",
         "als01": f"{mod_build}.NdarAls01",
+        "bdi01": f"{mod_build}.NdarBdi01",
     }
 
     # Validate nda_reports arguments
@@ -277,6 +278,3 @@ def make_nda_reports(
         os.remove(out_file)
         os.rename(dummy_file, out_file)
         del rep_obj
-
-
-# %%

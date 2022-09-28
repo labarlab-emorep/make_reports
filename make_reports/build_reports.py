@@ -477,9 +477,16 @@ class NdarAls01:
 
     Attributes
     ----------
-
-    df_report
-    nda_label
+    df_als : pd.DataFrame
+        Cleaned ALS Qualtrics survey
+    df_report : pd.DataFrame
+        Report of ALS data that complies with NDAR data definitions
+    final_demo : pd.DataFrame
+        Compiled demographic information
+    nda_cols : list
+        NDA report template column names
+    nda_label : list
+        NDA report template column label
 
     """
 
@@ -500,6 +507,8 @@ class NdarAls01:
             Cleaned ALS Qualtrics survey
         final_demo : pd.DataFrame
             Compiled demographic information
+        nda_cols : list
+            NDA report template column names
         nda_label : list
             NDA report template column label
 
@@ -527,9 +536,15 @@ class NdarAls01:
         self._make_als()
 
     def _make_als(self):
-        """Title.
+        """Make als01 report.
 
-        Desc.
+        Remap column names and response values, add demographic info.
+
+        Attributes
+        ----------
+        df_report : pd.DataFrame
+            Report of ALS data that complies with NDAR data definitions
+
         """
         # Remap response values and column names
         resp_qual = ["1", "2", "3", "4"]
@@ -586,8 +601,186 @@ class NdarAls01:
         self.df_report.update(df_final_als)
 
 
+# %%
 class NdarBdi01:
-    pass
+    """Make bdi01 report for NDAR submission.
+
+    Pull subject demographic info from gather_surveys.GetRedcapDemographic
+    and data from gather_surveys.GetRedcapSurveys.
+
+    Attributes
+    ----------
+
+    """
+
+    def __init__(self, redcap_data, redcap_demo):
+        """Read in survey data and make report.
+
+        Get cleaned BDI RedCap survey from visit_day2 and
+        visit_day3, and finalized demographic information.
+
+        Parameters
+        ----------
+        redcap_data : make_reports.gather_surveys.GetRedcapSurveys
+        redcap_demo : make_reports.gather_surveys.GetRedcapDemographic
+
+        Attributes
+        ----------
+        df_bdi : pd.DataFrame
+            Cleaned ALS Qualtrics survey
+        final_demo : pd.DataFrame
+            Compiled demographic information
+        nda_label : list
+            NDA report template column label
+
+        """
+        print("Buiding NDA report : bdi01 ...")
+        # Read in template
+        self.nda_label, self.nda_cols = report_helper.mine_template(
+            "bdi01_template.csv"
+        )
+
+        # Get clean bdi data, match dataframe column names
+        redcap_data.make_clean_reports("visit_day2", redcap_demo.subj_consent)
+        self.df_bdi_day2 = redcap_data.df_clean_bdi
+        redcap_data.make_clean_reports("visit_day3", redcap_demo.subj_consent)
+        self.df_bdi_day3 = redcap_data.df_clean_bdi
+        self.df_bdi_day3.columns = self.df_bdi_day2.columns.values
+
+        # Get final demographics
+        final_demo = redcap_demo.final_demo
+        final_demo = final_demo.replace("NaN", np.nan)
+        final_demo["sex"] = final_demo["sex"].replace(
+            ["Male", "Female", "Neither"], ["M", "F", "O"]
+        )
+        self.final_demo = final_demo.dropna(subset=["subjectkey"])
+
+        # Make nda reports for each session
+        df_nda_day2 = self._make_bdi("day2")
+        df_nda_day3 = self._make_bdi("day3")
+
+        # Combine into final report
+        df_report = pd.concat([df_nda_day2, df_nda_day3])
+        df_report = df_report.sort_values(by=["src_subject_id"])
+        self.df_report = df_report[df_report["interview_date"].notna()]
+
+    def _get_age(self, sess):
+        """Title.
+
+        Parameters
+        ----------
+        sess : str
+            [day2 | day3]
+
+        Desc.
+        """
+        # Get dataframe
+        df_bdi = getattr(self, f"df_bdi_{sess}")
+
+        # Light cleaning of dataframe
+        df_bdi = df_bdi.replace("nan", np.nan)
+        df_bdi = df_bdi[df_bdi["q_1"].notna()]
+        df_bdi = df_bdi.rename(
+            columns={
+                "study_id": "src_subject_id",
+            }
+        )
+        df_bdi["bdi_timestamp"] = pd.to_datetime(df_bdi["bdi_timestamp"])
+
+        # Find BDI subjects in final_demo
+        bdi_subj = df_bdi["src_subject_id"].tolist()
+        idx_demo = self.final_demo[
+            self.final_demo["src_subject_id"].isin(bdi_subj)
+        ].index.tolist()
+
+        # Get date-of-birth, date-of-survey, calculate age in months
+        bdi_dob = self.final_demo.loc[idx_demo, "dob"].tolist()
+        bdi_dos = df_bdi["bdi_timestamp"].tolist()
+        if len(bdi_dob) != len(bdi_dos):
+            raise IndexError("Length of bdi_dob does not match bdi_dos.")
+        bdi_age_mo = report_helper.calc_age_mo(bdi_dob, bdi_dos)
+
+        # Update dataframe using ndar column names
+        df_bdi["interview_date"] = df_bdi["bdi_timestamp"].dt.strftime(
+            "%Y-%m-%d"
+        )
+        df_bdi["interview_age"] = bdi_age_mo
+        df_bdi["visit"] = sess
+        return df_bdi
+
+    def _make_bdi(self, sess):
+        """Title.
+
+        Parameters
+        ----------
+        sess : str
+            [day2 | day3]
+
+        Desc.
+        """
+        # Calculate age in months of visit
+        df_bdi = self._get_age(sess)
+
+        # Convert response values to int
+        q_cols = [x for x in df_bdi.columns if "q_" in x]
+        df_bdi[q_cols] = df_bdi[q_cols].astype("Int64")
+
+        # Remap column names
+        map_item = {
+            "q_1": "bdi1",
+            "q_2": "bdi2",
+            "q_3": "bdi3",
+            "q_4": "bdi4",
+            "q_5": "bdi5",
+            "q_6": "bdi6",
+            "q_7": "beck07",
+            "q_8": "beck08",
+            "q_9": "bdi9",
+            "q_10": "bdi10",
+            "q_11": "bdi_irritated",
+            "q_12": "bdi_lost",
+            "q_13": "bdi_indecision",
+            "q_14": "beck14",
+            "q_15": "beck15",
+            "q_16": "beck16",
+            "q_17": "beck17",
+            "q_18": "bd_017",
+            "q_19": "beck19",
+            "q_19b": "beck20",
+            "q_20": "beck21",
+            "q_21": "beck22",
+        }
+        df_bdi_remap = df_bdi.rename(columns=map_item)
+
+        # Drop non-ndar columns
+        df_bdi_remap = df_bdi_remap.drop(
+            [
+                "guid_timestamp",
+                "redcap_survey_identifier",
+                "bdi_timestamp",
+                "bdi_complete",
+            ],
+            axis=1,
+        )
+
+        # Sum BDI responses, exclude bdi_[irritated|lost|indecision],
+        # convert type to int.
+        bdi_cols = [
+            x for x in df_bdi_remap.columns if "b" in x and len(x) <= 6
+        ]
+        df_bdi_remap["bdi_tot"] = df_bdi_remap[bdi_cols].sum(axis=1)
+        df_bdi_remap["bdi_tot"] = df_bdi_remap["bdi_tot"].astype("Int64")
+
+        # Get demo info, remove interview_[date|age] to avoid conflicts
+        # with incoming bdi. Merge.
+        df_final = self.final_demo.iloc[:, 0:5]
+        df_final = df_final.drop(["interview_date", "interview_age"], axis=1)
+        df_final_bdi = pd.merge(df_final, df_bdi_remap, on="src_subject_id")
+
+        # Build dataframe from nda columns, update with df_final_bdi data
+        df_nda = pd.DataFrame(columns=self.nda_cols, index=df_final_bdi.index)
+        df_nda.update(df_final_bdi)
+        return df_nda
 
 
 class NdarBrd01:
