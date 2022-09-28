@@ -601,18 +601,22 @@ class GetQualtricsSurveys:
         Survey names for session/visit 1
     surveys_visit23 : list
         Survey names for sessions/visits 2 & 3
+    post_labels : bool
+        Whether to use labels in post_scan_ratings pull
     qualtrics_token : str
         Qualtrics API token
 
     """
 
-    def __init__(self, qualtrics_token):
+    def __init__(self, qualtrics_token, post_labels):
         """Download Qualtrics surveys.
 
         Parameters
         ----------
         qualtrics_token : str
             Qualtrics API token
+        post_labels : bool
+            Whether to use labels in post_scan_ratings pull
 
         Attributes
         ----------
@@ -626,11 +630,15 @@ class GetQualtricsSurveys:
             Survey names for session/visit 1
         surveys_visit23 : list
             Survey names for sessions/visits 2 & 3
+        post_labels : bool
+            Whether to use labels in post_scan_ratings pull
         qualtrics_token : str
             Qualtrics API token
 
         """
+        # Capture arguments as attributes
         self.qualtrics_token = qualtrics_token
+        self.post_labels = post_labels
 
         # Specify visit survey keys
         self.surveys_visit1 = [
@@ -677,10 +685,7 @@ class GetQualtricsSurveys:
         ) as jf:
             return json.load(jf)
 
-    def _pull_qualtrics_data(
-        self,
-        survey_name,
-    ):
+    def _pull_qualtrics_data(self, survey_name):
         """Pull a Qualtrics report and make a pandas dataframe.
 
         References guide at
@@ -701,6 +706,7 @@ class GetQualtricsSurveys:
             If response export progress takes too long
 
         """
+        print(f"Downloading {survey_name} ...")
         # Get ids
         survey_id = self.report_keys_qualtrics[survey_name]
         dc_id = self.report_keys_qualtrics["datacenter_ID"]
@@ -717,14 +723,13 @@ class GetQualtricsSurveys:
             "x-api-token": self.qualtrics_token,
         }
 
-        # Create data export
-        #   "useLabels": True
-        #   "seenUnansweredRecode": 999
+        # Create data export, submit download request
         data = {"format": "csv"}
+        if self.post_labels:
+            data["useLabels"] = True
         download_request_response = requests.request(
             "POST", url, json=data, headers=headers
         )
-        # print(download_request_response.json())
         try:
             progressId = download_request_response.json()["result"][
                 "progressId"
@@ -733,38 +738,38 @@ class GetQualtricsSurveys:
             print(download_request_response.json())
             sys.exit(2)
 
-        # Check on data export progress and wait until export is ready.
-        # TODO beautify print out
+        # Check on data export progress, wait until export is ready
         is_file = None
+        request_check_url = url + progressId
         while (
             progress_status != "complete"
             and progress_status != "failed"
             and is_file is None
         ):
-            if not is_file:
-                print(f"Progress status for {survey_name} : {progress_status}")
-
-            # Check progress
-            request_check_url = url + progressId
+            # Query status
             request_check_response = requests.request(
                 "GET", request_check_url, headers=headers
             )
+
+            # Update is_file when data export is ready
             try:
                 is_file = request_check_response.json()["result"]["fileId"]
             except KeyError:
                 pass
 
-            # Print out progress, update progress_status
-            # print(request_check_response.json())
+            # Write data export progress for user, update progress_status
             request_check_progress = request_check_response.json()["result"][
                 "percentComplete"
             ]
-            print(f"Download is {str(request_check_progress)} complete")
+            print(f"\tDownload is {request_check_progress} complete")
             progress_status = request_check_response.json()["result"]["status"]
 
-        # Check for error
+        # Check for export error
         if progress_status == "failed":
-            raise Exception("export failed")
+            raise Exception(
+                f"Export of {survey_name} failed, check "
+                + "survey_download.GetQualtricsSurveys._pull_qualtrics_data"
+            )
         file_id = request_check_response.json()["result"]["fileId"]
 
         # Download requested survey file
@@ -778,7 +783,7 @@ class GetQualtricsSurveys:
         with zipfile.ZipFile(req_file_zipped) as req_file:
             with req_file.open(f"{survey_name}.csv") as f:
                 df = pd.read_csv(f)
-        print(f"\n\t Successfully downloaded : {survey_name}.csv\n")
+        print(f"\n\tSuccessfully downloaded : {survey_name}.csv\n")
         return df
 
     def make_raw_reports(self, visit_name):

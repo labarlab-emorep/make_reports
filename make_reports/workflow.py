@@ -83,7 +83,7 @@ def make_manager_reports(manager_reports, query_date, proj_dir, redcap_token):
         del mr
 
 
-def make_survey_reports(proj_dir, qualtrics_token, redcap_token):
+def make_survey_reports(proj_dir, post_labels, qualtrics_token, redcap_token):
     """Make raw and clean dataframes from RedCap, Qualtrics data.
 
     Download data from Qualtrics and RedCap, organize according to
@@ -94,6 +94,8 @@ def make_survey_reports(proj_dir, qualtrics_token, redcap_token):
     ----------
     proj_dir : path
         Project's experiment directory
+    post_labels : bool
+        Whether to use labels in post_scan_ratings pull
     qualtrics_token : str
         Qualtrics API token
     redcap_token : str
@@ -124,7 +126,9 @@ def make_survey_reports(proj_dir, qualtrics_token, redcap_token):
     survey_par = os.path.join(proj_dir, "data_survey")
 
     # Make raw and clean dataframes from qualtrics surveys
-    qualtrics_data = survey_download.GetQualtricsSurveys(qualtrics_token)
+    qualtrics_data = survey_download.GetQualtricsSurveys(
+        qualtrics_token, post_labels
+    )
     for visit in [
         "visit_day1",
         "visit_day2",
@@ -133,9 +137,12 @@ def make_survey_reports(proj_dir, qualtrics_token, redcap_token):
     ]:
         # Write raw dataframes
         survey_name, df_raw = qualtrics_data.make_raw_reports(visit)
-        out_raw = os.path.join(
-            survey_par, visit, "data_raw", f"{survey_name}_latest.csv"
+        out_file = (
+            f"{survey_name}_labels_latest.csv"
+            if post_labels
+            else f"{survey_name}_latest.csv"
         )
+        out_raw = os.path.join(survey_par, visit, "data_raw", out_file)
         print(f"\nWriting raw {visit} survey data : \n\t{out_raw}")
         df_raw.to_csv(out_raw, index=False, na_rep="")
 
@@ -171,7 +178,9 @@ def make_survey_reports(proj_dir, qualtrics_token, redcap_token):
         redcap_data.df_clean_bdi.to_csv(out_clean, index=False, na_rep="")
 
 
-def make_nda_reports(nda_reports, proj_dir, qualtrics_token, redcap_token):
+def make_nda_reports(
+    nda_reports, proj_dir, post_labels, qualtrics_token, redcap_token
+):
     """Make reports and organize data for NDAR upload.
 
     Generate requested NDAR reports and organize data (if required) for the
@@ -183,6 +192,8 @@ def make_nda_reports(nda_reports, proj_dir, qualtrics_token, redcap_token):
         Names of desired NDA reports e.g. ["demo_info01", "affim01"]
     proj_dir : path
         Project's experiment directory
+    post_labels : bool
+        Whether to use labels in post_scan_ratings pull
     qualtrics_token : str
         Qualtrics API token
     redcap_token : str
@@ -229,7 +240,9 @@ def make_nda_reports(nda_reports, proj_dir, qualtrics_token, redcap_token):
     # Get redcap and qualtrics survey info
     redcap_demo = survey_download.GetRedcapDemographic(redcap_token)
     redcap_data = survey_download.GetRedcapSurveys(redcap_token)
-    qualtrics_data = survey_download.GetQualtricsSurveys(qualtrics_token)
+    qualtrics_data = survey_download.GetQualtricsSurveys(
+        qualtrics_token, post_labels
+    )
 
     # Make requested reports
     for report in nda_reports:
