@@ -425,13 +425,16 @@ class NdarAffim01:
             "affim01_template.csv"
         )
 
-        # Get survey data
+        # Get clean survey data
         qualtrics_data.surveys_visit1 = ["AIM"]
         qualtrics_data.make_clean_reports("visit_day1")
         df_aim = qualtrics_data.clean_visit["AIM"]
+
+        # Rename columns, drop NaN rows
         df_aim = df_aim.rename(columns={"SubID": "src_subject_id"})
         df_aim.columns = df_aim.columns.str.lower()
-        self.df_aim = df_aim.replace("NaN", np.nan)
+        df_aim = df_aim.replace("NaN", np.nan)
+        self.df_aim = df_aim[df_aim["aim_1"].notna()]
 
         # Get final demographics, make report
         final_demo = redcap_demo.final_demo
@@ -454,10 +457,12 @@ class NdarAffim01:
             ["Male", "Female", "Neither"], ["M", "F", "O"]
         )
 
-        # Sum aim responses
+        # Sum aim responses, toggle pandas warning mode
         aim_list = [x for x in self.df_aim.columns if "aim" in x]
+        pd.options.mode.chained_assignment = None
         self.df_aim[aim_list] = self.df_aim[aim_list].astype("Int64")
         self.df_aim["aimtot"] = self.df_aim[aim_list].sum(axis=1)
+        pd.options.mode.chained_assignment = "warn"
 
         # Merge final_demo with aim
         self.df_report = pd.merge(df_final, self.df_aim, on="src_subject_id")
@@ -505,12 +510,15 @@ class NdarAls01:
             "als01_template.csv"
         )
 
-        # Get survey data
+        # Get clean survey data
         qualtrics_data.surveys_visit1 = ["ALS"]
         qualtrics_data.make_clean_reports("visit_day1")
         df_als = qualtrics_data.clean_visit["ALS"]
+
+        # Rename columns, frop NaN rows
         df_als = df_als.rename(columns={"SubID": "src_subject_id"})
-        self.df_als = df_als.replace("NaN", np.nan)
+        df_als = df_als.replace("NaN", np.nan)
+        self.df_als = df_als[df_als["ALS_1"].notna()]
 
         # Get final demographics, make report
         final_demo = redcap_demo.final_demo
@@ -546,28 +554,30 @@ class NdarAls01:
             "ALS_17": "als45",
             "ALS_18": "als46",
         }
-        df_als = self.df_als.rename(columns=map_item)
-        als_cols = [x for x in df_als.columns if "als" in x]
-        df_als[als_cols] = df_als[als_cols].replace(resp_qual, resp_ndar)
+        df_als_remap = self.df_als.rename(columns=map_item)
+        als_cols = [x for x in df_als_remap.columns if "als" in x]
+        df_als_remap[als_cols] = df_als_remap[als_cols].replace(
+            resp_qual, resp_ndar
+        )
 
         # Calculate totals
-        df_als[als_cols] = df_als[als_cols].astype("Int64")
-        df_als["als_glob"] = df_als[als_cols].sum(axis=1)
-        df_als["als_sf_total"] = df_als[als_cols].sum(axis=1)
+        df_als_remap[als_cols] = df_als_remap[als_cols].astype("Int64")
+        df_als_remap["als_glob"] = df_als_remap[als_cols].sum(axis=1)
+        df_als_remap["als_sf_total"] = df_als_remap[als_cols].sum(axis=1)
 
         # Add pilot notes for certain subjects
         pilot_list = ["ER0001", "ER0002", "ER0003", "ER0004", "ER0005"]
-        idx_pilot = df_als[
-            df_als["src_subject_id"].isin(pilot_list)
+        idx_pilot = df_als_remap[
+            df_als_remap["src_subject_id"].isin(pilot_list)
         ].index.tolist()
-        df_als.loc[idx_pilot, "comments"] = "PILOT PARTICIPANT"
+        df_als_remap.loc[idx_pilot, "comments"] = "PILOT PARTICIPANT"
 
         # Combine demographic and als dataframes
         df_final = self.final_demo.iloc[:, 0:5]
         df_final["sex"] = df_final["sex"].replace(
             ["Male", "Female", "Neither"], ["M", "F", "O"]
         )
-        df_final_als = pd.merge(df_final, df_als, on="src_subject_id")
+        df_final_als = pd.merge(df_final, df_als_remap, on="src_subject_id")
 
         # Build dataframe from nda columns, update with demo and als data
         self.df_report = pd.DataFrame(
