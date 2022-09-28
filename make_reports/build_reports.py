@@ -610,6 +610,18 @@ class NdarBdi01:
 
     Attributes
     ----------
+    df_bdi_day2 : pd.DataFrame
+        Cleaned visit_day2 BDI RedCap survey
+    df_bdi_day3 : pd.DataFrame
+        Cleaned visit_day3 BDI RedCap survey
+    df_report : pd.DataFrame
+        Report of BDI data that complies with NDAR data definitions
+    final_demo : pd.DataFrame
+        Compiled demographic information
+    nda_cols : list
+        NDA report template column names
+    nda_label : list
+        NDA report template column label
 
     """
 
@@ -626,10 +638,16 @@ class NdarBdi01:
 
         Attributes
         ----------
-        df_bdi : pd.DataFrame
-            Cleaned ALS Qualtrics survey
+        df_bdi_day2 : pd.DataFrame
+            Cleaned visit_day2 BDI RedCap survey
+        df_bdi_day3 : pd.DataFrame
+            Cleaned visit_day3 BDI RedCap survey
+        df_report : pd.DataFrame
+            Report of BDI data that complies with NDAR data definitions
         final_demo : pd.DataFrame
             Compiled demographic information
+        nda_cols : list
+            NDA report template column names
         nda_label : list
             NDA report template column label
 
@@ -665,14 +683,26 @@ class NdarBdi01:
         self.df_report = df_report[df_report["interview_date"].notna()]
 
     def _get_age(self, sess):
-        """Title.
+        """Calculate participant age-in-months at visit.
+
+        Add the visit age-in-months as interview_age column. Also
+        add the visit column, and make appropriate interview_date.
 
         Parameters
         ----------
         sess : str
-            [day2 | day3]
+            [day2 | day3], visit/session name
 
-        Desc.
+        Returns
+        -------
+        pd.DataFrame
+
+        Raises
+        ------
+        IndexError
+            If date of birth list does not have same length
+            as the date of survey list
+
         """
         # Get dataframe
         df_bdi = getattr(self, f"df_bdi_{sess}")
@@ -709,14 +739,20 @@ class NdarBdi01:
         return df_bdi
 
     def _make_bdi(self, sess):
-        """Title.
+        """Make an NDAR compliant report for visit.
+
+        Remap column names, add demographic info, get session
+        age, and generate report.
 
         Parameters
         ----------
         sess : str
-            [day2 | day3]
+            [day2 | day3], visit/session name
 
-        Desc.
+        Returns
+        -------
+        pd.DataFrame
+
         """
         # Calculate age in months of visit
         df_bdi = self._get_age(sess)
