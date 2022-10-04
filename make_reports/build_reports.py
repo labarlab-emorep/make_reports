@@ -453,6 +453,10 @@ class NdarAffim01:
         """
         # Get final_demo cols
         df_final = self.final_demo.iloc[:, 0:5]
+        df_final["interview_date"] = pd.to_datetime(df_final["interview_date"])
+        df_final["interview_date"] = df_final["interview_date"].dt.strftime(
+            "%m/%d/%Y"
+        )
         df_final["sex"] = df_final["sex"].replace(
             ["Male", "Female", "Neither"], ["M", "F", "O"]
         )
@@ -589,6 +593,10 @@ class NdarAls01:
 
         # Combine demographic and als dataframes
         df_final = self.final_demo.iloc[:, 0:5]
+        df_final["interview_date"] = pd.to_datetime(df_final["interview_date"])
+        df_final["interview_date"] = df_final["interview_date"].dt.strftime(
+            "%m/%d/%Y"
+        )
         df_final["sex"] = df_final["sex"].replace(
             ["Male", "Female", "Neither"], ["M", "F", "O"]
         )
@@ -816,6 +824,10 @@ class NdarBdi01:
         # Build dataframe from nda columns, update with df_final_bdi data
         df_nda = pd.DataFrame(columns=self.nda_cols, index=df_final_bdi.index)
         df_nda.update(df_final_bdi)
+        df_nda["interview_date"] = pd.to_datetime(df_nda["interview_date"])
+        df_nda["interview_date"] = df_nda["interview_date"].dt.strftime(
+            "%m/%d/%Y"
+        )
         return df_nda
 
 
@@ -967,7 +979,7 @@ class NdarEmrq01:
         """
         print("Buiding NDA report : emrq01 ...")
         # Read in template
-        nda_label, nda_cols = report_helper.mine_template(
+        self.nda_label, self.nda_cols = report_helper.mine_template(
             "emrq01_template.csv"
         )
 
@@ -979,7 +991,7 @@ class NdarEmrq01:
         # Rename columns, frop NaN rows
         df_emrq = df_emrq.rename(columns={"SubID": "src_subject_id"})
         df_emrq = df_emrq.replace("NaN", np.nan)
-        df_emrq = df_emrq[df_emrq["ERQ_1"].notna()]
+        self.df_emrq = df_emrq[df_emrq["ERQ_1"].notna()]
 
         # Get final demographics, make report
         final_demo = redcap_demo.final_demo
@@ -987,16 +999,22 @@ class NdarEmrq01:
         final_demo["sex"] = final_demo["sex"].replace(
             ["Male", "Female", "Neither"], ["M", "F", "O"]
         )
-        final_demo = final_demo.dropna(subset=["subjectkey"])
-        # self._make_emrq()
+        self.final_demo = final_demo.dropna(subset=["subjectkey"])
+        self._make_emrq()
 
     def _make_emrq(self):
         """Title.
 
         Desc.
+
+        Attributes
+        ----------
+
+        df_report
+
         """
         # Update column names, make data integer
-        df_emrq = df_emrq.rename(columns=str.lower)
+        df_emrq = self.df_emrq.rename(columns=str.lower)
         emrq_cols = [x for x in df_emrq.columns if "erq" in x]
         df_emrq[emrq_cols] = df_emrq[emrq_cols].astype("Int64")
 
@@ -1012,7 +1030,7 @@ class NdarEmrq01:
         ].astype("Int64")
 
         # Combine demo, erq info
-        df_final = final_demo.iloc[:, 0:5]
+        df_final = self.final_demo.iloc[:, 0:5]
         df_final["interview_date"] = pd.to_datetime(df_final["interview_date"])
         df_final["interview_date"] = df_final["interview_date"].dt.strftime(
             "%m/%d/%Y"
@@ -1020,9 +1038,10 @@ class NdarEmrq01:
         df_final_emrq = pd.merge(df_final, df_emrq, on="src_subject_id")
 
         # Build dataframe from nda columns, update with df_final_emrq data
-        df_nda = pd.DataFrame(columns=nda_cols, index=df_final_emrq.index)
-        df_nda.update(df_final_emrq)
-        return df_nda
+        self.df_report = pd.DataFrame(
+            columns=self.nda_cols, index=df_final_emrq.index
+        )
+        self.df_report.update(df_final_emrq)
 
 
 class NdarImage03:
