@@ -178,6 +178,7 @@ def make_survey_reports(proj_dir, post_labels, qualtrics_token, redcap_token):
         redcap_data.df_clean_bdi.to_csv(out_clean, index=False, na_rep="")
 
 
+# %%
 def make_nda_reports(
     nda_reports, proj_dir, post_labels, qualtrics_token, redcap_token
 ):
