@@ -3,6 +3,7 @@ import io
 import requests
 import csv
 import pandas as pd
+import numpy as np
 import importlib.resources as pkg_resources
 from make_reports import reference_files
 
@@ -114,3 +115,29 @@ def calc_age_mo(subj_dob, subj_dos):
         total_months = (12 * num_years) + num_months
         subj_age_mo.append(total_months)
     return subj_age_mo
+
+
+def give_ndar_demo(final_demo):
+    """Title.
+
+    Desc.
+
+    Parameters
+    ----------
+    make_reports.gather_surveys.GetRedcapDemographic.final_demo
+
+    Returns
+    -------
+    pd.DataFrame
+
+    """
+    final_demo = final_demo.replace("NaN", np.nan)
+    final_demo["sex"] = final_demo["sex"].replace(
+        ["Male", "Female", "Neither"], ["M", "F", "O"]
+    )
+    final_demo = final_demo.dropna(subset=["subjectkey"])
+    final_demo["interview_date"] = pd.to_datetime(final_demo["interview_date"])
+    final_demo["interview_date"] = final_demo["interview_date"].dt.strftime(
+        "%m/%d/%Y"
+    )
+    return final_demo.iloc[:, 0:5]
