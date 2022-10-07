@@ -436,10 +436,11 @@ class NdarAffim01:
         df_aim = df_aim.replace("NaN", np.nan)
         self.df_aim = df_aim[df_aim["aim_1"].notna()]
 
-        # Get final demographics, make report
-        final_demo = redcap_demo.final_demo
-        final_demo = final_demo.replace("NaN", np.nan)
-        self.final_demo = final_demo.dropna(subset=["subjectkey"])
+        # # Get final demographics, make report
+        # final_demo = redcap_demo.final_demo
+        # final_demo = final_demo.replace("NaN", np.nan)
+        # self.final_demo = final_demo.dropna(subset=["subjectkey"])
+        self.df_final = report_helper.give_ndar_demo(redcap_demo.final_demo)
         self._make_aim()
 
     def _make_aim(self):
@@ -451,11 +452,15 @@ class NdarAffim01:
             Report of AIM data that complies with NDAR data definitions
 
         """
-        # Get final_demo cols
-        df_final = self.final_demo.iloc[:, 0:5]
-        df_final["sex"] = df_final["sex"].replace(
-            ["Male", "Female", "Neither"], ["M", "F", "O"]
-        )
+        # # Get final_demo cols
+        # df_final = self.final_demo.iloc[:, 0:5]
+        # df_final["interview_date"] = pd.to_datetime(df_final["interview_date"])
+        # df_final["interview_date"] = df_final["interview_date"].dt.strftime(
+        #     "%m/%d/%Y"
+        # )
+        # df_final["sex"] = df_final["sex"].replace(
+        #     ["Male", "Female", "Neither"], ["M", "F", "O"]
+        # )
 
         # Sum aim responses, toggle pandas warning mode
         aim_list = [x for x in self.df_aim.columns if "aim" in x]
@@ -465,7 +470,10 @@ class NdarAffim01:
         pd.options.mode.chained_assignment = "warn"
 
         # Merge final_demo with aim
-        self.df_report = pd.merge(df_final, self.df_aim, on="src_subject_id")
+        # self.df_report = pd.merge(df_final, self.df_aim, on="src_subject_id")
+        self.df_report = pd.merge(
+            self.df_final, self.df_aim, on="src_subject_id"
+        )
 
 
 # %%
@@ -529,10 +537,11 @@ class NdarAls01:
         df_als = df_als.replace("NaN", np.nan)
         self.df_als = df_als[df_als["ALS_1"].notna()]
 
-        # Get final demographics, make report
-        final_demo = redcap_demo.final_demo
-        final_demo = final_demo.replace("NaN", np.nan)
-        self.final_demo = final_demo.dropna(subset=["subjectkey"])
+        # # Get final demographics, make report
+        # final_demo = redcap_demo.final_demo
+        # final_demo = final_demo.replace("NaN", np.nan)
+        # self.final_demo = final_demo.dropna(subset=["subjectkey"])
+        self.df_final = report_helper.give_ndar_demo(redcap_demo.final_demo)
         self._make_als()
 
     def _make_als(self):
@@ -587,12 +596,18 @@ class NdarAls01:
         ].index.tolist()
         df_als_remap.loc[idx_pilot, "comments"] = "PILOT PARTICIPANT"
 
-        # Combine demographic and als dataframes
-        df_final = self.final_demo.iloc[:, 0:5]
-        df_final["sex"] = df_final["sex"].replace(
-            ["Male", "Female", "Neither"], ["M", "F", "O"]
+        # # Combine demographic and als dataframes
+        # df_final = self.final_demo.iloc[:, 0:5]
+        # df_final["interview_date"] = pd.to_datetime(df_final["interview_date"])
+        # df_final["interview_date"] = df_final["interview_date"].dt.strftime(
+        #     "%m/%d/%Y"
+        # )
+        # df_final["sex"] = df_final["sex"].replace(
+        #     ["Male", "Female", "Neither"], ["M", "F", "O"]
+        # )
+        df_final_als = pd.merge(
+            self.df_final, df_als_remap, on="src_subject_id"
         )
-        df_final_als = pd.merge(df_final, df_als_remap, on="src_subject_id")
 
         # Build dataframe from nda columns, update with demo and als data
         self.df_report = pd.DataFrame(
@@ -816,11 +831,11 @@ class NdarBdi01:
         # Build dataframe from nda columns, update with df_final_bdi data
         df_nda = pd.DataFrame(columns=self.nda_cols, index=df_final_bdi.index)
         df_nda.update(df_final_bdi)
+        df_nda["interview_date"] = pd.to_datetime(df_nda["interview_date"])
+        df_nda["interview_date"] = df_nda["interview_date"].dt.strftime(
+            "%m/%d/%Y"
+        )
         return df_nda
-
-
-class NdarBrd01:
-    pass
 
 
 class NdarDemoInfo01:
@@ -936,8 +951,105 @@ class NdarEmoEndo01:
     pass
 
 
+# %%
 class NdarEmrq01:
-    pass
+    """Make emrq01 report for NDAR submission.
+
+    Pull subject demographic info from gather_surveys.GetRedcapDemographic
+    and survey data from gather_surveys.GetQualtricsSurveys.
+
+    Attributes
+    ----------
+
+    df_report : pd.DataFrame
+    nda_label : list
+
+    """
+
+    def __init__(self, qualtrics_data, redcap_demo):
+        """Read in survey data and make report.
+
+        Get cleaned ERQ Qualtrics survey from visit_day1, and
+        finalized demographic information.
+
+        Parameters
+        ----------
+        qualtrics_data : make_reports.gather_surveys.GetQualtricsSurveys
+        redcap_demo : make_reports.gather_surveys.GetRedcapDemographic
+
+        Attributes
+        ----------
+
+        df_report : pd.DataFrame
+        nda_label : list
+
+        """
+        print("Buiding NDA report : emrq01 ...")
+        # Read in template
+        self.nda_label, self.nda_cols = report_helper.mine_template(
+            "emrq01_template.csv"
+        )
+
+        # Get clean survey data
+        qualtrics_data.surveys_visit1 = ["ERQ"]
+        qualtrics_data.make_clean_reports("visit_day1")
+        df_emrq = qualtrics_data.clean_visit["ERQ"]
+
+        # Rename columns, frop NaN rows
+        df_emrq = df_emrq.rename(columns={"SubID": "src_subject_id"})
+        df_emrq = df_emrq.replace("NaN", np.nan)
+        self.df_emrq = df_emrq[df_emrq["ERQ_1"].notna()]
+
+        # # Get final demographics, make report
+        # final_demo = redcap_demo.final_demo
+        # final_demo = final_demo.replace("NaN", np.nan)
+        # final_demo["sex"] = final_demo["sex"].replace(
+        #     ["Male", "Female", "Neither"], ["M", "F", "O"]
+        # )
+        # self.final_demo = final_demo.dropna(subset=["subjectkey"])
+        self.df_final = report_helper.give_ndar_demo(redcap_demo.final_demo)
+        self._make_emrq()
+
+    def _make_emrq(self):
+        """Title.
+
+        Desc.
+
+        Attributes
+        ----------
+
+        df_report
+
+        """
+        # Update column names, make data integer
+        df_emrq = self.df_emrq.rename(columns=str.lower)
+        emrq_cols = [x for x in df_emrq.columns if "erq" in x]
+        df_emrq[emrq_cols] = df_emrq[emrq_cols].astype("Int64")
+
+        # Calculate reappraisal, suppression scores.
+        # Reappraisal = sum of items 1, 3, 5, 7, 8, 10,
+        # Suppression = sum of items 2, 4, 6, 9.
+        cols_reap = ["erq_1", "erq_3", "erq_5", "erq_7", "erq_8", "erq_10"]
+        cols_supp = ["erq_2", "erq_4", "erq_6", "erq_9"]
+        df_emrq["erq_reappraisal"] = df_emrq[cols_reap].sum(axis=1)
+        df_emrq["erq_suppression"] = df_emrq[cols_supp].sum(axis=1)
+        df_emrq[["erq_reappraisal", "erq_suppression"]] = df_emrq[
+            ["erq_reappraisal", "erq_suppression"]
+        ].astype("Int64")
+
+        # # Combine demo, erq info
+        # df_final = self.final_demo.iloc[:, 0:5]
+        # df_final["interview_date"] = pd.to_datetime(df_final["interview_date"])
+        # df_final["interview_date"] = df_final["interview_date"].dt.strftime(
+        #     "%m/%d/%Y"
+        # )
+        df_final_emrq = pd.merge(self.df_final, df_emrq, on="src_subject_id")
+
+        # Build dataframe from nda columns, update with df_final_emrq data
+        self.df_report = pd.DataFrame(
+            columns=self.nda_cols, index=df_final_emrq.index
+        )
+        self.df_report.update(df_final_emrq)
 
 
 class NdarImage03:
