@@ -143,7 +143,7 @@ def pull_qualtrics_data(
     with zipfile.ZipFile(req_file_zipped) as req_file:
         with req_file.open(f"{survey_name}.csv") as f:
             df = pd.read_csv(f)
-    print(f"\n\tSuccessfully downloaded : {survey_name}.csv\n")
+    print(f"\n\tSuccessfully downloaded : {survey_name}.csv")
     return df
 
 
