@@ -54,16 +54,16 @@ class GetRedcapSurveys:
             Raw BDI responses for session day3
 
         """
-        # Communicate
-        print("\nPulling RedCap surveys ...")
+        # # Communicate
+        # print("\nPulling RedCap surveys ...")
 
-        # Get BDI dataframes
-        self.df_raw_bdi2 = report_helper.pull_redcap_data(
-            redcap_token, self.report_keys_redcap["bdi_day2"]
-        )
-        self.df_raw_bdi3 = report_helper.pull_redcap_data(
-            redcap_token, self.report_keys_redcap["bdi_day3"]
-        )
+        # # Get BDI dataframes
+        # self.df_raw_bdi2 = report_helper.pull_redcap_data(
+        #     redcap_token, self.report_keys_redcap["bdi_day2"]
+        # )
+        # self.df_raw_bdi3 = report_helper.pull_redcap_data(
+        #     redcap_token, self.report_keys_redcap["bdi_day3"]
+        # )
 
     # Make self.report_keys_redcap immutable
     @property
@@ -218,13 +218,13 @@ class GetRedcapDemographic:
         ) as jf:
             report_keys_redcap = json.load(jf)
 
-        # Get original & new consent dataframes
-        df_consent_orig = report_helper.pull_redcap_data(
-            redcap_token, report_keys_redcap["consent_orig"]
-        )
-        df_consent_new = report_helper.pull_redcap_data(
-            redcap_token, report_keys_redcap["consent_new"]
-        )
+        # # Get original & new consent dataframes
+        # df_consent_orig = report_helper.pull_redcap_data(
+        #     redcap_token, report_keys_redcap["consent_orig"]
+        # )
+        # df_consent_new = report_helper.pull_redcap_data(
+        #     redcap_token, report_keys_redcap["consent_new"]
+        # )
 
         # Update consent_new column names, merge
         cols_new = df_consent_new.columns.tolist()
@@ -244,9 +244,9 @@ class GetRedcapDemographic:
         ].tolist()
 
         # Get guid dataframe, index of consented
-        self.df_guid = report_helper.pull_redcap_data(
-            redcap_token, report_keys_redcap["guid"]
-        )
+        # self.df_guid = report_helper.pull_redcap_data(
+        #     redcap_token, report_keys_redcap["guid"]
+        # )
         self.idx_guid = self.df_guid[
             self.df_guid["record_id"].isin(self.subj_consent)
         ].index.tolist()
@@ -270,9 +270,9 @@ class GetRedcapDemographic:
             ]
 
         # Get demographic dataframe, index of consented
-        self.df_demo = report_helper.pull_redcap_data(
-            redcap_token, report_keys_redcap["demographics"]
-        )
+        # self.df_demo = report_helper.pull_redcap_data(
+        #     redcap_token, report_keys_redcap["demographics"]
+        # )
         self.idx_demo = self.df_demo[
             self.df_demo["record_id"].isin(self.subj_consent)
         ].index.tolist()
@@ -633,106 +633,106 @@ class GetQualtricsSurveys:
         ) as jf:
             return json.load(jf)
 
-    def _pull_qualtrics_data(self, survey_name):
-        """Pull a Qualtrics report and make a pandas dataframe.
+    # def _pull_qualtrics_data(self, survey_name):
+    #     """Pull a Qualtrics report and make a pandas dataframe.
 
-        References guide at
-            https://api.qualtrics.com/ZG9jOjg3NzY3Nw-new-survey-response-export-guide
+    #     References guide at
+    #         https://api.qualtrics.com/ZG9jOjg3NzY3Nw-new-survey-response-export-guide
 
-        Parameters
-        ----------
-        survey_name : str
-            Qualtrics survey name
+    #     Parameters
+    #     ----------
+    #     survey_name : str
+    #         Qualtrics survey name
 
-        Returns
-        -------
-        pd.DataFrame
+    #     Returns
+    #     -------
+    #     pd.DataFrame
 
-        Raises
-        ------
-        TimeoutError
-            If response export progress takes too long
+    #     Raises
+    #     ------
+    #     TimeoutError
+    #         If response export progress takes too long
 
-        """
-        print(f"Downloading {survey_name} ...")
-        # Get ids
-        survey_id = self.report_keys_qualtrics[survey_name]
-        dc_id = self.report_keys_qualtrics["datacenter_ID"]
+    #     """
+    #     print(f"Downloading {survey_name} ...")
+    #     # Get ids
+    #     survey_id = self.report_keys_qualtrics[survey_name]
+    #     dc_id = self.report_keys_qualtrics["datacenter_ID"]
 
-        # Setting static parameters
-        request_check_progress = 0.0
-        progress_status = "inProgress"
-        url = (
-            f"https://{dc_id}.qualtrics.com/API/v3/surveys/{survey_id}"
-            + "/export-responses/"
-        )
-        headers = {
-            "content-type": "application/json",
-            "x-api-token": self.qualtrics_token,
-        }
+    #     # Setting static parameters
+    #     request_check_progress = 0.0
+    #     progress_status = "inProgress"
+    #     url = (
+    #         f"https://{dc_id}.qualtrics.com/API/v3/surveys/{survey_id}"
+    #         + "/export-responses/"
+    #     )
+    #     headers = {
+    #         "content-type": "application/json",
+    #         "x-api-token": self.qualtrics_token,
+    #     }
 
-        # Create data export, submit download request
-        data = {"format": "csv"}
-        if self.post_labels:
-            data["useLabels"] = True
-        download_request_response = requests.request(
-            "POST", url, json=data, headers=headers
-        )
-        try:
-            progressId = download_request_response.json()["result"][
-                "progressId"
-            ]
-        except KeyError:
-            print(download_request_response.json())
-            sys.exit(2)
+    #     # Create data export, submit download request
+    #     data = {"format": "csv"}
+    #     if self.post_labels:
+    #         data["useLabels"] = True
+    #     download_request_response = requests.request(
+    #         "POST", url, json=data, headers=headers
+    #     )
+    #     try:
+    #         progressId = download_request_response.json()["result"][
+    #             "progressId"
+    #         ]
+    #     except KeyError:
+    #         print(download_request_response.json())
+    #         sys.exit(2)
 
-        # Check on data export progress, wait until export is ready
-        is_file = None
-        request_check_url = url + progressId
-        while (
-            progress_status != "complete"
-            and progress_status != "failed"
-            and is_file is None
-        ):
-            # Query status
-            request_check_response = requests.request(
-                "GET", request_check_url, headers=headers
-            )
+    #     # Check on data export progress, wait until export is ready
+    #     is_file = None
+    #     request_check_url = url + progressId
+    #     while (
+    #         progress_status != "complete"
+    #         and progress_status != "failed"
+    #         and is_file is None
+    #     ):
+    #         # Query status
+    #         request_check_response = requests.request(
+    #             "GET", request_check_url, headers=headers
+    #         )
 
-            # Update is_file when data export is ready
-            try:
-                is_file = request_check_response.json()["result"]["fileId"]
-            except KeyError:
-                pass
+    #         # Update is_file when data export is ready
+    #         try:
+    #             is_file = request_check_response.json()["result"]["fileId"]
+    #         except KeyError:
+    #             pass
 
-            # Write data export progress for user, update progress_status
-            request_check_progress = request_check_response.json()["result"][
-                "percentComplete"
-            ]
-            print(f"\tDownload is {request_check_progress} complete")
-            progress_status = request_check_response.json()["result"]["status"]
+    #         # Write data export progress for user, update progress_status
+    #         request_check_progress = request_check_response.json()["result"][
+    #             "percentComplete"
+    #         ]
+    #         print(f"\tDownload is {request_check_progress} complete")
+    #         progress_status = request_check_response.json()["result"]["status"]
 
-        # Check for export error
-        if progress_status == "failed":
-            raise Exception(
-                f"Export of {survey_name} failed, check "
-                + "gather_surveys.GetQualtricsSurveys._pull_qualtrics_data"
-            )
-        file_id = request_check_response.json()["result"]["fileId"]
+    #     # Check for export error
+    #     if progress_status == "failed":
+    #         raise Exception(
+    #             f"Export of {survey_name} failed, check "
+    #             + "gather_surveys.GetQualtricsSurveys._pull_qualtrics_data"
+    #         )
+    #     file_id = request_check_response.json()["result"]["fileId"]
 
-        # Download requested survey file
-        request_download_url = url + file_id + "/file"
-        request_download = requests.request(
-            "GET", request_download_url, headers=headers, stream=True
-        )
+    #     # Download requested survey file
+    #     request_download_url = url + file_id + "/file"
+    #     request_download = requests.request(
+    #         "GET", request_download_url, headers=headers, stream=True
+    #     )
 
-        # Extract compressed file
-        req_file_zipped = io.BytesIO(request_download.content)
-        with zipfile.ZipFile(req_file_zipped) as req_file:
-            with req_file.open(f"{survey_name}.csv") as f:
-                df = pd.read_csv(f)
-        print(f"\n\tSuccessfully downloaded : {survey_name}.csv\n")
-        return df
+    #     # Extract compressed file
+    #     req_file_zipped = io.BytesIO(request_download.content)
+    #     with zipfile.ZipFile(req_file_zipped) as req_file:
+    #         with req_file.open(f"{survey_name}.csv") as f:
+    #             df = pd.read_csv(f)
+    #     print(f"\n\tSuccessfully downloaded : {survey_name}.csv\n")
+    #     return df
 
     def make_raw_reports(self, visit_name):
         """Access the requested raw dataframe.

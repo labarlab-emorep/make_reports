@@ -4,6 +4,118 @@ import os
 from datetime import datetime
 from make_reports import gather_surveys, build_reports
 
+import json
+import importlib.resources as pkg_resources
+from make_reports import report_helper
+from make_reports import reference_files
+
+
+# %%
+def download_surveys(
+    proj_dir,
+    redcap_token=None,
+    qualtrics_token=None,
+    get_redcap=False,
+    get_qualtrics=False,
+):
+    """Title.
+
+    Desc.
+    """
+    # Communicate
+    if get_redcap:
+
+        # TODO check token
+
+        print("\nPulling RedCap surveys ...")
+        with pkg_resources.open_text(
+            reference_files, "report_keys_redcap.json"
+        ) as jf:
+            report_keys_redcap = json.load(jf)
+
+        redcap_tup = [
+            ("demographics", "redcap_demographics"),
+            ("consent_orig", "redcap_demographics"),
+            ("consent_new", "redcap_demographics"),
+            ("guid", "redcap_demographics"),
+            ("bdi_day2", "visit_day2"),
+            ("bdi_day3", "visit_day3"),
+        ]
+
+        # TODO validate survey list in report_keys_redcap
+
+        for sur_name, loc_dir in redcap_tup:
+            print(f"\t Downloading RedCap survey : {sur_name}")
+            report_id = report_keys_redcap[sur_name]
+            df = report_helper.pull_redcap_data(redcap_token, report_id)
+            out_file = os.path.join(
+                proj_dir,
+                "data_survey",
+                loc_dir,
+                "data_raw",
+                f"df_{sur_name}_latest.csv",
+            )
+            df.to_csv(out_file, index=False, na_rep="")
+            print(f"\t Wrote : {out_file}")
+
+    if get_qualtrics:
+
+        # TODO check token
+
+        with pkg_resources.open_text(
+            reference_files, "report_keys_qualtrics.json"
+        ) as jf:
+            report_keys_qualtrics = json.load(jf)
+        datacenter_id = report_keys_qualtrics["datacenter_ID"]
+
+        qualtrics_tup = [
+            ("EmoRep_Session_1", "visit_day1"),
+            (
+                "FINAL - EmoRep Stimulus Ratings - fMRI Study",
+                "post_scan_ratings",
+            ),
+            ("Session 2 & 3 Survey", "visit_day23"),
+        ]
+
+        for survey_name, loc_dir in qualtrics_tup:
+            post_labels = True if loc_dir == "post_scan_ratings" else False
+            survey_id = report_keys_qualtrics[survey_name]
+            df = report_helper.pull_qualtrics_data(
+                survey_name,
+                survey_id,
+                datacenter_id,
+                qualtrics_token,
+                post_labels,
+            )
+            if loc_dir == "visit_day23":
+                for day in ["visit_day2", "visit_day3"]:
+                    out_file = os.path.join(
+                        proj_dir,
+                        "data_survey",
+                        day,
+                        "data_raw",
+                        f"{survey_name}_latest.csv",
+                    )
+                    df.to_csv(out_file, index=False, na_rep="")
+            else:
+                out_file = os.path.join(
+                    proj_dir,
+                    "data_survey",
+                    loc_dir,
+                    "data_raw",
+                    f"{survey_name}_latest.csv",
+                )
+                df.to_csv(out_file, index=False, na_rep="")
+
+
+# %%
+def clean_surveys():
+    """Title.
+
+    Desc.
+    """
+    pass
+
 
 # %%
 def make_manager_reports(manager_reports, query_date, proj_dir, redcap_token):

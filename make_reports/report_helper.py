@@ -1,7 +1,9 @@
 """Report-agnostic supporting methods."""
+import sys
 import io
 import requests
 import csv
+import zipfile
 import pandas as pd
 import importlib.resources as pkg_resources
 from make_reports import reference_files
@@ -40,6 +42,108 @@ def pull_redcap_data(
     }
     r = requests.post("https://redcap.duke.edu/redcap/api/", data)
     df = pd.read_csv(io.StringIO(r.text), low_memory=False, na_values=None)
+    return df
+
+
+def pull_qualtrics_data(
+    survey_name, survey_id, datacenter_id, qualtrics_token, post_labels
+):
+    """Pull a Qualtrics report and make a pandas dataframe.
+
+    References guide at
+        https://api.qualtrics.com/ZG9jOjg3NzY3Nw-new-survey-response-export-guide
+
+    Parameters
+    ----------
+    survey_name : str
+        Qualtrics survey name
+
+
+
+
+    Returns
+    -------
+    pd.DataFrame
+
+    Raises
+    ------
+    TimeoutError
+        If response export progress takes too long
+
+    """
+    print(f"Downloading {survey_name} ...")
+
+    # Setting static parameters
+    request_check_progress = 0.0
+    progress_status = "inProgress"
+    url = (
+        f"https://{datacenter_id}.qualtrics.com/API/v3/surveys/{survey_id}"
+        + "/export-responses/"
+    )
+    headers = {
+        "content-type": "application/json",
+        "x-api-token": qualtrics_token,
+    }
+
+    # Create data export, submit download request
+    data = {"format": "csv"}
+    if post_labels:
+        data["useLabels"] = True
+    download_request_response = requests.request(
+        "POST", url, json=data, headers=headers
+    )
+    try:
+        progressId = download_request_response.json()["result"]["progressId"]
+    except KeyError:
+        print(download_request_response.json())
+        sys.exit(2)
+
+    # Check on data export progress, wait until export is ready
+    is_file = None
+    request_check_url = url + progressId
+    while (
+        progress_status != "complete"
+        and progress_status != "failed"
+        and is_file is None
+    ):
+        # Query status
+        request_check_response = requests.request(
+            "GET", request_check_url, headers=headers
+        )
+
+        # Update is_file when data export is ready
+        try:
+            is_file = request_check_response.json()["result"]["fileId"]
+        except KeyError:
+            pass
+
+        # Write data export progress for user, update progress_status
+        request_check_progress = request_check_response.json()["result"][
+            "percentComplete"
+        ]
+        print(f"\tDownload is {request_check_progress} complete")
+        progress_status = request_check_response.json()["result"]["status"]
+
+    # Check for export error
+    if progress_status == "failed":
+        raise Exception(
+            f"Export of {survey_name} failed, check "
+            + "gather_surveys.GetQualtricsSurveys._pull_qualtrics_data"
+        )
+    file_id = request_check_response.json()["result"]["fileId"]
+
+    # Download requested survey file
+    request_download_url = url + file_id + "/file"
+    request_download = requests.request(
+        "GET", request_download_url, headers=headers, stream=True
+    )
+
+    # Extract compressed file
+    req_file_zipped = io.BytesIO(request_download.content)
+    with zipfile.ZipFile(req_file_zipped) as req_file:
+        with req_file.open(f"{survey_name}.csv") as f:
+            df = pd.read_csv(f)
+    print(f"\n\tSuccessfully downloaded : {survey_name}.csv\n")
     return df
 
 
