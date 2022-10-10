@@ -26,14 +26,15 @@ def download_redcap(proj_dir, redcap_token, survey_name=None):
     ) as jf:
         report_keys_redcap = json.load(jf)
 
-    redcap_dict = {
-        "demographics": "redcap_demographics",
-        "consent_orig": "redcap_demographics",
-        "consent_new": "redcap_demographics",
-        "guid": "redcap_demographics",
-        "bdi_day2": "visit_day2",
-        "bdi_day3": "visit_day3",
-    }
+    # redcap_dict = {
+    #     "demographics": "redcap_demographics",
+    #     "consent_orig": "redcap_demographics",
+    #     "consent_new": "redcap_demographics",
+    #     "guid": "redcap_demographics",
+    #     "bdi_day2": "visit_day2",
+    #     "bdi_day3": "visit_day3",
+    # }
+    redcap_dict = report_helper.redcap_dict()
 
     # TODO validate survey list in report_keys_redcap
     # TODO validate survey_name in redcap_dict
@@ -80,11 +81,12 @@ def download_qualtrics(proj_dir, qualtrics_token, survey_name=None):
         report_keys_qualtrics = json.load(jf)
     datacenter_id = report_keys_qualtrics["datacenter_ID"]
 
-    qualtrics_dict = {
-        "EmoRep_Session_1": "visit_day1",
-        "FINAL - EmoRep Stimulus Ratings - fMRI Study": "post_scan_ratings",
-        "Session 2 & 3 Survey": "visit_day23",
-    }
+    # qualtrics_dict = {
+    #     "EmoRep_Session_1": "visit_day1",
+    #     "FINAL - EmoRep Stimulus Ratings - fMRI Study": "post_scan_ratings",
+    #     "Session 2 & 3 Survey": "visit_day23",
+    # }
+    qualtrics_dict = report_helper.qualtrics_dict()
 
     # TODO validate survey list in report_keys_redcap
     iter_dict = (

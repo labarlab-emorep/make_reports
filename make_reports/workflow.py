@@ -2,10 +2,11 @@
 # %%
 import os
 from datetime import datetime
-from make_reports import gather_surveys, build_reports
 
+# from make_reports import gather_surveys, build_reports
 
-from make_reports import survey_download
+from make_reports import survey_download, survey_clean
+from make_reports import report_helper
 
 
 # %%
@@ -49,12 +50,34 @@ def download_surveys(
 
 
 # %%
-def clean_surveys():
+def clean_surveys(proj_dir, clean_redcap=False):
     """Title.
 
     Desc.
     """
-    pass
+    if clean_redcap:
+        redcap_dict = report_helper.redcap_dict()
+        clean_redcap = survey_clean.CleanRedcap(proj_dir)
+        for sur_name, dir_name in redcap_dict.items():
+            clean_redcap.clean_surveys(sur_name)
+            clean_file = os.path.join(
+                proj_dir,
+                "data_survey",
+                dir_name,
+                "data_clean",
+                f"df_{sur_name}.csv",
+            )
+            clean_redcap.df_clean.to_csv(clean_file, index=False, na_rep="")
+            pilot_file = os.path.join(
+                proj_dir,
+                "data_pilot/data_survey",
+                dir_name,
+                "data_clean",
+                f"df_{sur_name}.csv",
+            )
+            if not os.path.exists(os.path.dirname(pilot_file)):
+                os.makedirs(os.path.dirname(pilot_file))
+            clean_redcap.df_pilot.to_csv(pilot_file, index=False, na_rep="")
 
 
 # %%

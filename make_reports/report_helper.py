@@ -218,3 +218,41 @@ def calc_age_mo(subj_dob, subj_dos):
         total_months = (12 * num_years) + num_months
         subj_age_mo.append(total_months)
     return subj_age_mo
+
+
+def pilot_list():
+    """Title.
+
+    Desc.
+
+    """
+    return ["ER0001", "ER0002", "ER0003", "ER0004", "ER0005"]
+
+
+def redcap_dict():
+    """Title.
+
+    Desc.
+
+    """
+    return {
+        "demographics": "redcap_demographics",
+        "consent_orig": "redcap_demographics",
+        "consent_new": "redcap_demographics",
+        "guid": "redcap_demographics",
+        "bdi_day2": "visit_day2",
+        "bdi_day3": "visit_day3",
+    }
+
+
+def qualtrics_dict():
+    """Title.
+
+    Desc.
+
+    """
+    return {
+        "EmoRep_Session_1": "visit_day1",
+        "FINAL - EmoRep Stimulus Ratings - fMRI Study": "post_scan_ratings",
+        "Session 2 & 3 Survey": "visit_day23",
+    }

@@ -54,16 +54,16 @@ class GetRedcapSurveys:
             Raw BDI responses for session day3
 
         """
-        # # Communicate
-        # print("\nPulling RedCap surveys ...")
+        # Communicate
+        print("\nPulling RedCap surveys ...")
 
-        # # Get BDI dataframes
-        # self.df_raw_bdi2 = report_helper.pull_redcap_data(
-        #     redcap_token, self.report_keys_redcap["bdi_day2"]
-        # )
-        # self.df_raw_bdi3 = report_helper.pull_redcap_data(
-        #     redcap_token, self.report_keys_redcap["bdi_day3"]
-        # )
+        # Get BDI dataframes
+        self.df_raw_bdi2 = report_helper.pull_redcap_data(
+            redcap_token, self.report_keys_redcap["bdi_day2"]
+        )
+        self.df_raw_bdi3 = report_helper.pull_redcap_data(
+            redcap_token, self.report_keys_redcap["bdi_day3"]
+        )
 
     # Make self.report_keys_redcap immutable
     @property
