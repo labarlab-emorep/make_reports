@@ -50,34 +50,112 @@ def download_surveys(
 
 
 # %%
+def _write_clean_redcap(data_clean, data_pilot, proj_dir, dir_name, sur_name):
+    """Title.
+
+    Desc.
+
+    """
+    clean_file = os.path.join(
+        proj_dir,
+        "data_survey",
+        dir_name,
+        "data_clean",
+        f"df_{sur_name}.csv",
+    )
+    data_clean.to_csv(clean_file, index=False, na_rep="")
+
+    pilot_file = os.path.join(
+        proj_dir,
+        "data_pilot/data_survey",
+        dir_name,
+        "data_clean",
+        f"df_{sur_name}.csv",
+    )
+    if not os.path.exists(os.path.dirname(pilot_file)):
+        os.makedirs(os.path.dirname(pilot_file))
+    data_pilot.to_csv(pilot_file, index=False, na_rep="")
+
+
+# %%
+def _write_clean_qualtrics(clean_dict, pilot_dict, proj_dir, dir_name):
+    """Title.
+
+    Desc.
+
+    """
+    for h_name, h_df in clean_dict.items():
+        out_file = os.path.join(
+            proj_dir,
+            "data_survey",
+            dir_name,
+            "data_clean",
+            f"df_{h_name}.csv",
+        )
+        print(f"\tWriting : {out_file}")
+        h_df.to_csv(out_file, index=False, na_rep="")
+
+    for h_name, h_df in pilot_dict.items():
+        out_file = os.path.join(
+            proj_dir,
+            "data_pilot/data_survey",
+            dir_name,
+            "data_clean",
+            f"df_{h_name}.csv",
+        )
+        print(f"\tWriting : {out_file}")
+        h_df.to_csv(out_file, index=False, na_rep="")
+
+
+# %%
 def clean_surveys(proj_dir, clean_redcap=False, clean_qualtrics=False):
     """Title.
 
     Desc.
+
+    Parameters
+    ----------
+    proj_dir
+    clean_redcap : bool
+    clean_qualtrics : bool
+
     """
     if clean_redcap:
         redcap_dict = report_helper.redcap_dict()
         clean_redcap = survey_clean.CleanRedcap(proj_dir)
         for sur_name, dir_name in redcap_dict.items():
             clean_redcap.clean_surveys(sur_name)
-            clean_file = os.path.join(
+            _write_clean_redcap(
+                clean_redcap.df_clean,
+                clean_redcap.df_pilot,
                 proj_dir,
-                "data_survey",
                 dir_name,
-                "data_clean",
-                f"df_{sur_name}.csv",
+                sur_name,
             )
-            clean_redcap.df_clean.to_csv(clean_file, index=False, na_rep="")
-            pilot_file = os.path.join(
-                proj_dir,
-                "data_pilot/data_survey",
-                dir_name,
-                "data_clean",
-                f"df_{sur_name}.csv",
-            )
-            if not os.path.exists(os.path.dirname(pilot_file)):
-                os.makedirs(os.path.dirname(pilot_file))
-            clean_redcap.df_pilot.to_csv(pilot_file, index=False, na_rep="")
+
+    if clean_qualtrics:
+        qualtrics_dict = report_helper.qualtrics_dict()
+        clean_qualtrics = survey_clean.CleanQualtrics(proj_dir)
+        for sur_name, dir_name in qualtrics_dict.items():
+            if dir_name == "post_scan_ratings":
+                continue
+            clean_qualtrics.clean_surveys(sur_name)
+
+            if dir_name == "visit_day1":
+                _write_clean_qualtrics(
+                    clean_qualtrics.data_clean,
+                    clean_qualtrics.data_pilot,
+                    proj_dir,
+                    dir_name,
+                )
+            elif dir_name == "visit_day23":
+                for vis_name in ["visit_day2", "visit_day3"]:
+                    _write_clean_qualtrics(
+                        clean_qualtrics.data_clean[vis_name],
+                        clean_qualtrics.data_pilot[vis_name],
+                        proj_dir,
+                        vis_name,
+                    )
 
 
 # %%

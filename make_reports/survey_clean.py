@@ -2,6 +2,7 @@
 # %%
 import os
 import pandas as pd
+import numpy as np
 from make_reports import report_helper
 
 
@@ -235,3 +236,222 @@ class CleanRedcap:
         ].index.tolist()
         self.df_pilot = df_raw.loc[idx_pilot]
         self.df_clean = df_raw.loc[idx_study]
+
+
+# %%
+class CleanQualtrics:
+    """Title.
+
+    Desc.
+
+    Parameters
+    ----------
+
+    Attributes
+    ----------
+    df_clean
+    df_pilot
+
+    """
+
+    def __init__(self, proj_dir):
+        """Title.
+
+        Desc.
+
+        Parameters
+        ----------
+        proj_dir
+
+        Attributes
+        ----------
+        proj_dir
+        redcap_dict
+        pilot_list
+
+        """
+        self.proj_dir = proj_dir
+        self.qualtrics_dict = report_helper.qualtrics_dict()
+        self.pilot_list = report_helper.pilot_list()
+
+    def clean_surveys(self, survey_name):
+        """Title.
+
+        Desc.
+
+        Parameters
+        ----------
+
+        Attributes
+        ----------
+        df_raw
+
+        """
+        visit_name = self.qualtrics_dict[survey_name]
+        visit_raw = (
+            "visit_day2"
+            if survey_name == "Session 2 & 3 Survey"
+            else self.qualtrics_dict[survey_name]
+        )
+        raw_path = os.path.join(
+            self.proj_dir,
+            "data_survey",
+            visit_raw,
+            "data_raw",
+        )
+        self.df_raw = pd.read_csv(
+            os.path.join(raw_path, f"{survey_name}_latest.csv")
+        )
+
+        # Get and run cleaning method
+        print(f"Cleaning survey : {survey_name}")
+        clean_method = getattr(self, f"_clean_{visit_name}")
+        clean_method()
+
+    def _clean_visit_day1(self):
+        """Title.
+
+        Desc.
+
+        Attributes
+        ----------
+        data_clean : dict
+        data_pilot : dict
+
+        """
+        surveys_visit1 = [
+            "ALS",
+            "AIM",
+            "ERQ",
+            "PSWQ",
+            "RRS",
+            "STAI",
+            "TAS",
+        ]
+
+        # Setup and identify column names
+        subj_cols = ["study_id"]
+        self.df_raw.rename(
+            {"RecipientLastName": subj_cols[0]}, axis=1, inplace=True
+        )
+        col_names = self.df_raw.columns
+
+        # Subset dataframe by survey key
+        data_clean = {}
+        data_pilot = {}
+        for sur_name in surveys_visit1:
+            print(f"\tCleaning survey data : day1, {sur_name}")
+            sur_cols = [x for x in col_names if sur_name in x]
+            ext_cols = subj_cols + sur_cols
+            df_sur = self.df_raw[ext_cols]
+
+            # Clean subset dataframe, writeout
+            df_sur = df_sur.fillna("NaN")
+            df_sur = df_sur[df_sur[subj_cols[0]].str.contains("ER")]
+            df_sur = df_sur.sort_values(by=[subj_cols[0]])
+
+            # Separate pilot from study data
+            idx_pilot = df_sur[
+                df_sur["study_id"].isin(self.pilot_list)
+            ].index.tolist()
+            idx_study = df_sur[
+                ~df_sur["study_id"].isin(self.pilot_list)
+            ].index.tolist()
+            df_pilot = df_sur.loc[idx_pilot]
+            df_clean = df_sur.loc[idx_study]
+
+            # Update dictionaries
+            data_pilot[sur_name] = df_pilot
+            data_clean[sur_name] = df_clean
+            del df_sur
+            del df_pilot
+            del df_clean
+
+        self.data_clean = data_clean
+        self.data_pilot = data_pilot
+
+    def _clean_visit_day23(self):
+        """Title.
+
+        Desc.
+
+        Attributes
+        ----------
+        data_clean
+        data_pilot
+
+        """
+        surveys_visit23 = ["PANAS", "STAI_State"]
+
+        # Identify session, how session is coded in raw data
+        day_dict = {"day2": "1", "day3": "2"}
+        # day_str = visit_name.split("_")[1]
+        # if day_str not in day_dict.keys():
+        #     raise ValueError(f"Inapproproiate visit_name : {visit_name}")
+        # print(f"Cleaning raw survey data : {day_str}")
+        # day_code = day_dict[day_str]
+
+        # Get dataframe and setup output column names
+        subj_cols = ["study_id", "visit"]
+        self.df_raw.rename(
+            {"SubID": subj_cols[0], "Session_Num": subj_cols[1]},
+            axis=1,
+            inplace=True,
+        )
+        col_names = self.df_raw.columns
+
+        # Get relevant info from dataframe
+        data_clean = {}
+        data_pilot = {}
+        for day_str, day_code in day_dict.items():
+            data_clean[f"visit_{day_str}"] = {}
+            data_pilot[f"visit_{day_str}"] = {}
+            for sur_key in surveys_visit23:
+                print(f"\tCleaning survey data : {day_str}, {sur_key}")
+                sur_cols = [x for x in col_names if sur_key in x]
+                ext_cols = subj_cols + sur_cols
+                df_sub = self.df_raw[ext_cols]
+                df_sub = df_sub.fillna("NaN")
+
+                # Organize rows and columns, get visit-specific responses
+                df_sub = df_sub[df_sub[subj_cols[0]].str.contains("ER")]
+                df_sub[subj_cols[1]] = np.where(
+                    df_sub[subj_cols[1]] == day_code,
+                    day_str,
+                    df_sub[subj_cols[1]],
+                )
+                df_sub = df_sub[df_sub[subj_cols[1]].str.contains(day_str)]
+                df_sub = df_sub.sort_values(by=[subj_cols[0]])
+
+                # Separate pilot from study data
+                idx_pilot = df_sub[
+                    df_sub["study_id"].isin(self.pilot_list)
+                ].index.tolist()
+                idx_study = df_sub[
+                    ~df_sub["study_id"].isin(self.pilot_list)
+                ].index.tolist()
+                df_pilot = df_sub.loc[idx_pilot]
+                df_clean = df_sub.loc[idx_study]
+
+                # Update dicts
+                data_clean[f"visit_{day_str}"][sur_key] = df_clean
+                data_pilot[f"visit_{day_str}"][sur_key] = df_pilot
+                del df_sub
+                del df_clean
+                del df_pilot
+
+        self.data_clean = data_clean
+        self.data_pilot = data_pilot
+
+    def _clean_post_scan_ratings():
+        """Title.
+
+        Desc.
+
+        Attributes
+        ----------
+        df_clean
+        df_pilot
+
+        """
+        pass
