@@ -135,6 +135,39 @@ class CleanRedcap:
                 raise TypeError(f"Unrecognized datetime str: {dob}.")
         return dob_clean
 
+    def _get_educ_years(self):
+        """Get participant education level.
+
+        Use info from years_education column of df_demo when they are numeric,
+        otherwise use the educate_switch to convert from level of education
+        to number of years.
+
+
+            Number of years completed of education (int)
+
+        """
+        # Convert education level to years
+        educate_switch = {2: 12, 3: 13, 4: 14, 5: 16, 6: 17, 7: 18, 8: 20}
+
+        # Get education level, and self-report of years educated
+        edu_year = self.df_raw["years_education"].tolist()
+        edu_level = self.df_raw["level_education"].tolist()
+        record_id = self.df_raw["record_id"].tolist()
+
+        # Convert into years (deal with self-reports)
+        subj_educate = []
+        for h_year, h_level, h_id in zip(edu_year, edu_level, record_id):
+            print(h_year, h_level, h_id)
+            # Patch for 1984 education issue
+            if h_year == "1984":
+                subj_educate.append(educate_switch[8])
+            else:
+                try:
+                    subj_educate.append(int(h_year))
+                except ValueError:
+                    subj_educate.append(educate_switch[h_level])
+        return subj_educate
+
     def _clean_demographics(self):
         """Title.
 
@@ -144,22 +177,28 @@ class CleanRedcap:
         # Reorder columns, drop rows without last name response
         col_names = self.df_raw.columns.tolist()
         col_reorder = col_names[-1:] + col_names[-2:-1] + col_names[:-2]
-        df_raw = self.df_raw[col_reorder]
-        df_raw = df_raw[df_raw["lastname"].notna()]
+        self.df_raw = self.df_raw[col_reorder]
+        self.df_raw = self.df_raw[self.df_raw["lastname"].notna()]
 
         # Convert DOB response to datetime
-        dob_list = df_raw["dob"].tolist()
+        dob_list = self.df_raw["dob"].tolist()
         dob_clean = self._dob_convert(dob_list)
-        df_raw["dob"] = dob_clean
+        self.df_raw["dob"] = dob_clean
+
+        # Fix years of education
+        yrs_edu = self._get_educ_years()
+        self.df_raw["years_education"] = yrs_edu
 
         # Separate pilot from study data
         pilot_list = [int(x[-1]) for x in self.pilot_list]
-        idx_pilot = df_raw[df_raw["record_id"].isin(pilot_list)].index.tolist()
-        idx_study = df_raw[
-            ~df_raw["record_id"].isin(pilot_list)
+        idx_pilot = self.df_raw[
+            self.df_raw["record_id"].isin(pilot_list)
         ].index.tolist()
-        self.df_pilot = df_raw.loc[idx_pilot]
-        self.df_clean = df_raw.loc[idx_study]
+        idx_study = self.df_raw[
+            ~self.df_raw["record_id"].isin(pilot_list)
+        ].index.tolist()
+        self.df_pilot = self.df_raw.loc[idx_pilot]
+        self.df_clean = self.df_raw.loc[idx_study]
 
     def _clean_consent(self):
         """Title.

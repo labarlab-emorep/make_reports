@@ -10,12 +10,374 @@ be prepended to the dataframe, per NDARs double-header.
 
 """
 # %%
+import os
 import pandas as pd
 import numpy as np
 from datetime import datetime
 from make_reports import report_helper
 
 
+# %%
+class DemoAll:
+    """Title
+
+    Desc.
+
+    Attributes
+    ----------
+
+    """
+
+    def __init__(self, proj_dir):
+        """Title
+
+        Desc.
+
+        Attributes
+        ----------
+        proj_dir
+
+        """
+        print(
+            "\nBuilding final_demo from RedCap demographic,"
+            + " guid, consent reports ..."
+        )
+        self.proj_dir = proj_dir
+
+        # Get cleaned data, get index and list of participants
+        # who have consented
+        self._read_data()
+        self._get_consent()
+
+        # Run methods
+        print("\tCompiling needed demographic info ...")
+        self.make_complete()
+
+    def _read_data(self):
+        """Title
+
+        Desc.
+
+        Attributes
+        ----------
+        df_guid
+        df_demo
+        df_consent
+
+        """
+        # Set key, df mapping
+        map_dict = {
+            "cons_orig": "df_consent_orig.csv",
+            "cons_new": "df_consent_new.csv",
+            "demo": "df_demographics.csv",
+            "guid": "df_guid.csv",
+        }
+
+        # Read in study reports
+        redcap_clean = os.path.join(
+            self.proj_dir, "data_survey", "redcap_demographics", "data_clean"
+        )
+        clean_dict = {}
+        for h_key, h_df in map_dict.items():
+            clean_dict[h_key] = pd.read_csv(os.path.join(redcap_clean, h_df))
+
+        # Read in pilot reports
+        redcap_pilot = os.path.join(
+            self.proj_dir,
+            "data_pilot/data_survey",
+            "redcap_demographics",
+            "data_clean",
+        )
+        pilot_dict = {}
+        for h_key, h_df in map_dict.items():
+            pilot_dict[h_key] = pd.read_csv(os.path.join(redcap_pilot, h_df))
+
+        # Merge study, pilot
+        df_cons_orig = pd.concat(
+            [pilot_dict["cons_orig"], clean_dict["cons_orig"]],
+            ignore_index=True,
+        )
+        df_cons_new = pd.concat(
+            [pilot_dict["cons_new"], clean_dict["cons_new"]], ignore_index=True
+        )
+        self.df_demo = pd.concat(
+            [pilot_dict["demo"], clean_dict["demo"]], ignore_index=True
+        )
+        self.df_guid = pd.concat(
+            [pilot_dict["guid"], clean_dict["guid"]], ignore_index=True
+        )
+        del pilot_dict, clean_dict
+
+        # Update consent_new column names, merge
+        cols_new = df_cons_new.columns.tolist()
+        cols_orig = df_cons_orig.columns.tolist()
+        cols_replace = {}
+        for h_new, h_orig in zip(cols_new, cols_orig):
+            cols_replace[h_new] = h_orig
+        df_cons_new = df_cons_new.rename(columns=cols_replace)
+        self.df_consent = df_cons_new.combine_first(df_cons_orig)
+        del df_cons_new, df_cons_orig
+
+    def _get_consent(self):
+        """Title
+
+        Desc.
+
+        Attributes
+        ----------
+        idx_demo
+        idx_guid
+        idx_consent
+        subj_consent
+        subj_guid
+        subj_demo
+
+        """
+        # Subj consent
+        idx_consent = self.df_consent.index[
+            self.df_consent["consent"] == 1.0
+        ].tolist()
+        subj_consent = self.df_consent.loc[idx_consent, "record_id"]
+
+        # TODO something here to adjust idx/subj_consent if participants
+        # withdraw consent in the future.
+
+        # GUID
+        idx_guid = self.df_guid[
+            self.df_guid["record_id"].isin(subj_consent)
+        ].index.tolist()
+
+        # Purge subjects who do not have GUID from idx, subj lists
+        h_subj_guid = self.df_guid.loc[idx_guid, "guid"].tolist()
+        idx_nan = np.where(pd.isnull(h_subj_guid))[0].tolist()
+        if idx_nan:
+            idx_guid = [
+                x for idx, x in enumerate(idx_guid) if idx not in idx_nan
+            ]
+            idx_consent = [
+                x for idx, x in enumerate(idx_consent) if idx not in idx_nan
+            ]
+            subj_consent = [
+                x for idx, x in enumerate(subj_consent) if idx not in idx_nan
+            ]
+        subj_guid = self.df_guid.loc[idx_guid, "guid"].tolist()
+
+        # demo
+        idx_demo = self.df_demo[
+            self.df_demo["record_id"].isin(subj_consent)
+        ].index.tolist()
+        subj_study = self.df_guid.loc[idx_guid, "study_id"].tolist()
+
+        # Set attributes here to avoid using them above
+        self.idx_guid = idx_guid
+        self.idx_demo = idx_demo
+        self.idx_consent = idx_consent
+        self.subj_consent = subj_consent
+        self.subj_guid = subj_guid
+        self.subj_study = subj_study
+
+    # def _get_educate(self):
+    #     """Get participant education level.
+
+    #     Use info from years_education column of df_demo when they are numeric,
+    #     otherwise use the educate_switch to convert from level of education
+    #     to number of years.
+
+    #     Attributes
+    #     ----------
+    #         Number of years completed of education (int)
+
+    #     """
+    #     # Convert education level to years
+    #     educate_switch = {2: 12, 4: 14, 5: 16, 7: 18, 8: 20}
+
+    #     # Get education level, and self-report of years educated
+    #     edu_year = self.df_demo.loc[self.idx_demo, "years_education"].tolist()
+    #     edu_level = self.df_demo.loc[self.idx_demo, "level_education"].tolist()
+
+    #     # Convert into years (deal with self-reports)
+    #     subj_educate = []
+    #     for h_year, h_level in zip(edu_year, edu_level):
+    #         print(h_year, type(h_year))
+
+    #         # Patch for 1984 education issue
+    #         if h_year == "1984":
+    #             subj_educate.append(educate_switch[8])
+    #         elif h_year.isnumeric():
+    #             subj_educate.append(int(h_year))
+    #         else:
+    #             subj_educate.append(educate_switch[h_level])
+    #     self.subj_educate = subj_educate
+
+    def _get_race(self):
+        """Get participant race response.
+
+        Account for single response, single response of
+        multiple, multiple responses (which may not include
+        the multiple option), and "other" responses.
+
+        Attributes
+        ----------
+
+
+        list
+            Participant responses to race question
+
+        """
+        # Get race response - deal with "More than one" (6) and
+        # "Other" (8) separately.
+        race_switch = {
+            1: "American Indian or Alaska Native",
+            2: "Asian",
+            3: "Black or African-American",
+            4: "White",
+            5: "Native Hawaiian or Other Pacific Islander",
+            7: "Unknown or not reported",
+        }
+        get_race_resp = [
+            (self.df_demo["race___1"] == 1),
+            (self.df_demo["race___2"] == 1),
+            (self.df_demo["race___3"] == 1),
+            (self.df_demo["race___4"] == 1),
+            (self.df_demo["race___5"] == 1),
+            (self.df_demo["race___7"] == 1),
+        ]
+        set_race_str = [
+            race_switch[1],
+            race_switch[2],
+            race_switch[3],
+            race_switch[4],
+            race_switch[5],
+            race_switch[7],
+        ]
+
+        # Get race responses, set to new column
+        self.df_demo["race_resp"] = np.select(get_race_resp, set_race_str)
+
+        # Capture "Other" responses, stitch response together
+        idx_other = self.df_demo.index[self.df_demo["race___8"] == 1].tolist()
+        race_other = [
+            f"Other - {x}"
+            for x in self.df_demo.loc[idx_other, "race_other"].tolist()
+        ]
+        self.df_demo.loc[idx_other, "race_resp"] = race_other
+
+        # Capture "More than one race" responses, write to df_demo["race_more"]
+        idx_more = self.df_demo.index[self.df_demo["race___6"] == 1].tolist()
+        self.df_demo["race_more"] = np.nan
+        self.df_demo.loc[idx_more, "race_more"] = "More"
+
+        # Capture multiple race responses (in case option 6 not selected)
+        col_list = [
+            "race___1",
+            "race___2",
+            "race___3",
+            "race___4",
+            "race___5",
+            "race___7",
+            "race___8",
+        ]
+        self.df_demo["race_sum"] = self.df_demo[col_list].sum(axis=1)
+        idx_mult = self.df_demo.index[self.df_demo["race_sum"] > 1].tolist()
+        self.df_demo.loc[idx_mult, "race_more"] = "More"
+
+        # Update race_resp col with responses in df_demo["race_more"]
+        idx_more = self.df_demo.index[
+            self.df_demo["race_more"] == "More"
+        ].tolist()
+        self.df_demo.loc[idx_more, "race_resp"] = "More than one race"
+        race_resp = self.df_demo.loc[self.idx_demo, "race_resp"].tolist()
+        self.race_resp = race_resp
+
+    def _get_ethnic_minority(self):
+        """Determine if participant is considered a minority.
+
+        Parameters
+        ----------
+        subj_race : list
+            Participant race responses
+
+        Attributes
+        -------
+
+        tuple
+            [0] list of participants' ethnicity status
+            [1] list of whether participants' are minority
+
+        """
+        # Get ethnicity
+        h_ethnic = self.df_demo.loc[self.idx_demo, "ethnicity"].tolist()
+        ethnic_switch = {
+            1.0: "Hispanic or Latino",
+            2.0: "Not Hispanic or Latino",
+        }
+        subj_ethnic = [ethnic_switch[x] for x in h_ethnic]
+
+        # Determine if minority - not white or hispanic
+        subj_minor = []
+        for race, ethnic in zip(self.race_resp, subj_ethnic):
+            if race != "White" and ethnic == "Not Hispanic or Latino":
+                subj_minor.append("Minority")
+            else:
+                subj_minor.append("Not Minority")
+        self.subj_ethnic = subj_ethnic
+        self.subj_minor = subj_minor
+
+    def make_complete(self):
+        """Make a demographic dataframe with all needed information.
+
+        Pull relevant data from consent, GUID, and demographic reports
+        to compile data for all participants in RedCap who have consented.
+
+        Attributes
+        ----------
+        final_demo : pd.DataFrame
+            Complete report containing demographic info for NDA submission
+
+        """
+        # Get consent date
+        self.df_consent["datetime"] = pd.to_datetime(self.df_consent["date"])
+        self.df_consent["datetime"] = self.df_consent["datetime"].dt.date
+        subj_consent_date = self.df_consent.loc[
+            self.idx_consent, "datetime"
+        ].tolist()
+
+        # Get age, sex
+        subj_age = self.df_demo.loc[self.idx_demo, "age"].tolist()
+        h_sex = self.df_demo.loc[self.idx_demo, "gender"].tolist()
+        sex_switch = {1.0: "Male", 2.0: "Female", 3.0: "Neither"}
+        subj_sex = [sex_switch[x] for x in h_sex]
+
+        # Get DOB, age in months, education
+        subj_dob = self.df_demo["dob"]
+        subj_dob_dt = [
+            datetime.strptime(x, "%Y-%m-%d").date() for x in subj_dob
+        ]
+        subj_age_mo = report_helper.calc_age_mo(subj_dob_dt, subj_consent_date)
+        subj_educate = self.df_demo["years_education"]
+
+        # Get race, ethnicity, minority status
+        self._get_race()
+        self._get_ethnic_minority()
+
+        # Write dataframe
+        out_dict = {
+            "subjectkey": self.subj_guid,
+            "src_subject_id": self.subj_study,
+            "interview_date": subj_consent_date,
+            "interview_age": subj_age_mo,
+            "sex": subj_sex,
+            "age": subj_age,
+            "dob": subj_dob,
+            "ethnicity": self.subj_ethnic,
+            "race": self.race_resp,
+            "is_minority": self.subj_minor,
+            "years_education": subj_educate,
+        }
+        self.final_demo = pd.DataFrame(out_dict, columns=out_dict.keys())
+
+
+# %%
 class ManagerRegular:
     """Make reports regularly submitted by lab manager.
 

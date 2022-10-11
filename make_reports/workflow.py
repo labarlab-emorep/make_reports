@@ -2,10 +2,8 @@
 # %%
 import os
 from datetime import datetime
-
-# from make_reports import gather_surveys, build_reports
-
 from make_reports import survey_download, survey_clean
+from make_reports import build_reports
 from make_reports import report_helper
 
 
@@ -50,64 +48,6 @@ def download_surveys(
 
 
 # %%
-def _write_clean_redcap(data_clean, data_pilot, proj_dir, dir_name, sur_name):
-    """Title.
-
-    Desc.
-
-    """
-    clean_file = os.path.join(
-        proj_dir,
-        "data_survey",
-        dir_name,
-        "data_clean",
-        f"df_{sur_name}.csv",
-    )
-    data_clean.to_csv(clean_file, index=False, na_rep="")
-
-    pilot_file = os.path.join(
-        proj_dir,
-        "data_pilot/data_survey",
-        dir_name,
-        "data_clean",
-        f"df_{sur_name}.csv",
-    )
-    if not os.path.exists(os.path.dirname(pilot_file)):
-        os.makedirs(os.path.dirname(pilot_file))
-    data_pilot.to_csv(pilot_file, index=False, na_rep="")
-
-
-# %%
-def _write_clean_qualtrics(clean_dict, pilot_dict, proj_dir, dir_name):
-    """Title.
-
-    Desc.
-
-    """
-    for h_name, h_df in clean_dict.items():
-        out_file = os.path.join(
-            proj_dir,
-            "data_survey",
-            dir_name,
-            "data_clean",
-            f"df_{h_name}.csv",
-        )
-        print(f"\tWriting : {out_file}")
-        h_df.to_csv(out_file, index=False, na_rep="")
-
-    for h_name, h_df in pilot_dict.items():
-        out_file = os.path.join(
-            proj_dir,
-            "data_pilot/data_survey",
-            dir_name,
-            "data_clean",
-            f"df_{h_name}.csv",
-        )
-        print(f"\tWriting : {out_file}")
-        h_df.to_csv(out_file, index=False, na_rep="")
-
-
-# %%
 def clean_surveys(proj_dir, clean_redcap=False, clean_qualtrics=False):
     """Title.
 
@@ -120,6 +60,61 @@ def clean_surveys(proj_dir, clean_redcap=False, clean_qualtrics=False):
     clean_qualtrics : bool
 
     """
+
+    def _write_clean_redcap(data_clean, data_pilot, dir_name, sur_name):
+        """Title.
+
+        Desc.
+
+        """
+        clean_file = os.path.join(
+            proj_dir,
+            "data_survey",
+            dir_name,
+            "data_clean",
+            f"df_{sur_name}.csv",
+        )
+        data_clean.to_csv(clean_file, index=False, na_rep="")
+
+        pilot_file = os.path.join(
+            proj_dir,
+            "data_pilot/data_survey",
+            dir_name,
+            "data_clean",
+            f"df_{sur_name}.csv",
+        )
+        if not os.path.exists(os.path.dirname(pilot_file)):
+            os.makedirs(os.path.dirname(pilot_file))
+        data_pilot.to_csv(pilot_file, index=False, na_rep="")
+
+    def _write_clean_qualtrics(clean_dict, pilot_dict, dir_name):
+        """Title.
+
+        Desc.
+
+        """
+        for h_name, h_df in clean_dict.items():
+            out_file = os.path.join(
+                proj_dir,
+                "data_survey",
+                dir_name,
+                "data_clean",
+                f"df_{h_name}.csv",
+            )
+            print(f"\tWriting : {out_file}")
+            h_df.to_csv(out_file, index=False, na_rep="")
+
+        for h_name, h_df in pilot_dict.items():
+            out_file = os.path.join(
+                proj_dir,
+                "data_pilot/data_survey",
+                dir_name,
+                "data_clean",
+                f"df_{h_name}.csv",
+            )
+            print(f"\tWriting : {out_file}")
+            h_df.to_csv(out_file, index=False, na_rep="")
+
     if clean_redcap:
         redcap_dict = report_helper.redcap_dict()
         clean_redcap = survey_clean.CleanRedcap(proj_dir)
@@ -128,7 +123,6 @@ def clean_surveys(proj_dir, clean_redcap=False, clean_qualtrics=False):
             _write_clean_redcap(
                 clean_redcap.df_clean,
                 clean_redcap.df_pilot,
-                proj_dir,
                 dir_name,
                 sur_name,
             )
@@ -145,7 +139,6 @@ def clean_surveys(proj_dir, clean_redcap=False, clean_qualtrics=False):
                 _write_clean_qualtrics(
                     clean_qualtrics.data_clean,
                     clean_qualtrics.data_pilot,
-                    proj_dir,
                     dir_name,
                 )
             elif dir_name == "visit_day23":
@@ -153,13 +146,12 @@ def clean_surveys(proj_dir, clean_redcap=False, clean_qualtrics=False):
                     _write_clean_qualtrics(
                         clean_qualtrics.data_clean[vis_name],
                         clean_qualtrics.data_pilot[vis_name],
-                        proj_dir,
                         vis_name,
                     )
 
 
 # %%
-def make_manager_reports(manager_reports, query_date, proj_dir, redcap_token):
+def make_manager_reports(manager_reports, query_date, proj_dir):
     """Make reports for the lab manager.
 
     Coordinate the use of build_reports.ManagerRegular to generate
@@ -174,8 +166,7 @@ def make_manager_reports(manager_reports, query_date, proj_dir, redcap_token):
         Date for finding report range
     proj_dir : path
         Project's experiment directory
-    redcap_token : str
-        RedCap API token
+
 
     Returns
     -------
@@ -190,11 +181,11 @@ def make_manager_reports(manager_reports, query_date, proj_dir, redcap_token):
 
     """
     # Validate redcap token
-    if not redcap_token:
-        raise ValueError(
-            "RedCap API token required for --manager-reports."
-            + " Please specify --redcap-token."
-        )
+    # if not redcap_token:
+    #     raise ValueError(
+    #         "RedCap API token required for --manager-reports."
+    #         + " Please specify --redcap-token."
+    #     )
 
     # Validate manager_reports arguments
     valid_mr_args = ["nih12", "nih4", "duke3"]
@@ -217,7 +208,8 @@ def make_manager_reports(manager_reports, query_date, proj_dir, redcap_token):
         os.makedirs(manager_dir)
 
     # Query RedCap demographic info
-    redcap_demo = gather_surveys.GetRedcapDemographic(redcap_token)
+    # redcap_demo = gather_surveys.GetRedcapDemographic(redcap_token)
+    redcap_demo = build_reports.DemoAll(proj_dir)
 
     # Generate reports
     for report in manager_reports:
