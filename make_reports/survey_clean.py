@@ -60,27 +60,40 @@ class CleanRedcap:
             self.redcap_dict[survey_name],
             "data_raw",
         )
-        # raw_path = os.path.join(
-        #     proj_dir,
-        #     "data_survey",
-        #     redcap_dict[survey_name],
-        #     "data_raw",
-        # )
         self.df_raw = pd.read_csv(
             os.path.join(raw_path, f"df_{survey_name}_latest.csv")
         )
 
-        # Get clean method
+        # Get and run cleaning method
+        print(f"Cleaning survey : {survey_name}")
         if survey_name == "bdi_day2" or survey_name == "bdi_day3":
             self._clean_bdi_day23()
+        elif survey_name == "consent_new" or survey_name == "consent_orig":
+            self._clean_consent()
         else:
             clean_method = getattr(self, f"_clean_{survey_name}")
             clean_method()
 
     def _dob_convert(self, dob_list):
-        """Title.
+        """Helper method for _clean_demographics.
 
-        Desc.
+        Convert list of date-of-birth responses to datetime objects.
+
+        Parameters
+        ----------
+        dob_list : list
+            Participant date-of-birth responses
+
+        Returns
+        -------
+        list
+
+        Raises
+        ------
+        ValueError
+            When numeric dob response does not match expected formats
+        TypeError
+            When dob response does not match expected formats
 
         """
 
@@ -127,6 +140,7 @@ class CleanRedcap:
         Desc.
 
         """
+        # Reorder columns, drop rows without last name response
         col_names = self.df_raw.columns.tolist()
         col_reorder = col_names[-1:] + col_names[-2:-1] + col_names[:-2]
         df_raw = self.df_raw[col_reorder]
@@ -146,29 +160,46 @@ class CleanRedcap:
         self.df_pilot = df_raw.loc[idx_pilot]
         self.df_clean = df_raw.loc[idx_study]
 
-    def _clean_consent_orig():
+    def _clean_consent(self):
         """Title.
 
         Desc.
 
         """
-        pass
+        # Drop rows without signature
+        col_names = self.df_raw.columns.tolist()
+        col_drop = (
+            "signature_v2" if "signature_v2" in col_names else "signature"
+        )
+        df_raw = self.df_raw[self.df_raw[col_drop].notna()]
 
-    def _clean_consent_new():
+        # Separate pilot from study data
+        pilot_list = [int(x[-1]) for x in self.pilot_list]
+        idx_pilot = df_raw[df_raw["record_id"].isin(pilot_list)].index.tolist()
+        idx_study = df_raw[
+            ~df_raw["record_id"].isin(pilot_list)
+        ].index.tolist()
+        self.df_pilot = df_raw.loc[idx_pilot]
+        self.df_clean = df_raw.loc[idx_study]
+
+    def _clean_guid(self):
         """Title.
 
         Desc.
 
         """
-        pass
+        # Drop rows without guid
+        df_raw = self.df_raw[self.df_raw["guid"].notna()]
 
-    def _clean_guid():
-        """Title.
-
-        Desc.
-
-        """
-        pass
+        # Separate pilot from study data
+        idx_pilot = df_raw[
+            df_raw["study_id"].isin(self.pilot_list)
+        ].index.tolist()
+        idx_study = df_raw[
+            ~df_raw["study_id"].isin(self.pilot_list)
+        ].index.tolist()
+        self.df_pilot = df_raw.loc[idx_pilot]
+        self.df_clean = df_raw.loc[idx_study]
 
     def _clean_bdi_day23(self):
         """Title.
@@ -192,7 +223,8 @@ class CleanRedcap:
 
         # Remove rows without responses or study_id (from guid survey)
         df_raw = df_raw[df_raw["study_id"].notna()]
-        df_raw = df_raw[df_raw["q_1"].notna()]
+        col_drop = "q_1_v2" if "q_1_v2" in col_names else "q_1"
+        df_raw = df_raw[df_raw[col_drop].notna()]
 
         # Separate pilot from study data
         idx_pilot = df_raw[
