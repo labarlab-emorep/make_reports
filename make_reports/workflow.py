@@ -50,7 +50,7 @@ def download_surveys(
 
 
 # %%
-def clean_surveys(proj_dir, clean_redcap=False):
+def clean_surveys(proj_dir, clean_redcap=False, clean_qualtrics=False):
     """Title.
 
     Desc.
