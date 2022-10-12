@@ -220,6 +220,32 @@ def calc_age_mo(subj_dob, subj_dos):
     return subj_age_mo
 
 
+def get_survey_age(df_survey, df_demo, subj_col):
+    """Title.
+
+    Desc.
+
+    """
+    # TODO check for datetime column
+
+    df_survey["interview_date"] = df_survey["datetime"]
+    df_survey["datetime"] = pd.to_datetime(df_survey["datetime"])
+    subj_survey = df_survey[subj_col].tolist()
+    subj_dos = df_survey["datetime"].tolist()
+
+    df_demo["dob"] = pd.to_datetime(df_demo["dob"])
+    idx_demo = df_demo[
+        df_demo["src_subject_id"].isin(subj_survey)
+    ].index.tolist()
+    subj_dob = df_demo.loc[idx_demo, "dob"].tolist()
+
+    if len(subj_dob) != len(subj_dos):
+        raise IndexError("Length of subj DOB does not match subj DOS.")
+    subj_age_mo = calc_age_mo(subj_dob, subj_dos)
+    df_survey["interview_age"] = subj_age_mo
+    return df_survey
+
+
 def pilot_list():
     """Title.
 

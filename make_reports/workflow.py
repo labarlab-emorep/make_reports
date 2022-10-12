@@ -284,6 +284,8 @@ def make_nda_reports(
     redcap_demo = build_reports.DemoAll(proj_dir)
     redcap_demo.remove_withdrawn()
 
+    final_demo = redcap_demo.final_demo
+
     # Make requested reports
     for report in nda_reports:
 

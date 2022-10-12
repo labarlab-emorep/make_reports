@@ -745,9 +745,11 @@ class NdarAffim01:
                 "df_AIM.csv",
             )
         )
+        df_aim = pd.concat([df_pilot, df_study], ignore_index=True)
+        del df_pilot, df_study
 
         # Rename columns, drop NaN rows
-        df_aim = df_aim.rename(columns={"SubID": "src_subject_id"})
+        df_aim = df_aim.rename(columns={"study_id": "src_subject_id"})
         df_aim.columns = df_aim.columns.str.lower()
         df_aim = df_aim.replace("NaN", np.nan)
         self.df_aim = df_aim[df_aim["aim_1"].notna()]
@@ -767,9 +769,18 @@ class NdarAffim01:
 
         """
         # Get final_demo cols
-        df_final = self.final_demo.iloc[:, 0:5]
-        df_final["sex"] = df_final["sex"].replace(
+        # df_final = self.final_demo.iloc[:, 0:5]
+        # df_final["sex"] = df_final["sex"].replace(
+        #     ["Male", "Female", "Neither"], ["M", "F", "O"]
+        # )
+        df_nda = final_demo[["subjectkey", "src_subject_id", "sex"]]
+        df_nda["sex"] = df_nda["sex"].replace(
             ["Male", "Female", "Neither"], ["M", "F", "O"]
+        )
+        df_survey = pd.merge(df_aim, df_nda, on="src_subject_id")
+
+        df_survey = report_helper.get_survey_age(
+            df_survey, final_demo, "src_subject_id"
         )
 
         # Sum aim responses, toggle pandas warning mode
