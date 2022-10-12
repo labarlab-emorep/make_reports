@@ -157,7 +157,7 @@ class CleanRedcap:
         # Convert into years (deal with self-reports)
         subj_educate = []
         for h_year, h_level, h_id in zip(edu_year, edu_level, record_id):
-            print(h_year, h_level, h_id)
+            # print(h_year, h_level, h_id)
             # Patch for 1984 education issue
             if h_year == "1984":
                 subj_educate.append(educate_switch[8])
@@ -266,6 +266,20 @@ class CleanRedcap:
         col_drop = "q_1_v2" if "q_1_v2" in col_names else "q_1"
         df_raw = df_raw[df_raw[col_drop].notna()]
 
+        # Enforce datetime format
+        col_rename = (
+            "bdi_2_timestamp"
+            if "bdi_2_timestamp" in col_names
+            else "bdi_timestamp"
+        )
+        df_raw.rename(
+            {col_rename: "datetime"},
+            axis=1,
+            inplace=True,
+        )
+        df_raw["datetime"] = pd.to_datetime(df_raw["datetime"])
+        df_raw["datetime"] = df_raw["datetime"].dt.strftime("%Y-%m-%d")
+
         # Separate pilot from study data
         idx_pilot = df_raw[
             df_raw["study_id"].isin(self.pilot_list)
@@ -370,9 +384,11 @@ class CleanQualtrics:
         ]
 
         # Setup and identify column names
-        subj_cols = ["study_id"]
+        subj_cols = ["study_id", "datetime"]
         self.df_raw.rename(
-            {"RecipientLastName": subj_cols[0]}, axis=1, inplace=True
+            {"RecipientLastName": subj_cols[0], "StartDate": subj_cols[1]},
+            axis=1,
+            inplace=True,
         )
         col_names = self.df_raw.columns
 
@@ -385,10 +401,14 @@ class CleanQualtrics:
             ext_cols = subj_cols + sur_cols
             df_sur = self.df_raw[ext_cols]
 
-            # Clean subset dataframe, writeout
+            # Clean subset dataframe
             df_sur = df_sur.dropna()
             df_sur = df_sur[df_sur[subj_cols[0]].str.contains("ER")]
             df_sur = df_sur.sort_values(by=[subj_cols[0]])
+
+            # Enforce datetime format
+            df_sur["datetime"] = pd.to_datetime(df_sur["datetime"])
+            df_sur["datetime"] = df_sur["datetime"].dt.strftime("%Y-%m-%d")
 
             # Drop first duplicate and withdrawn participant responses
             df_sur = df_sur.drop_duplicates(subset="study_id", keep="last")
@@ -439,9 +459,13 @@ class CleanQualtrics:
         # day_code = day_dict[day_str]
 
         # Get dataframe and setup output column names
-        subj_cols = ["study_id", "visit"]
+        subj_cols = ["study_id", "visit", "datetime"]
         self.df_raw.rename(
-            {"SubID": subj_cols[0], "Session_Num": subj_cols[1]},
+            {
+                "SubID": subj_cols[0],
+                "Session_Num": subj_cols[1],
+                "StartDate": subj_cols[2],
+            },
             axis=1,
             inplace=True,
         )
@@ -469,6 +493,10 @@ class CleanQualtrics:
                 )
                 df_sub = df_sub[df_sub[subj_cols[1]].str.contains(day_str)]
                 df_sub = df_sub.sort_values(by=[subj_cols[0]])
+
+                # Enforce datetime format
+                df_sub["datetime"] = pd.to_datetime(df_sub["datetime"])
+                df_sub["datetime"] = df_sub["datetime"].dt.strftime("%Y-%m-%d")
 
                 # Drop first duplicate and withdrawn participant responses
                 df_sub = df_sub.drop_duplicates(subset="study_id", keep="last")
