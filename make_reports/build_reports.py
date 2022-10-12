@@ -301,6 +301,20 @@ class DemoAll:
         self.final_demo = pd.DataFrame(out_dict, columns=out_dict.keys())
         del df_merge
 
+    def remove_withdrawn(self):
+        """Title.
+
+        Desc.
+
+        """
+        withdrew_list = report_helper.withdrew_list()
+        self.final_demo = self.final_demo[
+            ~self.final_demo.src_subject_id.str.contains(
+                "|".join(withdrew_list)
+            )
+        ]
+        self.final_demo = self.final_demo.reset_index(drop=True)
+
 
 # %%
 class ManagerRegular:
@@ -685,7 +699,7 @@ class NdarAffim01:
 
     """
 
-    def __init__(self, qualtrics_data, redcap_demo):
+    def __init__(self, proj_dir, final_demo):
         """Read in survey data and make report.
 
         Get cleaned AIM Qualtrics survey from visit_day1, and
@@ -693,8 +707,7 @@ class NdarAffim01:
 
         Parameters
         ----------
-        qualtrics_data : make_reports.gather_surveys.GetQualtricsSurveys
-        redcap_demo : make_reports.gather_surveys.GetRedcapDemographic
+
 
         Attributes
         ----------
@@ -712,10 +725,26 @@ class NdarAffim01:
             "affim01_template.csv"
         )
 
-        # Get clean survey data
-        qualtrics_data.surveys_visit1 = ["AIM"]
-        qualtrics_data.make_clean_reports("visit_day1")
-        df_aim = qualtrics_data.clean_visit["AIM"]
+        # # Get clean survey data
+        # qualtrics_data.surveys_visit1 = ["AIM"]
+        # qualtrics_data.make_clean_reports("visit_day1")
+        # df_aim = qualtrics_data.clean_visit["AIM"]
+        df_pilot = pd.read_csv(
+            os.path.join(
+                proj_dir,
+                "data_pilot/data_survey",
+                "visit_day1/data_clean",
+                "df_AIM.csv",
+            )
+        )
+        df_study = pd.read_csv(
+            os.path.join(
+                proj_dir,
+                "data_survey",
+                "visit_day1/data_clean",
+                "df_AIM.csv",
+            )
+        )
 
         # Rename columns, drop NaN rows
         df_aim = df_aim.rename(columns={"SubID": "src_subject_id"})
@@ -724,7 +753,6 @@ class NdarAffim01:
         self.df_aim = df_aim[df_aim["aim_1"].notna()]
 
         # Get final demographics, make report
-        final_demo = redcap_demo.final_demo
         final_demo = final_demo.replace("NaN", np.nan)
         self.final_demo = final_demo.dropna(subset=["subjectkey"])
         self._make_aim()

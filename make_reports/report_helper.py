@@ -256,3 +256,7 @@ def qualtrics_dict():
         "FINAL - EmoRep Stimulus Ratings - fMRI Study": "post_scan_ratings",
         "Session 2 & 3 Survey": "visit_day23",
     }
+
+
+def withdrew_list():
+    return ["ER0103", "ER0229"]

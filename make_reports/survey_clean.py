@@ -312,6 +312,7 @@ class CleanQualtrics:
         self.proj_dir = proj_dir
         self.qualtrics_dict = report_helper.qualtrics_dict()
         self.pilot_list = report_helper.pilot_list()
+        self.withdrew_list = report_helper.withdrew_list()
 
     def clean_surveys(self, survey_name):
         """Title.
@@ -385,9 +386,16 @@ class CleanQualtrics:
             df_sur = self.df_raw[ext_cols]
 
             # Clean subset dataframe, writeout
-            df_sur = df_sur.fillna("NaN")
+            df_sur = df_sur.dropna()
             df_sur = df_sur[df_sur[subj_cols[0]].str.contains("ER")]
             df_sur = df_sur.sort_values(by=[subj_cols[0]])
+
+            # Drop first duplicate and withdrawn participant responses
+            df_sur = df_sur.drop_duplicates(subset="study_id", keep="last")
+            df_sur = df_sur[
+                ~df_sur.study_id.str.contains("|".join(self.withdrew_list))
+            ]
+            df_sur = df_sur.reset_index(drop=True)
 
             # Separate pilot from study data
             idx_pilot = df_sur[
@@ -450,9 +458,9 @@ class CleanQualtrics:
                 sur_cols = [x for x in col_names if sur_key in x]
                 ext_cols = subj_cols + sur_cols
                 df_sub = self.df_raw[ext_cols]
-                df_sub = df_sub.fillna("NaN")
 
                 # Organize rows and columns, get visit-specific responses
+                df_sub = df_sub.dropna()
                 df_sub = df_sub[df_sub[subj_cols[0]].str.contains("ER")]
                 df_sub[subj_cols[1]] = np.where(
                     df_sub[subj_cols[1]] == day_code,
@@ -461,6 +469,13 @@ class CleanQualtrics:
                 )
                 df_sub = df_sub[df_sub[subj_cols[1]].str.contains(day_str)]
                 df_sub = df_sub.sort_values(by=[subj_cols[0]])
+
+                # Drop first duplicate and withdrawn participant responses
+                df_sub = df_sub.drop_duplicates(subset="study_id", keep="last")
+                df_sub = df_sub[
+                    ~df_sub.study_id.str.contains("|".join(self.withdrew_list))
+                ]
+                df_sub = df_sub.reset_index(drop=True)
 
                 # Separate pilot from study data
                 idx_pilot = df_sub[
