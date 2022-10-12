@@ -180,13 +180,6 @@ def make_manager_reports(manager_reports, query_date, proj_dir):
         If query_date occures before 2022-03-31
 
     """
-    # Validate redcap token
-    # if not redcap_token:
-    #     raise ValueError(
-    #         "RedCap API token required for --manager-reports."
-    #         + " Please specify --redcap-token."
-    #     )
-
     # Validate manager_reports arguments
     valid_mr_args = ["nih12", "nih4", "duke3"]
     for report in manager_reports:
@@ -208,7 +201,6 @@ def make_manager_reports(manager_reports, query_date, proj_dir):
         os.makedirs(manager_dir)
 
     # Query RedCap demographic info
-    # redcap_demo = gather_surveys.GetRedcapDemographic(redcap_token)
     redcap_demo = build_reports.DemoAll(proj_dir)
 
     # Generate reports

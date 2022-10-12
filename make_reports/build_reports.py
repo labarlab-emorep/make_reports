@@ -44,10 +44,8 @@ class DemoAll:
         )
         self.proj_dir = proj_dir
 
-        # Get cleaned data, get index and list of participants
-        # who have consented
+        # Read-in pilot, study data and combine dataframes
         self._read_data()
-        self._get_consent()
 
         # Run methods
         print("\tCompiling needed demographic info ...")
@@ -92,7 +90,7 @@ class DemoAll:
         for h_key, h_df in map_dict.items():
             pilot_dict[h_key] = pd.read_csv(os.path.join(redcap_pilot, h_df))
 
-        # Merge study, pilot
+        # Merge study, pilot dataframes
         df_cons_orig = pd.concat(
             [pilot_dict["cons_orig"], clean_dict["cons_orig"]],
             ignore_index=True,
@@ -100,114 +98,32 @@ class DemoAll:
         df_cons_new = pd.concat(
             [pilot_dict["cons_new"], clean_dict["cons_new"]], ignore_index=True
         )
-        self.df_demo = pd.concat(
+        df_demo = pd.concat(
             [pilot_dict["demo"], clean_dict["demo"]], ignore_index=True
         )
-        self.df_guid = pd.concat(
+        df_guid = pd.concat(
             [pilot_dict["guid"], clean_dict["guid"]], ignore_index=True
         )
         del pilot_dict, clean_dict
 
-        # Update consent_new column names, merge
+        # Update consent_new column names from original and merge
         cols_new = df_cons_new.columns.tolist()
         cols_orig = df_cons_orig.columns.tolist()
         cols_replace = {}
         for h_new, h_orig in zip(cols_new, cols_orig):
             cols_replace[h_new] = h_orig
         df_cons_new = df_cons_new.rename(columns=cols_replace)
-        self.df_consent = df_cons_new.combine_first(df_cons_orig)
+        df_consent = pd.concat([df_cons_orig, df_cons_new], ignore_index=True)
+        df_consent = df_consent.drop_duplicates(subset=["record_id"])
+        df_consent = df_consent.sort_values(by=["record_id"])
         del df_cons_new, df_cons_orig
 
-    def _get_consent(self):
-        """Title
-
-        Desc.
-
-        Attributes
-        ----------
-        idx_demo
-        idx_guid
-        idx_consent
-        subj_consent
-        subj_guid
-        subj_demo
-
-        """
-        # Subj consent
-        idx_consent = self.df_consent.index[
-            self.df_consent["consent"] == 1.0
-        ].tolist()
-        subj_consent = self.df_consent.loc[idx_consent, "record_id"]
-
-        # TODO something here to adjust idx/subj_consent if participants
-        # withdraw consent in the future.
-
-        # GUID
-        idx_guid = self.df_guid[
-            self.df_guid["record_id"].isin(subj_consent)
-        ].index.tolist()
-
-        # Purge subjects who do not have GUID from idx, subj lists
-        h_subj_guid = self.df_guid.loc[idx_guid, "guid"].tolist()
-        idx_nan = np.where(pd.isnull(h_subj_guid))[0].tolist()
-        if idx_nan:
-            idx_guid = [
-                x for idx, x in enumerate(idx_guid) if idx not in idx_nan
-            ]
-            idx_consent = [
-                x for idx, x in enumerate(idx_consent) if idx not in idx_nan
-            ]
-            subj_consent = [
-                x for idx, x in enumerate(subj_consent) if idx not in idx_nan
-            ]
-        subj_guid = self.df_guid.loc[idx_guid, "guid"].tolist()
-
-        # demo
-        idx_demo = self.df_demo[
-            self.df_demo["record_id"].isin(subj_consent)
-        ].index.tolist()
-        subj_study = self.df_guid.loc[idx_guid, "study_id"].tolist()
-
-        # Set attributes here to avoid using them above
-        self.idx_guid = idx_guid
-        self.idx_demo = idx_demo
-        self.idx_consent = idx_consent
-        self.subj_consent = subj_consent
-        self.subj_guid = subj_guid
-        self.subj_study = subj_study
-
-    # def _get_educate(self):
-    #     """Get participant education level.
-
-    #     Use info from years_education column of df_demo when they are numeric,
-    #     otherwise use the educate_switch to convert from level of education
-    #     to number of years.
-
-    #     Attributes
-    #     ----------
-    #         Number of years completed of education (int)
-
-    #     """
-    #     # Convert education level to years
-    #     educate_switch = {2: 12, 4: 14, 5: 16, 7: 18, 8: 20}
-
-    #     # Get education level, and self-report of years educated
-    #     edu_year = self.df_demo.loc[self.idx_demo, "years_education"].tolist()
-    #     edu_level = self.df_demo.loc[self.idx_demo, "level_education"].tolist()
-
-    #     # Convert into years (deal with self-reports)
-    #     subj_educate = []
-    #     for h_year, h_level in zip(edu_year, edu_level):
-    #         print(h_year, type(h_year))
-
-    #         # Patch for 1984 education issue
-    #         if h_year == "1984":
-    #             subj_educate.append(educate_switch[8])
-    #         elif h_year.isnumeric():
-    #             subj_educate.append(int(h_year))
-    #         else:
-    #             subj_educate.append(educate_switch[h_level])
-    #     self.subj_educate = subj_educate
+        # Merge dataframes, use merge how=inner to keep only participants
+        # who have data in all dataframes.
+        df_merge = pd.merge(df_consent, df_guid, on="record_id")
+        df_merge = pd.merge(df_merge, df_demo, on="record_id")
+        self.df_merge = df_merge
+        del df_guid, df_demo, df_consent, df_merge
 
     def _get_race(self):
         """Get participant race response.
@@ -224,6 +140,9 @@ class DemoAll:
             Participant responses to race question
 
         """
+        # Get attribute for readibility, testing
+        df_merge = self.df_merge
+
         # Get race response - deal with "More than one" (6) and
         # "Other" (8) separately.
         race_switch = {
@@ -235,12 +154,12 @@ class DemoAll:
             7: "Unknown or not reported",
         }
         get_race_resp = [
-            (self.df_demo["race___1"] == 1),
-            (self.df_demo["race___2"] == 1),
-            (self.df_demo["race___3"] == 1),
-            (self.df_demo["race___4"] == 1),
-            (self.df_demo["race___5"] == 1),
-            (self.df_demo["race___7"] == 1),
+            (df_merge["race___1"] == 1),
+            (df_merge["race___2"] == 1),
+            (df_merge["race___3"] == 1),
+            (df_merge["race___4"] == 1),
+            (df_merge["race___5"] == 1),
+            (df_merge["race___7"] == 1),
         ]
         set_race_str = [
             race_switch[1],
@@ -252,20 +171,21 @@ class DemoAll:
         ]
 
         # Get race responses, set to new column
-        self.df_demo["race_resp"] = np.select(get_race_resp, set_race_str)
+        df_merge["race_resp"] = np.select(get_race_resp, set_race_str)
 
         # Capture "Other" responses, stitch response together
-        idx_other = self.df_demo.index[self.df_demo["race___8"] == 1].tolist()
+        idx_other = df_merge.index[df_merge["race___8"] == 1].tolist()
         race_other = [
             f"Other - {x}"
-            for x in self.df_demo.loc[idx_other, "race_other"].tolist()
+            for x in df_merge.loc[idx_other, "race_other"].tolist()
         ]
-        self.df_demo.loc[idx_other, "race_resp"] = race_other
+        df_merge.loc[idx_other, "race_resp"] = race_other
 
-        # Capture "More than one race" responses, write to df_demo["race_more"]
-        idx_more = self.df_demo.index[self.df_demo["race___6"] == 1].tolist()
-        self.df_demo["race_more"] = np.nan
-        self.df_demo.loc[idx_more, "race_more"] = "More"
+        # Capture "More than one race" responses, write
+        # to df_merge["race_more"].
+        idx_more = df_merge.index[df_merge["race___6"] == 1].tolist()
+        df_merge["race_more"] = np.nan
+        df_merge.loc[idx_more, "race_more"] = "More"
 
         # Capture multiple race responses (in case option 6 not selected)
         col_list = [
@@ -277,17 +197,16 @@ class DemoAll:
             "race___7",
             "race___8",
         ]
-        self.df_demo["race_sum"] = self.df_demo[col_list].sum(axis=1)
-        idx_mult = self.df_demo.index[self.df_demo["race_sum"] > 1].tolist()
-        self.df_demo.loc[idx_mult, "race_more"] = "More"
+        df_merge["race_sum"] = df_merge[col_list].sum(axis=1)
+        idx_mult = df_merge.index[df_merge["race_sum"] > 1].tolist()
+        df_merge.loc[idx_mult, "race_more"] = "More"
 
-        # Update race_resp col with responses in df_demo["race_more"]
-        idx_more = self.df_demo.index[
-            self.df_demo["race_more"] == "More"
-        ].tolist()
-        self.df_demo.loc[idx_more, "race_resp"] = "More than one race"
-        race_resp = self.df_demo.loc[self.idx_demo, "race_resp"].tolist()
+        # Update race_resp col with responses in df_merge["race_more"]
+        idx_more = df_merge.index[df_merge["race_more"] == "More"].tolist()
+        df_merge.loc[idx_more, "race_resp"] = "More than one race"
+        race_resp = df_merge["race_resp"].tolist()
         self.race_resp = race_resp
+        del df_merge
 
     def _get_ethnic_minority(self):
         """Determine if participant is considered a minority.
@@ -306,7 +225,7 @@ class DemoAll:
 
         """
         # Get ethnicity
-        h_ethnic = self.df_demo.loc[self.idx_demo, "ethnicity"].tolist()
+        h_ethnic = self.df_merge["ethnicity"].tolist()
         ethnic_switch = {
             1.0: "Hispanic or Latino",
             2.0: "Not Hispanic or Latino",
@@ -335,26 +254,31 @@ class DemoAll:
             Complete report containing demographic info for NDA submission
 
         """
+        # Capture attribute for easy testing
+        df_merge = self.df_merge
+
+        # Get GUID, study IDs
+        subj_guid = df_merge["guid"].tolist()
+        subj_study = df_merge["study_id"].tolist()
+
         # Get consent date
-        self.df_consent["datetime"] = pd.to_datetime(self.df_consent["date"])
-        self.df_consent["datetime"] = self.df_consent["datetime"].dt.date
-        subj_consent_date = self.df_consent.loc[
-            self.idx_consent, "datetime"
-        ].tolist()
+        df_merge["datetime"] = pd.to_datetime(df_merge["date"])
+        df_merge["datetime"] = df_merge["datetime"].dt.date
+        subj_consent_date = df_merge["datetime"].tolist()
 
         # Get age, sex
-        subj_age = self.df_demo.loc[self.idx_demo, "age"].tolist()
-        h_sex = self.df_demo.loc[self.idx_demo, "gender"].tolist()
+        subj_age = df_merge["age"].tolist()
+        h_sex = df_merge["gender"].tolist()
         sex_switch = {1.0: "Male", 2.0: "Female", 3.0: "Neither"}
         subj_sex = [sex_switch[x] for x in h_sex]
 
         # Get DOB, age in months, education
-        subj_dob = self.df_demo["dob"]
+        subj_dob = df_merge["dob"]
         subj_dob_dt = [
             datetime.strptime(x, "%Y-%m-%d").date() for x in subj_dob
         ]
         subj_age_mo = report_helper.calc_age_mo(subj_dob_dt, subj_consent_date)
-        subj_educate = self.df_demo["years_education"]
+        subj_educate = df_merge["years_education"]
 
         # Get race, ethnicity, minority status
         self._get_race()
@@ -362,8 +286,8 @@ class DemoAll:
 
         # Write dataframe
         out_dict = {
-            "subjectkey": self.subj_guid,
-            "src_subject_id": self.subj_study,
+            "subjectkey": subj_guid,
+            "src_subject_id": subj_study,
             "interview_date": subj_consent_date,
             "interview_age": subj_age_mo,
             "sex": subj_sex,
@@ -375,6 +299,7 @@ class DemoAll:
             "years_education": subj_educate,
         }
         self.final_demo = pd.DataFrame(out_dict, columns=out_dict.keys())
+        del df_merge
 
 
 # %%
