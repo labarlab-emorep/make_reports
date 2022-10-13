@@ -721,14 +721,11 @@ class NdarAffim01:
         """
         print("Buiding NDA report : affim01 ...")
         # Read in template
-        self.nda_label, nda_cols = report_helper.mine_template(
+        self.nda_label, self.nda_cols = report_helper.mine_template(
             "affim01_template.csv"
         )
 
-        # # Get clean survey data
-        # qualtrics_data.surveys_visit1 = ["AIM"]
-        # qualtrics_data.make_clean_reports("visit_day1")
-        # df_aim = qualtrics_data.clean_visit["AIM"]
+        # Get clean survey data
         df_pilot = pd.read_csv(
             os.path.join(
                 proj_dir,
@@ -768,30 +765,28 @@ class NdarAffim01:
             Report of AIM data that complies with NDAR data definitions
 
         """
-        # Get final_demo cols
-        # df_final = self.final_demo.iloc[:, 0:5]
-        # df_final["sex"] = df_final["sex"].replace(
-        #     ["Male", "Female", "Neither"], ["M", "F", "O"]
-        # )
-        df_nda = final_demo[["subjectkey", "src_subject_id", "sex"]]
+        df_nda = self.final_demo[["subjectkey", "src_subject_id", "sex"]]
+        # pd.options.mode.chained_assignment = None
         df_nda["sex"] = df_nda["sex"].replace(
             ["Male", "Female", "Neither"], ["M", "F", "O"]
         )
-        df_survey = pd.merge(df_aim, df_nda, on="src_subject_id")
+        df_aim_nda = pd.merge(self.df_aim, df_nda, on="src_subject_id")
 
-        df_survey = report_helper.get_survey_age(
-            df_survey, final_demo, "src_subject_id"
+        df_aim_nda = report_helper.get_survey_age(
+            df_aim_nda, self.final_demo, "src_subject_id"
         )
 
         # Sum aim responses, toggle pandas warning mode
-        aim_list = [x for x in self.df_aim.columns if "aim" in x]
-        pd.options.mode.chained_assignment = None
-        self.df_aim[aim_list] = self.df_aim[aim_list].astype("Int64")
-        self.df_aim["aimtot"] = self.df_aim[aim_list].sum(axis=1)
-        pd.options.mode.chained_assignment = "warn"
+        aim_list = [x for x in df_aim_nda.columns if "aim" in x]
+        df_aim_nda[aim_list] = df_aim_nda[aim_list].astype("Int64")
+        df_aim_nda["aimtot"] = df_aim_nda[aim_list].sum(axis=1)
+        # pd.options.mode.chained_assignment = "warn"
 
         # Merge final_demo with aim
-        self.df_report = pd.merge(df_final, self.df_aim, on="src_subject_id")
+        self.df_report = pd.DataFrame(
+            columns=self.nda_cols, index=df_aim_nda.index
+        )
+        self.df_report.update(df_aim_nda)
 
 
 # %%
@@ -816,7 +811,7 @@ class NdarAls01:
 
     """
 
-    def __init__(self, qualtrics_data, redcap_demo):
+    def __init__(self, proj_dir, final_demo):
         """Read in survey data and make report.
 
         Get cleaned ALS Qualtrics survey from visit_day1, and
@@ -846,17 +841,31 @@ class NdarAls01:
         )
 
         # Get clean survey data
-        qualtrics_data.surveys_visit1 = ["ALS"]
-        qualtrics_data.make_clean_reports("visit_day1")
-        df_als = qualtrics_data.clean_visit["ALS"]
+        df_pilot = pd.read_csv(
+            os.path.join(
+                proj_dir,
+                "data_pilot/data_survey",
+                "visit_day1/data_clean",
+                "df_ALS.csv",
+            )
+        )
+        df_study = pd.read_csv(
+            os.path.join(
+                proj_dir,
+                "data_survey",
+                "visit_day1/data_clean",
+                "df_ALS.csv",
+            )
+        )
+        df_als = pd.concat([df_pilot, df_study], ignore_index=True)
+        del df_pilot, df_study
 
         # Rename columns, frop NaN rows
-        df_als = df_als.rename(columns={"SubID": "src_subject_id"})
+        df_als = df_als.rename(columns={"study_id": "src_subject_id"})
         df_als = df_als.replace("NaN", np.nan)
         self.df_als = df_als[df_als["ALS_1"].notna()]
 
         # Get final demographics, make report
-        final_demo = redcap_demo.final_demo
         final_demo = final_demo.replace("NaN", np.nan)
         self.final_demo = final_demo.dropna(subset=["subjectkey"])
         self._make_als()
@@ -907,24 +916,27 @@ class NdarAls01:
         df_als_remap["als_sf_total"] = df_als_remap[als_cols].sum(axis=1)
 
         # Add pilot notes for certain subjects
-        pilot_list = ["ER0001", "ER0002", "ER0003", "ER0004", "ER0005"]
+        pilot_list = report_helper.pilot_list()
         idx_pilot = df_als_remap[
             df_als_remap["src_subject_id"].isin(pilot_list)
         ].index.tolist()
         df_als_remap.loc[idx_pilot, "comments"] = "PILOT PARTICIPANT"
 
         # Combine demographic and als dataframes
-        df_final = self.final_demo.iloc[:, 0:5]
-        df_final["sex"] = df_final["sex"].replace(
+        df_nda = self.final_demo[["subjectkey", "src_subject_id", "sex"]]
+        df_nda["sex"] = df_nda["sex"].replace(
             ["Male", "Female", "Neither"], ["M", "F", "O"]
         )
-        df_final_als = pd.merge(df_final, df_als_remap, on="src_subject_id")
+        df_als_nda = pd.merge(df_als_remap, df_nda, on="src_subject_id")
+        df_als_nda = report_helper.get_survey_age(
+            df_als_nda, self.final_demo, "src_subject_id"
+        )
 
         # Build dataframe from nda columns, update with demo and als data
         self.df_report = pd.DataFrame(
-            columns=self.nda_cols, index=df_final_als.index
+            columns=self.nda_cols, index=df_als_nda.index
         )
-        self.df_report.update(df_final_als)
+        self.df_report.update(df_als_nda)
 
 
 # %%

@@ -1,7 +1,9 @@
 """Setup workflows for specific types of reports."""
 # %%
 import os
+import glob
 from datetime import datetime
+import pandas as pd
 from make_reports import survey_download, survey_clean
 from make_reports import build_reports
 from make_reports import report_helper
@@ -115,6 +117,19 @@ def clean_surveys(proj_dir, clean_redcap=False, clean_qualtrics=False):
             print(f"\tWriting : {out_file}")
             h_df.to_csv(out_file, index=False, na_rep="")
 
+    # Check for raw data
+    visit_raw = glob.glob(
+        f"{proj_dir}/data_survey/visit*/data_raw/*latest.csv"
+    )
+    redcap_raw = glob.glob(
+        f"{proj_dir}/data_survey/redcap*/data_raw/*latest.csv"
+    )
+    if len(visit_raw) != 5 and len(redcap_raw) != 4:
+        raise FileNotFoundError(
+            "Missing raw survey data in redcap or visit directories,"
+            + " please download raw data via rep_dl."
+        )
+
     if clean_redcap:
         redcap_dict = report_helper.redcap_dict()
         clean_redcap = survey_clean.CleanRedcap(proj_dir)
@@ -180,6 +195,16 @@ def make_manager_reports(manager_reports, query_date, proj_dir):
         If query_date occures before 2022-03-31
 
     """
+
+    # Check for clean RedCap data, generate if needed
+    redcap_clean = glob.glob(
+        f"{proj_dir}/data_survey/redcap_demographics/data_clean/*.csv"
+    )
+    if len(redcap_clean) != 4:
+        print("No clean data found in RedCap, cleaning ...")
+        clean_surveys(proj_dir, clean_redcap=True)
+        print("\tDone.")
+
     # Validate manager_reports arguments
     valid_mr_args = ["nih12", "nih4", "duke3"]
     for report in manager_reports:
@@ -221,9 +246,7 @@ def make_manager_reports(manager_reports, query_date, proj_dir):
 
 
 # %%
-def make_nda_reports(
-    nda_reports, proj_dir, post_labels, qualtrics_token, redcap_token
-):
+def make_nda_reports(nda_reports, proj_dir):
     """Make reports and organize data for NDAR upload.
 
     Generate requested NDAR reports and organize data (if required) for the
@@ -253,6 +276,17 @@ def make_nda_reports(
         If report name requested is not found in nda_switch
 
     """
+
+    # Check for clean RedCap/visit data, generate if needed
+    redcap_clean = glob.glob(
+        f"{proj_dir}/data_survey/redcap_demographics/data_clean/*.csv"
+    )
+    visit_clean = glob.glob(f"{proj_dir}/data_survey/visit*/data_clean/*.csv")
+    if len(redcap_clean) != 4 and len(visit_clean) != 13:
+        print("Missing RedCap, Qualtrics clean data. Cleaning ...")
+        clean_surveys(proj_dir, clean_redcap=True, clean_qualtrics=True)
+        print("\tDone.")
+
     # Set switch to find appropriate class: key = user-specified
     # report name, value = relevant class.
     mod_build = "make_reports.build_reports"
@@ -275,32 +309,22 @@ def make_nda_reports(
     if not os.path.exists(report_dir):
         os.makedirs(report_dir)
 
-    # Get redcap and qualtrics survey info
-    # redcap_demo = gather_surveys.GetRedcapDemographic(redcap_token)
-    # redcap_data = gather_surveys.GetRedcapSurveys(redcap_token)
-    # qualtrics_data = gather_surveys.GetQualtricsSurveys(
-    #     qualtrics_token, post_labels
-    # )
+    # Get redcap demo info
     redcap_demo = build_reports.DemoAll(proj_dir)
     redcap_demo.remove_withdrawn()
+    # final_demo = redcap_demo.final_demo
 
-    final_demo = redcap_demo.final_demo
+    # Ignore loc warning
+    pd.options.mode.chained_assignment = None
 
     # Make requested reports
     for report in nda_reports:
 
-        # Get appropriate class for report
+        # Get appropriate class
         h_pkg, h_mod, h_class = nda_switch[report].split(".")
         mod = __import__(f"{h_pkg}.{h_mod}", fromlist=[h_class])
         rep_class = getattr(mod, h_class)
-
-        # Supply appropriate dataset to report
-        if report == "demo_info01":
-            rep_obj = rep_class(redcap_demo)
-        elif report == "bdi01":
-            rep_obj = rep_class(redcap_data, redcap_demo)
-        else:
-            rep_obj = rep_class(qualtrics_data, redcap_demo)
+        rep_obj = rep_class(proj_dir, redcap_demo.final_demo)
 
         # Write out report
         out_file = os.path.join(report_dir, f"{report}_dataset.csv")
@@ -318,3 +342,5 @@ def make_nda_reports(
         os.remove(out_file)
         os.rename(dummy_file, out_file)
         del rep_obj
+
+    pd.options.mode.chained_assignment = "warn"
