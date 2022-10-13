@@ -1,4 +1,4 @@
-"""Download survey data from RedCap and Qualtrics."""
+"""Functions for downloading survey data from RedCap and Qualtrics."""
 import os
 import json
 import importlib.resources as pkg_resources
@@ -7,33 +7,29 @@ from make_reports import reference_files
 
 
 def download_redcap(proj_dir, redcap_token, survey_name=None):
-    """Title.
+    """Download EmoRep survey data from RedCap.
 
-    Desc.
+    Download surveys and write original/raw dataframes to <proj_dir>.
 
     Parameters
     ----------
-    proj_dir
-    redcap_token
+    proj_dir : path
+        Location of parent directory for project
+    redcap_token : str
+        API token for RedCap
 
     Returns
     -------
 
     """
     print("\nPulling RedCap surveys ...")
+
+    # Load redcap info for api pull data
     with pkg_resources.open_text(
         reference_files, "report_keys_redcap.json"
     ) as jf:
         report_keys_redcap = json.load(jf)
 
-    # redcap_dict = {
-    #     "demographics": "redcap_demographics",
-    #     "consent_orig": "redcap_demographics",
-    #     "consent_new": "redcap_demographics",
-    #     "guid": "redcap_demographics",
-    #     "bdi_day2": "visit_day2",
-    #     "bdi_day3": "visit_day3",
-    # }
     redcap_dict = report_helper.redcap_dict()
 
     # TODO validate survey list in report_keys_redcap

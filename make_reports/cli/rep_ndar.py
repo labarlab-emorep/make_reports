@@ -1,5 +1,10 @@
-r"""Make NDAR reports for EmoRep project.
+r"""Generate NDAR reports for EmoRep project.
 
+Organize project data and generate reports for regular
+NDAR submissions.
+
+Reports are written to:
+    <proj_dir>/ndar_upload/reports
 
 Examples
 --------
@@ -10,10 +15,8 @@ rep_ndar \
     --nda-reports-all
 
 """
-# %%
 import sys
 import textwrap
-from datetime import date
 from argparse import ArgumentParser, RawTextHelpFormatter
 from make_reports import workflow
 
@@ -66,15 +69,13 @@ def _get_args():
     return parser
 
 
-# %%
 def main():
-    "Coordinate resources according to user input."
+    """Capture arguments and trigger workflow."""
     args = _get_args().parse_args()
     nda_reports = args.nda_reports
     nda_reports_all = args.nda_reports_all
     proj_dir = args.proj_dir
 
-    # Generate NDA reports
     if nda_reports_all:
         nda_reports = ["affim01", "als01", "bdi01", "demo_info01"]
     workflow.make_nda_reports(nda_reports, proj_dir)
@@ -82,5 +83,3 @@ def main():
 
 if __name__ == "__main__":
     main()
-
-# %%

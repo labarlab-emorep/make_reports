@@ -1,20 +1,26 @@
-r"""Clean surveys, write to keoki.
+r"""Clean EmoRep survey data.
 
-Examples
---------
+Clean RedCap and Qualtrics survey data downloaded by rep_dl.
+
+Study data written to:
+    <proj_dir>/data_survey/<visit>/data_clean
+
+Pilot data written to:
+    <proj_dir>/data_pilot/data_survey/<visit>/data_clean
+
+Example
+-------
 rep_cl \
     --clean-redcap \
     --clean-qualtrics
 
 """
-# %%
 import sys
 import textwrap
 from argparse import ArgumentParser, RawTextHelpFormatter
 from make_reports import workflow
 
 
-# %%
 def _get_args():
     """Get and parse arguments."""
     parser = ArgumentParser(
@@ -61,14 +67,12 @@ def _get_args():
 
 # %%
 def main():
-    "Coordinate resources according to user input."
+    """Capture arguments and trigger workflow."""
     args = _get_args().parse_args()
     proj_dir = args.proj_dir
     clean_redcap = args.clean_redcap
     clean_qualtrics = args.clean_qualtrics
 
-    # TODO Validate args
-    # TODO check for rawdata
     workflow.clean_surveys(
         proj_dir,
         clean_redcap=clean_redcap,
