@@ -76,7 +76,7 @@ def main():
 
     # Generate NDA reports
     if nda_reports_all:
-        nda_reports = ["demo_info01", "affim01", "als01", "bdi01"]
+        nda_reports = ["affim01", "als01", "bdi01", "demo_info01"]
     workflow.make_nda_reports(nda_reports, proj_dir)
 
 

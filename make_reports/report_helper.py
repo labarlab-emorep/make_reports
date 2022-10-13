@@ -227,8 +227,7 @@ def get_survey_age(df_survey, df_demo, subj_col):
 
     """
     # TODO check for datetime column
-
-    df_survey["interview_date"] = df_survey["datetime"]
+    #
     df_survey["datetime"] = pd.to_datetime(df_survey["datetime"])
     subj_survey = df_survey[subj_col].tolist()
     subj_dos = df_survey["datetime"].tolist()
@@ -243,6 +242,7 @@ def get_survey_age(df_survey, df_demo, subj_col):
         raise IndexError("Length of subj DOB does not match subj DOS.")
     subj_age_mo = calc_age_mo(subj_dob, subj_dos)
     df_survey["interview_age"] = subj_age_mo
+    df_survey["interview_date"] = df_survey["datetime"].dt.strftime("%m/%d/%Y")
     return df_survey
 
 

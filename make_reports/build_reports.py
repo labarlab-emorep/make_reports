@@ -963,7 +963,7 @@ class NdarBdi01:
 
     """
 
-    def __init__(self, redcap_data, redcap_demo):
+    def __init__(self, proj_dir, final_demo):
         """Read in survey data and make report.
 
         Get cleaned BDI RedCap survey from visit_day2 and
@@ -991,20 +991,17 @@ class NdarBdi01:
 
         """
         print("Buiding NDA report : bdi01 ...")
+        self.proj_dir = proj_dir
+
         # Read in template
         self.nda_label, self.nda_cols = report_helper.mine_template(
             "bdi01_template.csv"
         )
 
-        # Get clean bdi data, match dataframe column names
-        redcap_data.make_clean_reports("visit_day2", redcap_demo.subj_consent)
-        self.df_bdi_day2 = redcap_data.df_clean_bdi
-        redcap_data.make_clean_reports("visit_day3", redcap_demo.subj_consent)
-        self.df_bdi_day3 = redcap_data.df_clean_bdi
-        self.df_bdi_day3.columns = self.df_bdi_day2.columns.values
+        # Get pilot, study data for both day2, day3
+        self._get_clean()
 
         # Get final demographics
-        final_demo = redcap_demo.final_demo
         final_demo = final_demo.replace("NaN", np.nan)
         final_demo["sex"] = final_demo["sex"].replace(
             ["Male", "Female", "Neither"], ["M", "F", "O"]
@@ -1020,61 +1017,58 @@ class NdarBdi01:
         df_report = df_report.sort_values(by=["src_subject_id"])
         self.df_report = df_report[df_report["interview_date"].notna()]
 
-    def _get_age(self, sess):
-        """Calculate participant age-in-months at visit.
+    def _get_clean(self):
+        """Title.
 
-        Add the visit age-in-months as interview_age column. Also
-        add the visit column, and make appropriate interview_date.
-
-        Parameters
-        ----------
-        sess : str
-            [day2 | day3], visit/session name
-
-        Returns
-        -------
-        pd.DataFrame
-
-        Raises
-        ------
-        IndexError
-            If date of birth list does not have same length
-            as the date of survey list
+        Desc.
 
         """
-        # Get dataframe
-        df_bdi = getattr(self, f"df_bdi_{sess}")
-
-        # Light cleaning of dataframe
-        df_bdi = df_bdi.replace("nan", np.nan)
-        df_bdi = df_bdi[df_bdi["q_1"].notna()]
-        df_bdi = df_bdi.rename(
-            columns={
-                "study_id": "src_subject_id",
-            }
+        # Get clean survey data
+        df_pilot2 = pd.read_csv(
+            os.path.join(
+                self.proj_dir,
+                "data_pilot/data_survey",
+                "visit_day2/data_clean",
+                "df_bdi_day2.csv",
+            )
         )
-        df_bdi["bdi_timestamp"] = pd.to_datetime(df_bdi["bdi_timestamp"])
-
-        # Find BDI subjects in final_demo
-        bdi_subj = df_bdi["src_subject_id"].tolist()
-        idx_demo = self.final_demo[
-            self.final_demo["src_subject_id"].isin(bdi_subj)
-        ].index.tolist()
-
-        # Get date-of-birth, date-of-survey, calculate age in months
-        bdi_dob = self.final_demo.loc[idx_demo, "dob"].tolist()
-        bdi_dos = df_bdi["bdi_timestamp"].tolist()
-        if len(bdi_dob) != len(bdi_dos):
-            raise IndexError("Length of bdi_dob does not match bdi_dos.")
-        bdi_age_mo = report_helper.calc_age_mo(bdi_dob, bdi_dos)
-
-        # Update dataframe using ndar column names
-        df_bdi["interview_date"] = df_bdi["bdi_timestamp"].dt.strftime(
-            "%Y-%m-%d"
+        df_study2 = pd.read_csv(
+            os.path.join(
+                self.proj_dir,
+                "data_survey",
+                "visit_day2/data_clean",
+                "df_bdi_day2.csv",
+            )
         )
-        df_bdi["interview_age"] = bdi_age_mo
-        df_bdi["visit"] = sess
-        return df_bdi
+        df_bdi_day2 = pd.concat([df_pilot2, df_study2], ignore_index=True)
+        df_bdi_day2 = df_bdi_day2.rename(
+            columns={"study_id": "src_subject_id"}
+        )
+
+        df_pilot3 = pd.read_csv(
+            os.path.join(
+                self.proj_dir,
+                "data_pilot/data_survey",
+                "visit_day3/data_clean",
+                "df_bdi_day3.csv",
+            )
+        )
+        df_study3 = pd.read_csv(
+            os.path.join(
+                self.proj_dir,
+                "data_survey",
+                "visit_day3/data_clean",
+                "df_bdi_day3.csv",
+            )
+        )
+        df_bdi_day3 = pd.concat([df_pilot3, df_study3], ignore_index=True)
+        df_bdi_day3 = df_bdi_day3.rename(
+            columns={"study_id": "src_subject_id"}
+        )
+        df_bdi_day3.columns = df_bdi_day2.columns.values
+
+        self.df_bdi_day2 = df_bdi_day2
+        self.df_bdi_day3 = df_bdi_day3
 
     def _make_bdi(self, sess):
         """Make an NDAR compliant report for visit.
@@ -1092,8 +1086,8 @@ class NdarBdi01:
         pd.DataFrame
 
         """
-        # Calculate age in months of visit
-        df_bdi = self._get_age(sess)
+        # Get session data
+        df_bdi = getattr(self, f"df_bdi_{sess}")
 
         # Convert response values to int
         q_cols = [x for x in df_bdi.columns if "q_" in x]
@@ -1128,12 +1122,7 @@ class NdarBdi01:
 
         # Drop non-ndar columns
         df_bdi_remap = df_bdi_remap.drop(
-            [
-                "guid_timestamp",
-                "redcap_survey_identifier",
-                "bdi_timestamp",
-                "bdi_complete",
-            ],
+            ["bdi_complete", "record_id"],
             axis=1,
         )
 
@@ -1145,15 +1134,19 @@ class NdarBdi01:
         df_bdi_remap["bdi_tot"] = df_bdi_remap[bdi_cols].sum(axis=1)
         df_bdi_remap["bdi_tot"] = df_bdi_remap["bdi_tot"].astype("Int64")
 
-        # Get demo info, remove interview_[date|age] to avoid conflicts
-        # with incoming bdi. Merge.
-        df_final = self.final_demo.iloc[:, 0:5]
-        df_final = df_final.drop(["interview_date", "interview_age"], axis=1)
-        df_final_bdi = pd.merge(df_final, df_bdi_remap, on="src_subject_id")
+        # Combine demo and bdi dataframes
+        df_nda = self.final_demo[["subjectkey", "src_subject_id", "sex"]]
+        df_bdi_demo = pd.merge(df_bdi_remap, df_nda, on="src_subject_id")
+
+        # Calculate age in months of visit
+        df_bdi_demo = report_helper.get_survey_age(
+            df_bdi_demo, self.final_demo, "src_subject_id"
+        )
+        df_bdi_demo["visit"] = sess
 
         # Build dataframe from nda columns, update with df_final_bdi data
-        df_nda = pd.DataFrame(columns=self.nda_cols, index=df_final_bdi.index)
-        df_nda.update(df_final_bdi)
+        df_nda = pd.DataFrame(columns=self.nda_cols, index=df_bdi_demo.index)
+        df_nda.update(df_bdi_demo)
         return df_nda
 
 
@@ -1178,7 +1171,7 @@ class NdarDemoInfo01:
 
     """
 
-    def __init__(self, redcap_demo):
+    def __init__(self, proj_dir, final_demo):
         """Read in demographic info and make report.
 
         Get demographic info from redcap_demo, and extract required values.
@@ -1198,7 +1191,7 @@ class NdarDemoInfo01:
 
         """
         print("Buiding NDA report : demo_info01 ...")
-        self.final_demo = redcap_demo.final_demo
+        self.final_demo = final_demo
         self.nda_label, nda_cols = report_helper.mine_template(
             "demo_info01_template.csv"
         )
@@ -1246,7 +1239,7 @@ class NdarDemoInfo01:
         subj_educat = self.final_demo["years_education"]
 
         # Make comments for pilot subjs
-        pilot_list = ["ER0001", "ER0002", "ER0003", "ER0004", "ER0005"]
+        pilot_list = report_helper.pilot_list()
         subj_comments_misc = []
         for subj in subj_src_id:
             if subj in pilot_list:
