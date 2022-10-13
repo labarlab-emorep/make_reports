@@ -218,13 +218,13 @@ class GetRedcapDemographic:
         ) as jf:
             report_keys_redcap = json.load(jf)
 
-        # Get original & new consent dataframes
-        df_consent_orig = report_helper.pull_redcap_data(
-            redcap_token, report_keys_redcap["consent_orig"]
-        )
-        df_consent_new = report_helper.pull_redcap_data(
-            redcap_token, report_keys_redcap["consent_new"]
-        )
+        # # Get original & new consent dataframes
+        # df_consent_orig = report_helper.pull_redcap_data(
+        #     redcap_token, report_keys_redcap["consent_orig"]
+        # )
+        # df_consent_new = report_helper.pull_redcap_data(
+        #     redcap_token, report_keys_redcap["consent_new"]
+        # )
 
         # Update consent_new column names, merge
         cols_new = df_consent_new.columns.tolist()
@@ -244,9 +244,9 @@ class GetRedcapDemographic:
         ].tolist()
 
         # Get guid dataframe, index of consented
-        self.df_guid = report_helper.pull_redcap_data(
-            redcap_token, report_keys_redcap["guid"]
-        )
+        # self.df_guid = report_helper.pull_redcap_data(
+        #     redcap_token, report_keys_redcap["guid"]
+        # )
         self.idx_guid = self.df_guid[
             self.df_guid["record_id"].isin(self.subj_consent)
         ].index.tolist()
@@ -270,9 +270,9 @@ class GetRedcapDemographic:
             ]
 
         # Get demographic dataframe, index of consented
-        self.df_demo = report_helper.pull_redcap_data(
-            redcap_token, report_keys_redcap["demographics"]
-        )
+        # self.df_demo = report_helper.pull_redcap_data(
+        #     redcap_token, report_keys_redcap["demographics"]
+        # )
         self.idx_demo = self.df_demo[
             self.df_demo["record_id"].isin(self.subj_consent)
         ].index.tolist()

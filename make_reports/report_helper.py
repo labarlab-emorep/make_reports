@@ -1,9 +1,10 @@
 """Report-agnostic supporting methods."""
+import sys
 import io
 import requests
 import csv
+import zipfile
 import pandas as pd
-import numpy as np
 import importlib.resources as pkg_resources
 from make_reports import reference_files
 
@@ -41,6 +42,108 @@ def pull_redcap_data(
     }
     r = requests.post("https://redcap.duke.edu/redcap/api/", data)
     df = pd.read_csv(io.StringIO(r.text), low_memory=False, na_values=None)
+    return df
+
+
+def pull_qualtrics_data(
+    survey_name, survey_id, datacenter_id, qualtrics_token, post_labels
+):
+    """Pull a Qualtrics report and make a pandas dataframe.
+
+    References guide at
+        https://api.qualtrics.com/ZG9jOjg3NzY3Nw-new-survey-response-export-guide
+
+    Parameters
+    ----------
+    survey_name : str
+        Qualtrics survey name
+
+
+
+
+    Returns
+    -------
+    pd.DataFrame
+
+    Raises
+    ------
+    TimeoutError
+        If response export progress takes too long
+
+    """
+    print(f"Downloading {survey_name} ...")
+
+    # Setting static parameters
+    request_check_progress = 0.0
+    progress_status = "inProgress"
+    url = (
+        f"https://{datacenter_id}.qualtrics.com/API/v3/surveys/{survey_id}"
+        + "/export-responses/"
+    )
+    headers = {
+        "content-type": "application/json",
+        "x-api-token": qualtrics_token,
+    }
+
+    # Create data export, submit download request
+    data = {"format": "csv"}
+    if post_labels:
+        data["useLabels"] = True
+    download_request_response = requests.request(
+        "POST", url, json=data, headers=headers
+    )
+    try:
+        progressId = download_request_response.json()["result"]["progressId"]
+    except KeyError:
+        print(download_request_response.json())
+        sys.exit(2)
+
+    # Check on data export progress, wait until export is ready
+    is_file = None
+    request_check_url = url + progressId
+    while (
+        progress_status != "complete"
+        and progress_status != "failed"
+        and is_file is None
+    ):
+        # Query status
+        request_check_response = requests.request(
+            "GET", request_check_url, headers=headers
+        )
+
+        # Update is_file when data export is ready
+        try:
+            is_file = request_check_response.json()["result"]["fileId"]
+        except KeyError:
+            pass
+
+        # Write data export progress for user, update progress_status
+        request_check_progress = request_check_response.json()["result"][
+            "percentComplete"
+        ]
+        print(f"\tDownload is {request_check_progress} complete")
+        progress_status = request_check_response.json()["result"]["status"]
+
+    # Check for export error
+    if progress_status == "failed":
+        raise Exception(
+            f"Export of {survey_name} failed, check "
+            + "gather_surveys.GetQualtricsSurveys._pull_qualtrics_data"
+        )
+    file_id = request_check_response.json()["result"]["fileId"]
+
+    # Download requested survey file
+    request_download_url = url + file_id + "/file"
+    request_download = requests.request(
+        "GET", request_download_url, headers=headers, stream=True
+    )
+
+    # Extract compressed file
+    req_file_zipped = io.BytesIO(request_download.content)
+    with zipfile.ZipFile(req_file_zipped) as req_file:
+        with req_file.open(f"{survey_name}.csv") as f:
+            df = pd.read_csv(f)
+    print(f"\n\tSuccessfully downloaded : {survey_name}.csv")
     return df
 
 
@@ -117,27 +220,69 @@ def calc_age_mo(subj_dob, subj_dos):
     return subj_age_mo
 
 
-def give_ndar_demo(final_demo):
+def get_survey_age(df_survey, df_demo, subj_col):
     """Title.
 
     Desc.
 
-    Parameters
-    ----------
-    make_reports.gather_surveys.GetRedcapDemographic.final_demo
+    """
+    # TODO check for datetime column
+    #
+    df_survey["datetime"] = pd.to_datetime(df_survey["datetime"])
+    subj_survey = df_survey[subj_col].tolist()
+    subj_dos = df_survey["datetime"].tolist()
 
-    Returns
-    -------
-    pd.DataFrame
+    df_demo["dob"] = pd.to_datetime(df_demo["dob"])
+    idx_demo = df_demo[
+        df_demo["src_subject_id"].isin(subj_survey)
+    ].index.tolist()
+    subj_dob = df_demo.loc[idx_demo, "dob"].tolist()
+
+    if len(subj_dob) != len(subj_dos):
+        raise IndexError("Length of subj DOB does not match subj DOS.")
+    subj_age_mo = calc_age_mo(subj_dob, subj_dos)
+    df_survey["interview_age"] = subj_age_mo
+    df_survey["interview_date"] = df_survey["datetime"].dt.strftime("%m/%d/%Y")
+    return df_survey
+
+
+def pilot_list():
+    """Title.
+
+    Desc.
 
     """
-    final_demo = final_demo.replace("NaN", np.nan)
-    final_demo["sex"] = final_demo["sex"].replace(
-        ["Male", "Female", "Neither"], ["M", "F", "O"]
-    )
-    final_demo = final_demo.dropna(subset=["subjectkey"])
-    final_demo["interview_date"] = pd.to_datetime(final_demo["interview_date"])
-    final_demo["interview_date"] = final_demo["interview_date"].dt.strftime(
-        "%m/%d/%Y"
-    )
-    return final_demo.iloc[:, 0:5]
+    return ["ER0001", "ER0002", "ER0003", "ER0004", "ER0005"]
+
+
+def redcap_dict():
+    """Title.
+
+    Desc.
+
+    """
+    return {
+        "demographics": "redcap_demographics",
+        "consent_orig": "redcap_demographics",
+        "consent_new": "redcap_demographics",
+        "guid": "redcap_demographics",
+        "bdi_day2": "visit_day2",
+        "bdi_day3": "visit_day3",
+    }
+
+
+def qualtrics_dict():
+    """Title.
+
+    Desc.
+
+    """
+    return {
+        "EmoRep_Session_1": "visit_day1",
+        "FINAL - EmoRep Stimulus Ratings - fMRI Study": "post_scan_ratings",
+        "Session 2 & 3 Survey": "visit_day23",
+    }
+
+
+def withdrew_list():
+    return ["ER0103", "ER0229"]

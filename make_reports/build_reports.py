@@ -10,12 +10,313 @@ be prepended to the dataframe, per NDARs double-header.
 
 """
 # %%
+import os
 import pandas as pd
 import numpy as np
 from datetime import datetime
 from make_reports import report_helper
 
 
+# %%
+class DemoAll:
+    """Title
+
+    Desc.
+
+    Attributes
+    ----------
+
+    """
+
+    def __init__(self, proj_dir):
+        """Title
+
+        Desc.
+
+        Attributes
+        ----------
+        proj_dir
+
+        """
+        print(
+            "\nBuilding final_demo from RedCap demographic,"
+            + " guid, consent reports ..."
+        )
+        self.proj_dir = proj_dir
+
+        # Read-in pilot, study data and combine dataframes
+        self._read_data()
+
+        # Run methods
+        print("\tCompiling needed demographic info ...")
+        self.make_complete()
+
+    def _read_data(self):
+        """Title
+
+        Desc.
+
+        Attributes
+        ----------
+        df_guid
+        df_demo
+        df_consent
+
+        """
+        # Set key, df mapping
+        map_dict = {
+            "cons_orig": "df_consent_orig.csv",
+            "cons_new": "df_consent_new.csv",
+            "demo": "df_demographics.csv",
+            "guid": "df_guid.csv",
+        }
+
+        # Read in study reports
+        redcap_clean = os.path.join(
+            self.proj_dir, "data_survey", "redcap_demographics", "data_clean"
+        )
+        clean_dict = {}
+        for h_key, h_df in map_dict.items():
+            clean_dict[h_key] = pd.read_csv(os.path.join(redcap_clean, h_df))
+
+        # Read in pilot reports
+        redcap_pilot = os.path.join(
+            self.proj_dir,
+            "data_pilot/data_survey",
+            "redcap_demographics",
+            "data_clean",
+        )
+        pilot_dict = {}
+        for h_key, h_df in map_dict.items():
+            pilot_dict[h_key] = pd.read_csv(os.path.join(redcap_pilot, h_df))
+
+        # Merge study, pilot dataframes
+        df_cons_orig = pd.concat(
+            [pilot_dict["cons_orig"], clean_dict["cons_orig"]],
+            ignore_index=True,
+        )
+        df_cons_new = pd.concat(
+            [pilot_dict["cons_new"], clean_dict["cons_new"]], ignore_index=True
+        )
+        df_demo = pd.concat(
+            [pilot_dict["demo"], clean_dict["demo"]], ignore_index=True
+        )
+        df_guid = pd.concat(
+            [pilot_dict["guid"], clean_dict["guid"]], ignore_index=True
+        )
+        del pilot_dict, clean_dict
+
+        # Update consent_new column names from original and merge
+        cols_new = df_cons_new.columns.tolist()
+        cols_orig = df_cons_orig.columns.tolist()
+        cols_replace = {}
+        for h_new, h_orig in zip(cols_new, cols_orig):
+            cols_replace[h_new] = h_orig
+        df_cons_new = df_cons_new.rename(columns=cols_replace)
+        df_consent = pd.concat([df_cons_orig, df_cons_new], ignore_index=True)
+        df_consent = df_consent.drop_duplicates(subset=["record_id"])
+        df_consent = df_consent.sort_values(by=["record_id"])
+        del df_cons_new, df_cons_orig
+
+        # Merge dataframes, use merge how=inner to keep only participants
+        # who have data in all dataframes.
+        df_merge = pd.merge(df_consent, df_guid, on="record_id")
+        df_merge = pd.merge(df_merge, df_demo, on="record_id")
+        self.df_merge = df_merge
+        del df_guid, df_demo, df_consent, df_merge
+
+    def _get_race(self):
+        """Get participant race response.
+
+        Account for single response, single response of
+        multiple, multiple responses (which may not include
+        the multiple option), and "other" responses.
+
+        Attributes
+        ----------
+
+
+        list
+            Participant responses to race question
+
+        """
+        # Get attribute for readibility, testing
+        df_merge = self.df_merge
+
+        # Get race response - deal with "More than one" (6) and
+        # "Other" (8) separately.
+        race_switch = {
+            1: "American Indian or Alaska Native",
+            2: "Asian",
+            3: "Black or African-American",
+            4: "White",
+            5: "Native Hawaiian or Other Pacific Islander",
+            7: "Unknown or not reported",
+        }
+        get_race_resp = [
+            (df_merge["race___1"] == 1),
+            (df_merge["race___2"] == 1),
+            (df_merge["race___3"] == 1),
+            (df_merge["race___4"] == 1),
+            (df_merge["race___5"] == 1),
+            (df_merge["race___7"] == 1),
+        ]
+        set_race_str = [
+            race_switch[1],
+            race_switch[2],
+            race_switch[3],
+            race_switch[4],
+            race_switch[5],
+            race_switch[7],
+        ]
+
+        # Get race responses, set to new column
+        df_merge["race_resp"] = np.select(get_race_resp, set_race_str)
+
+        # Capture "Other" responses, stitch response together
+        idx_other = df_merge.index[df_merge["race___8"] == 1].tolist()
+        race_other = [
+            f"Other - {x}"
+            for x in df_merge.loc[idx_other, "race_other"].tolist()
+        ]
+        df_merge.loc[idx_other, "race_resp"] = race_other
+
+        # Capture "More than one race" responses, write
+        # to df_merge["race_more"].
+        idx_more = df_merge.index[df_merge["race___6"] == 1].tolist()
+        df_merge["race_more"] = np.nan
+        df_merge.loc[idx_more, "race_more"] = "More"
+
+        # Capture multiple race responses (in case option 6 not selected)
+        col_list = [
+            "race___1",
+            "race___2",
+            "race___3",
+            "race___4",
+            "race___5",
+            "race___7",
+            "race___8",
+        ]
+        df_merge["race_sum"] = df_merge[col_list].sum(axis=1)
+        idx_mult = df_merge.index[df_merge["race_sum"] > 1].tolist()
+        df_merge.loc[idx_mult, "race_more"] = "More"
+
+        # Update race_resp col with responses in df_merge["race_more"]
+        idx_more = df_merge.index[df_merge["race_more"] == "More"].tolist()
+        df_merge.loc[idx_more, "race_resp"] = "More than one race"
+        race_resp = df_merge["race_resp"].tolist()
+        self.race_resp = race_resp
+        del df_merge
+
+    def _get_ethnic_minority(self):
+        """Determine if participant is considered a minority.
+
+        Parameters
+        ----------
+        subj_race : list
+            Participant race responses
+
+        Attributes
+        -------
+
+        tuple
+            [0] list of participants' ethnicity status
+            [1] list of whether participants' are minority
+
+        """
+        # Get ethnicity
+        h_ethnic = self.df_merge["ethnicity"].tolist()
+        ethnic_switch = {
+            1.0: "Hispanic or Latino",
+            2.0: "Not Hispanic or Latino",
+        }
+        subj_ethnic = [ethnic_switch[x] for x in h_ethnic]
+
+        # Determine if minority - not white or hispanic
+        subj_minor = []
+        for race, ethnic in zip(self.race_resp, subj_ethnic):
+            if race != "White" and ethnic == "Not Hispanic or Latino":
+                subj_minor.append("Minority")
+            else:
+                subj_minor.append("Not Minority")
+        self.subj_ethnic = subj_ethnic
+        self.subj_minor = subj_minor
+
+    def make_complete(self):
+        """Make a demographic dataframe with all needed information.
+
+        Pull relevant data from consent, GUID, and demographic reports
+        to compile data for all participants in RedCap who have consented.
+
+        Attributes
+        ----------
+        final_demo : pd.DataFrame
+            Complete report containing demographic info for NDA submission
+
+        """
+        # Capture attribute for easy testing
+        df_merge = self.df_merge
+
+        # Get GUID, study IDs
+        subj_guid = df_merge["guid"].tolist()
+        subj_study = df_merge["study_id"].tolist()
+
+        # Get consent date
+        df_merge["datetime"] = pd.to_datetime(df_merge["date"])
+        df_merge["datetime"] = df_merge["datetime"].dt.date
+        subj_consent_date = df_merge["datetime"].tolist()
+
+        # Get age, sex
+        subj_age = df_merge["age"].tolist()
+        h_sex = df_merge["gender"].tolist()
+        sex_switch = {1.0: "Male", 2.0: "Female", 3.0: "Neither"}
+        subj_sex = [sex_switch[x] for x in h_sex]
+
+        # Get DOB, age in months, education
+        subj_dob = df_merge["dob"]
+        subj_dob_dt = [
+            datetime.strptime(x, "%Y-%m-%d").date() for x in subj_dob
+        ]
+        subj_age_mo = report_helper.calc_age_mo(subj_dob_dt, subj_consent_date)
+        subj_educate = df_merge["years_education"]
+
+        # Get race, ethnicity, minority status
+        self._get_race()
+        self._get_ethnic_minority()
+
+        # Write dataframe
+        out_dict = {
+            "subjectkey": subj_guid,
+            "src_subject_id": subj_study,
+            "interview_date": subj_consent_date,
+            "interview_age": subj_age_mo,
+            "sex": subj_sex,
+            "age": subj_age,
+            "dob": subj_dob,
+            "ethnicity": self.subj_ethnic,
+            "race": self.race_resp,
+            "is_minority": self.subj_minor,
+            "years_education": subj_educate,
+        }
+        self.final_demo = pd.DataFrame(out_dict, columns=out_dict.keys())
+        del df_merge
+
+    def remove_withdrawn(self):
+        """Title.
+
+        Desc.
+
+        """
+        withdrew_list = report_helper.withdrew_list()
+        self.final_demo = self.final_demo[
+            ~self.final_demo.src_subject_id.str.contains(
+                "|".join(withdrew_list)
+            )
+        ]
+        self.final_demo = self.final_demo.reset_index(drop=True)
+
+
+# %%
 class ManagerRegular:
     """Make reports regularly submitted by lab manager.
 
@@ -398,7 +699,7 @@ class NdarAffim01:
 
     """
 
-    def __init__(self, qualtrics_data, redcap_demo):
+    def __init__(self, proj_dir, final_demo):
         """Read in survey data and make report.
 
         Get cleaned AIM Qualtrics survey from visit_day1, and
@@ -406,8 +707,7 @@ class NdarAffim01:
 
         Parameters
         ----------
-        qualtrics_data : make_reports.gather_surveys.GetQualtricsSurveys
-        redcap_demo : make_reports.gather_surveys.GetRedcapDemographic
+
 
         Attributes
         ----------
@@ -421,26 +721,39 @@ class NdarAffim01:
         """
         print("Buiding NDA report : affim01 ...")
         # Read in template
-        self.nda_label, nda_cols = report_helper.mine_template(
+        self.nda_label, self.nda_cols = report_helper.mine_template(
             "affim01_template.csv"
         )
 
         # Get clean survey data
-        qualtrics_data.surveys_visit1 = ["AIM"]
-        qualtrics_data.make_clean_reports("visit_day1")
-        df_aim = qualtrics_data.clean_visit["AIM"]
+        df_pilot = pd.read_csv(
+            os.path.join(
+                proj_dir,
+                "data_pilot/data_survey",
+                "visit_day1/data_clean",
+                "df_AIM.csv",
+            )
+        )
+        df_study = pd.read_csv(
+            os.path.join(
+                proj_dir,
+                "data_survey",
+                "visit_day1/data_clean",
+                "df_AIM.csv",
+            )
+        )
+        df_aim = pd.concat([df_pilot, df_study], ignore_index=True)
+        del df_pilot, df_study
 
         # Rename columns, drop NaN rows
-        df_aim = df_aim.rename(columns={"SubID": "src_subject_id"})
+        df_aim = df_aim.rename(columns={"study_id": "src_subject_id"})
         df_aim.columns = df_aim.columns.str.lower()
         df_aim = df_aim.replace("NaN", np.nan)
         self.df_aim = df_aim[df_aim["aim_1"].notna()]
 
-        # # Get final demographics, make report
-        # final_demo = redcap_demo.final_demo
-        # final_demo = final_demo.replace("NaN", np.nan)
-        # self.final_demo = final_demo.dropna(subset=["subjectkey"])
-        self.df_final = report_helper.give_ndar_demo(redcap_demo.final_demo)
+        # Get final demographics, make report
+        final_demo = final_demo.replace("NaN", np.nan)
+        self.final_demo = final_demo.dropna(subset=["subjectkey"])
         self._make_aim()
 
     def _make_aim(self):
@@ -452,28 +765,28 @@ class NdarAffim01:
             Report of AIM data that complies with NDAR data definitions
 
         """
-        # # Get final_demo cols
-        # df_final = self.final_demo.iloc[:, 0:5]
-        # df_final["interview_date"] = pd.to_datetime(df_final["interview_date"])
-        # df_final["interview_date"] = df_final["interview_date"].dt.strftime(
-        #     "%m/%d/%Y"
-        # )
-        # df_final["sex"] = df_final["sex"].replace(
-        #     ["Male", "Female", "Neither"], ["M", "F", "O"]
-        # )
+        df_nda = self.final_demo[["subjectkey", "src_subject_id", "sex"]]
+        # pd.options.mode.chained_assignment = None
+        df_nda["sex"] = df_nda["sex"].replace(
+            ["Male", "Female", "Neither"], ["M", "F", "O"]
+        )
+        df_aim_nda = pd.merge(self.df_aim, df_nda, on="src_subject_id")
+
+        df_aim_nda = report_helper.get_survey_age(
+            df_aim_nda, self.final_demo, "src_subject_id"
+        )
 
         # Sum aim responses, toggle pandas warning mode
-        aim_list = [x for x in self.df_aim.columns if "aim" in x]
-        pd.options.mode.chained_assignment = None
-        self.df_aim[aim_list] = self.df_aim[aim_list].astype("Int64")
-        self.df_aim["aimtot"] = self.df_aim[aim_list].sum(axis=1)
-        pd.options.mode.chained_assignment = "warn"
+        aim_list = [x for x in df_aim_nda.columns if "aim" in x]
+        df_aim_nda[aim_list] = df_aim_nda[aim_list].astype("Int64")
+        df_aim_nda["aimtot"] = df_aim_nda[aim_list].sum(axis=1)
+        # pd.options.mode.chained_assignment = "warn"
 
         # Merge final_demo with aim
-        # self.df_report = pd.merge(df_final, self.df_aim, on="src_subject_id")
-        self.df_report = pd.merge(
-            self.df_final, self.df_aim, on="src_subject_id"
+        self.df_report = pd.DataFrame(
+            columns=self.nda_cols, index=df_aim_nda.index
         )
+        self.df_report.update(df_aim_nda)
 
 
 # %%
@@ -498,7 +811,7 @@ class NdarAls01:
 
     """
 
-    def __init__(self, qualtrics_data, redcap_demo):
+    def __init__(self, proj_dir, final_demo):
         """Read in survey data and make report.
 
         Get cleaned ALS Qualtrics survey from visit_day1, and
@@ -528,20 +841,33 @@ class NdarAls01:
         )
 
         # Get clean survey data
-        qualtrics_data.surveys_visit1 = ["ALS"]
-        qualtrics_data.make_clean_reports("visit_day1")
-        df_als = qualtrics_data.clean_visit["ALS"]
+        df_pilot = pd.read_csv(
+            os.path.join(
+                proj_dir,
+                "data_pilot/data_survey",
+                "visit_day1/data_clean",
+                "df_ALS.csv",
+            )
+        )
+        df_study = pd.read_csv(
+            os.path.join(
+                proj_dir,
+                "data_survey",
+                "visit_day1/data_clean",
+                "df_ALS.csv",
+            )
+        )
+        df_als = pd.concat([df_pilot, df_study], ignore_index=True)
+        del df_pilot, df_study
 
         # Rename columns, frop NaN rows
-        df_als = df_als.rename(columns={"SubID": "src_subject_id"})
+        df_als = df_als.rename(columns={"study_id": "src_subject_id"})
         df_als = df_als.replace("NaN", np.nan)
         self.df_als = df_als[df_als["ALS_1"].notna()]
 
-        # # Get final demographics, make report
-        # final_demo = redcap_demo.final_demo
-        # final_demo = final_demo.replace("NaN", np.nan)
-        # self.final_demo = final_demo.dropna(subset=["subjectkey"])
-        self.df_final = report_helper.give_ndar_demo(redcap_demo.final_demo)
+        # Get final demographics, make report
+        final_demo = final_demo.replace("NaN", np.nan)
+        self.final_demo = final_demo.dropna(subset=["subjectkey"])
         self._make_als()
 
     def _make_als(self):
@@ -590,30 +916,27 @@ class NdarAls01:
         df_als_remap["als_sf_total"] = df_als_remap[als_cols].sum(axis=1)
 
         # Add pilot notes for certain subjects
-        pilot_list = ["ER0001", "ER0002", "ER0003", "ER0004", "ER0005"]
+        pilot_list = report_helper.pilot_list()
         idx_pilot = df_als_remap[
             df_als_remap["src_subject_id"].isin(pilot_list)
         ].index.tolist()
         df_als_remap.loc[idx_pilot, "comments"] = "PILOT PARTICIPANT"
 
-        # # Combine demographic and als dataframes
-        # df_final = self.final_demo.iloc[:, 0:5]
-        # df_final["interview_date"] = pd.to_datetime(df_final["interview_date"])
-        # df_final["interview_date"] = df_final["interview_date"].dt.strftime(
-        #     "%m/%d/%Y"
-        # )
-        # df_final["sex"] = df_final["sex"].replace(
-        #     ["Male", "Female", "Neither"], ["M", "F", "O"]
-        # )
-        df_final_als = pd.merge(
-            self.df_final, df_als_remap, on="src_subject_id"
+        # Combine demographic and als dataframes
+        df_nda = self.final_demo[["subjectkey", "src_subject_id", "sex"]]
+        df_nda["sex"] = df_nda["sex"].replace(
+            ["Male", "Female", "Neither"], ["M", "F", "O"]
+        )
+        df_als_nda = pd.merge(df_als_remap, df_nda, on="src_subject_id")
+        df_als_nda = report_helper.get_survey_age(
+            df_als_nda, self.final_demo, "src_subject_id"
         )
 
         # Build dataframe from nda columns, update with demo and als data
         self.df_report = pd.DataFrame(
-            columns=self.nda_cols, index=df_final_als.index
+            columns=self.nda_cols, index=df_als_nda.index
         )
-        self.df_report.update(df_final_als)
+        self.df_report.update(df_als_nda)
 
 
 # %%
@@ -640,7 +963,7 @@ class NdarBdi01:
 
     """
 
-    def __init__(self, redcap_data, redcap_demo):
+    def __init__(self, proj_dir, final_demo):
         """Read in survey data and make report.
 
         Get cleaned BDI RedCap survey from visit_day2 and
@@ -668,20 +991,17 @@ class NdarBdi01:
 
         """
         print("Buiding NDA report : bdi01 ...")
+        self.proj_dir = proj_dir
+
         # Read in template
         self.nda_label, self.nda_cols = report_helper.mine_template(
             "bdi01_template.csv"
         )
 
-        # Get clean bdi data, match dataframe column names
-        redcap_data.make_clean_reports("visit_day2", redcap_demo.subj_consent)
-        self.df_bdi_day2 = redcap_data.df_clean_bdi
-        redcap_data.make_clean_reports("visit_day3", redcap_demo.subj_consent)
-        self.df_bdi_day3 = redcap_data.df_clean_bdi
-        self.df_bdi_day3.columns = self.df_bdi_day2.columns.values
+        # Get pilot, study data for both day2, day3
+        self._get_clean()
 
         # Get final demographics
-        final_demo = redcap_demo.final_demo
         final_demo = final_demo.replace("NaN", np.nan)
         final_demo["sex"] = final_demo["sex"].replace(
             ["Male", "Female", "Neither"], ["M", "F", "O"]
@@ -697,61 +1017,58 @@ class NdarBdi01:
         df_report = df_report.sort_values(by=["src_subject_id"])
         self.df_report = df_report[df_report["interview_date"].notna()]
 
-    def _get_age(self, sess):
-        """Calculate participant age-in-months at visit.
+    def _get_clean(self):
+        """Title.
 
-        Add the visit age-in-months as interview_age column. Also
-        add the visit column, and make appropriate interview_date.
-
-        Parameters
-        ----------
-        sess : str
-            [day2 | day3], visit/session name
-
-        Returns
-        -------
-        pd.DataFrame
-
-        Raises
-        ------
-        IndexError
-            If date of birth list does not have same length
-            as the date of survey list
+        Desc.
 
         """
-        # Get dataframe
-        df_bdi = getattr(self, f"df_bdi_{sess}")
-
-        # Light cleaning of dataframe
-        df_bdi = df_bdi.replace("nan", np.nan)
-        df_bdi = df_bdi[df_bdi["q_1"].notna()]
-        df_bdi = df_bdi.rename(
-            columns={
-                "study_id": "src_subject_id",
-            }
+        # Get clean survey data
+        df_pilot2 = pd.read_csv(
+            os.path.join(
+                self.proj_dir,
+                "data_pilot/data_survey",
+                "visit_day2/data_clean",
+                "df_bdi_day2.csv",
+            )
         )
-        df_bdi["bdi_timestamp"] = pd.to_datetime(df_bdi["bdi_timestamp"])
-
-        # Find BDI subjects in final_demo
-        bdi_subj = df_bdi["src_subject_id"].tolist()
-        idx_demo = self.final_demo[
-            self.final_demo["src_subject_id"].isin(bdi_subj)
-        ].index.tolist()
-
-        # Get date-of-birth, date-of-survey, calculate age in months
-        bdi_dob = self.final_demo.loc[idx_demo, "dob"].tolist()
-        bdi_dos = df_bdi["bdi_timestamp"].tolist()
-        if len(bdi_dob) != len(bdi_dos):
-            raise IndexError("Length of bdi_dob does not match bdi_dos.")
-        bdi_age_mo = report_helper.calc_age_mo(bdi_dob, bdi_dos)
-
-        # Update dataframe using ndar column names
-        df_bdi["interview_date"] = df_bdi["bdi_timestamp"].dt.strftime(
-            "%Y-%m-%d"
+        df_study2 = pd.read_csv(
+            os.path.join(
+                self.proj_dir,
+                "data_survey",
+                "visit_day2/data_clean",
+                "df_bdi_day2.csv",
+            )
         )
-        df_bdi["interview_age"] = bdi_age_mo
-        df_bdi["visit"] = sess
-        return df_bdi
+        df_bdi_day2 = pd.concat([df_pilot2, df_study2], ignore_index=True)
+        df_bdi_day2 = df_bdi_day2.rename(
+            columns={"study_id": "src_subject_id"}
+        )
+
+        df_pilot3 = pd.read_csv(
+            os.path.join(
+                self.proj_dir,
+                "data_pilot/data_survey",
+                "visit_day3/data_clean",
+                "df_bdi_day3.csv",
+            )
+        )
+        df_study3 = pd.read_csv(
+            os.path.join(
+                self.proj_dir,
+                "data_survey",
+                "visit_day3/data_clean",
+                "df_bdi_day3.csv",
+            )
+        )
+        df_bdi_day3 = pd.concat([df_pilot3, df_study3], ignore_index=True)
+        df_bdi_day3 = df_bdi_day3.rename(
+            columns={"study_id": "src_subject_id"}
+        )
+        df_bdi_day3.columns = df_bdi_day2.columns.values
+
+        self.df_bdi_day2 = df_bdi_day2
+        self.df_bdi_day3 = df_bdi_day3
 
     def _make_bdi(self, sess):
         """Make an NDAR compliant report for visit.
@@ -769,8 +1086,8 @@ class NdarBdi01:
         pd.DataFrame
 
         """
-        # Calculate age in months of visit
-        df_bdi = self._get_age(sess)
+        # Get session data
+        df_bdi = getattr(self, f"df_bdi_{sess}")
 
         # Convert response values to int
         q_cols = [x for x in df_bdi.columns if "q_" in x]
@@ -805,12 +1122,7 @@ class NdarBdi01:
 
         # Drop non-ndar columns
         df_bdi_remap = df_bdi_remap.drop(
-            [
-                "guid_timestamp",
-                "redcap_survey_identifier",
-                "bdi_timestamp",
-                "bdi_complete",
-            ],
+            ["bdi_complete", "record_id"],
             axis=1,
         )
 
@@ -822,19 +1134,19 @@ class NdarBdi01:
         df_bdi_remap["bdi_tot"] = df_bdi_remap[bdi_cols].sum(axis=1)
         df_bdi_remap["bdi_tot"] = df_bdi_remap["bdi_tot"].astype("Int64")
 
-        # Get demo info, remove interview_[date|age] to avoid conflicts
-        # with incoming bdi. Merge.
-        df_final = self.final_demo.iloc[:, 0:5]
-        df_final = df_final.drop(["interview_date", "interview_age"], axis=1)
-        df_final_bdi = pd.merge(df_final, df_bdi_remap, on="src_subject_id")
+        # Combine demo and bdi dataframes
+        df_nda = self.final_demo[["subjectkey", "src_subject_id", "sex"]]
+        df_bdi_demo = pd.merge(df_bdi_remap, df_nda, on="src_subject_id")
+
+        # Calculate age in months of visit
+        df_bdi_demo = report_helper.get_survey_age(
+            df_bdi_demo, self.final_demo, "src_subject_id"
+        )
+        df_bdi_demo["visit"] = sess
 
         # Build dataframe from nda columns, update with df_final_bdi data
-        df_nda = pd.DataFrame(columns=self.nda_cols, index=df_final_bdi.index)
-        df_nda.update(df_final_bdi)
-        df_nda["interview_date"] = pd.to_datetime(df_nda["interview_date"])
-        df_nda["interview_date"] = df_nda["interview_date"].dt.strftime(
-            "%m/%d/%Y"
-        )
+        df_nda = pd.DataFrame(columns=self.nda_cols, index=df_bdi_demo.index)
+        df_nda.update(df_bdi_demo)
         return df_nda
 
 
@@ -855,7 +1167,7 @@ class NdarDemoInfo01:
 
     """
 
-    def __init__(self, redcap_demo):
+    def __init__(self, proj_dir, final_demo):
         """Read in demographic info and make report.
 
         Get demographic info from redcap_demo, and extract required values.
@@ -875,7 +1187,7 @@ class NdarDemoInfo01:
 
         """
         print("Buiding NDA report : demo_info01 ...")
-        self.final_demo = redcap_demo.final_demo
+        self.final_demo = final_demo
         self.nda_label, nda_cols = report_helper.mine_template(
             "demo_info01_template.csv"
         )
@@ -923,7 +1235,7 @@ class NdarDemoInfo01:
         subj_educat = self.final_demo["years_education"]
 
         # Make comments for pilot subjs
-        pilot_list = ["ER0001", "ER0002", "ER0003", "ER0004", "ER0005"]
+        pilot_list = report_helper.pilot_list()
         subj_comments_misc = []
         for subj in subj_src_id:
             if subj in pilot_list:
