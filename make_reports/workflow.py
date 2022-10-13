@@ -295,6 +295,7 @@ def make_nda_reports(nda_reports, proj_dir):
         "affim01": f"{mod_build}.NdarAffim01",
         "als01": f"{mod_build}.NdarAls01",
         "bdi01": f"{mod_build}.NdarBdi01",
+        "emrq01": f"{mod_build}.NdarEmrq01",
     }
 
     # Validate nda_reports arguments
