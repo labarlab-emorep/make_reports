@@ -1,4 +1,4 @@
-"""Report-agnostic supporting methods."""
+"""Supporting functions for making reports."""
 import sys
 import io
 import requests
@@ -46,7 +46,7 @@ def pull_redcap_data(
 
 
 def pull_qualtrics_data(
-    survey_name, survey_id, datacenter_id, qualtrics_token, post_labels
+    survey_name, survey_id, datacenter_id, qualtrics_token, post_labels=False
 ):
     """Pull a Qualtrics report and make a pandas dataframe.
 
@@ -57,9 +57,14 @@ def pull_qualtrics_data(
     ----------
     survey_name : str
         Qualtrics survey name
-
-
-
+    survey_id : str
+        Qualtrics survey_ID
+    data_center_id : str
+        Qualtrics datacenter_ID
+    qualtrics_token : str
+        API token for Qualtrics
+    post_labels : bool
+        Whether to pull labeled [True] or numeric [False] reports
 
     Returns
     -------
@@ -148,7 +153,7 @@ def pull_qualtrics_data(
 
 
 def mine_template(template_file):
-    """Extract row values from NDA template.
+    """Extract column values from NDA template.
 
     Parameters
     ----------
@@ -160,12 +165,11 @@ def mine_template(template_file):
     tuple
         [0] = list of nda template label e.g. [image, 03]
         [1] = list of nda column names
+
     """
     with pkg_resources.open_text(reference_files, template_file) as tf:
         reader = csv.reader(tf)
         row_info = [row for idx, row in enumerate(reader)]
-        # label_nda = [row for idx, row in enumerate(reader) if idx == 0][0]
-        # cols_nda = [row for idx, row in enumerate(reader) if idx == 1][0]
     return (row_info[0], row_info[1])
 
 
@@ -221,25 +225,41 @@ def calc_age_mo(subj_dob, subj_dos):
 
 
 def get_survey_age(df_survey, df_demo, subj_col):
-    """Title.
+    """Add interview_age, interview_date to df_survey.
 
-    Desc.
+    interview_age addition will be age-in-months, and
+    interview_date will be in format Month/Day/Year.
+
+    Parameters
+    ----------
+    df_survey : pd.DataFrame
+        Contains columns "src_subject_id", "datetime"
+    df_demo : pd.DataFrame
+        Contains columns "src_subject_id", "dob",
+        e.g. make_reports.build_reports.DemoAll.final_demo
+
+    Returns
+    -------
+    pd.DataFrame
 
     """
-    # TODO check for datetime column
-    #
+    # Extract survey datetime info
     df_survey["datetime"] = pd.to_datetime(df_survey["datetime"])
     subj_survey = df_survey[subj_col].tolist()
     subj_dos = df_survey["datetime"].tolist()
 
+    # Extract date-of-birth info for participants in survey
     df_demo["dob"] = pd.to_datetime(df_demo["dob"])
     idx_demo = df_demo[
         df_demo["src_subject_id"].isin(subj_survey)
     ].index.tolist()
     subj_dob = df_demo.loc[idx_demo, "dob"].tolist()
 
+    # Check that lists match
     if len(subj_dob) != len(subj_dos):
         raise IndexError("Length of subj DOB does not match subj DOS.")
+
+    # Calculate age-in-months, update dataframe
     subj_age_mo = calc_age_mo(subj_dob, subj_dos)
     df_survey["interview_age"] = subj_age_mo
     df_survey["interview_date"] = df_survey["datetime"].dt.strftime("%m/%d/%Y")
@@ -247,20 +267,14 @@ def get_survey_age(df_survey, df_demo, subj_col):
 
 
 def pilot_list():
-    """Title.
-
-    Desc.
-
-    """
+    """Return a list of pilot participants."""
     return ["ER0001", "ER0002", "ER0003", "ER0004", "ER0005"]
 
 
 def redcap_dict():
-    """Title.
-
-    Desc.
-
-    """
+    """Return a dict of RedCap surveys."""
+    # Key : RedCap dataframe
+    # Value : output parent directory name
     return {
         "demographics": "redcap_demographics",
         "consent_orig": "redcap_demographics",
@@ -272,11 +286,9 @@ def redcap_dict():
 
 
 def qualtrics_dict():
-    """Title.
-
-    Desc.
-
-    """
+    """Return a dict of Qualtrics surveys."""
+    # Key : Qualtrics dataframe
+    # Value : output parent directory identifier
     return {
         "EmoRep_Session_1": "visit_day1",
         "FINAL - EmoRep Stimulus Ratings - fMRI Study": "post_scan_ratings",
@@ -285,4 +297,5 @@ def qualtrics_dict():
 
 
 def withdrew_list():
+    """Return a list of participants who withdrew consent."""
     return ["ER0103", "ER0229"]

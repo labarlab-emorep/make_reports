@@ -1,5 +1,10 @@
-r"""Make NDAR reports for EmoRep project.
+r"""Generate NDAR reports for EmoRep project.
 
+Organize project data and generate reports for regular
+NDAR submissions.
+
+Reports are written to:
+    <proj_dir>/ndar_upload/reports
 
 Examples
 --------
@@ -10,10 +15,8 @@ rep_ndar \
     --nda-reports-all
 
 """
-# %%
 import sys
 import textwrap
-from datetime import date
 from argparse import ArgumentParser, RawTextHelpFormatter
 from make_reports import workflow
 
@@ -29,8 +32,7 @@ def _get_args():
         nargs="+",
         help=textwrap.dedent(
             """\
-            [affim01 | als01 | bdi01 | demo_info01]
-            requires --redcap-token and --qualtrics-token.
+            [affim01 | als01 | bdi01 | demo_info01 | emrq01]
             Make specific NDA reports by name.
             e.g. --nda-reports affim01 als01
             """
@@ -41,7 +43,6 @@ def _get_args():
         action="store_true",
         help=textwrap.dedent(
             """\
-            Requires --redcap-token and --qualtrics-token.
             Make all planned NDA reports.
             True if "--nda-reports-all" else False.
             """
@@ -66,21 +67,17 @@ def _get_args():
     return parser
 
 
-# %%
 def main():
-    "Coordinate resources according to user input."
+    """Capture arguments and trigger workflow."""
     args = _get_args().parse_args()
     nda_reports = args.nda_reports
     nda_reports_all = args.nda_reports_all
     proj_dir = args.proj_dir
 
-    # Generate NDA reports
     if nda_reports_all:
-        nda_reports = ["affim01", "als01", "bdi01", "demo_info01"]
+        nda_reports = ["affim01", "als01", "bdi01", "demo_info01", "emrq01"]
     workflow.make_nda_reports(nda_reports, proj_dir)
 
 
 if __name__ == "__main__":
     main()
-
-# %%

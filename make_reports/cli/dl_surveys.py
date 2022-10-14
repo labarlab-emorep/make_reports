@@ -1,7 +1,13 @@
-r"""Download surveys, write to keoki.
+r"""Download EmoRep survey data.
 
-Examples
---------
+Pull RedCap and Qualtrics surveys for EmoRep and write out original/raw
+dataframes to Keoki.
+
+Study data written to:
+    <proj_dir>/data_survey/<visit>/data_raw
+
+Example
+-------
 rep_dl \
     --get-redcap \
     --redcap-token $PAT_REDCAP_EMOREP \
@@ -9,14 +15,13 @@ rep_dl \
     --qualtrics-token $PAT_QUALTRICS_EMOREP
 
 """
-# %%
+import os
 import sys
 import textwrap
 from argparse import ArgumentParser, RawTextHelpFormatter
 from make_reports import workflow
 
 
-# %%
 def _get_args():
     """Get and parse arguments."""
     parser = ArgumentParser(
@@ -75,9 +80,8 @@ def _get_args():
     return parser
 
 
-# %%
 def main():
-    "Coordinate resources according to user input."
+    """Capture arguments and trigger workflow."""
     args = _get_args().parse_args()
     proj_dir = args.proj_dir
     qualtrics_token = args.qualtrics_token
@@ -85,7 +89,18 @@ def main():
     get_redcap = args.get_redcap
     get_qualtrics = args.get_qualtrics
 
-    # TODO Validate args
+    # Validate usage
+    if get_redcap and not redcap_token:
+        raise ValueError("Expected --redcap-token with --get-redcap.")
+    if get_qualtrics and not qualtrics_token:
+        raise ValueError("Expected --qualtrics-token with --get-qualtrics.")
+
+    # Check, setup proj_dir organization
+    for h_dir in ["data_survey", "data_pilot/data_survey"]:
+        sur_dir = os.path.join(proj_dir, h_dir)
+        if not os.path.exists(sur_dir):
+            os.path.makedirs(sur_dir)
+
     workflow.download_surveys(
         proj_dir,
         redcap_token=redcap_token,
