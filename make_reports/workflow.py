@@ -33,13 +33,6 @@ def download_surveys(
     -------
     None
 
-    Notes
-    -----
-    Study data written to:
-        <proj_dir>/data_survey/<visit>/data_raw
-    Pilot data written to:
-        <proj_dir>/data_pilot/data_survey/<visit>/data_raw
-
     """
     print("\nStarting survey download ...")
     if get_redcap:

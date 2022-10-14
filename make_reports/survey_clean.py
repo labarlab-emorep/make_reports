@@ -8,34 +8,56 @@ from make_reports import report_helper
 
 # %%
 class CleanRedcap:
-    """Title.
+    """Clean RedCap surveys.
 
-    Desc.
+    Find downloaded original/raw RedCap survey responses, and
+    convert values into usable dataframe types and formats. Participants
+    who have withdraw consent are included in the cleaned dataframes
+    for NIH/Duke reporting purposes.
 
     Parameters
     ----------
+    proj_dir : path
+        Location of parent directory for project
 
     Attributes
     ----------
-    df_clean
-    df_pilot
+    df_clean : pd.DataFrame
+        Cleaned survey responses for study participants
+    df_raw : pd.DataFrame
+        Original RedCap survey data
+    df_pilot : pd.DataFrame
+        Cleaned survey responses for pilot participants
+    pilot_list : make_reports.report_helper.pilot_list
+        Pilot participants
+    proj_dir : path
+        Location of parent directory for project
+    redcap_dict : make_reports.report_helper.redcap_dict
+        Mapping of survey name to directory organization
+
+    Methods
+    -------
+    clean_surveys(survey_name)
+        Load original survey data and coordinate cleaning methods.
 
     """
 
     def __init__(self, proj_dir):
-        """Title.
-
-        Desc.
+        """Set helper attributes.
 
         Parameters
         ----------
-        proj_dir
+        proj_dir : path
+            Location of parent directory for project
 
         Attributes
         ----------
-        proj_dir
-        redcap_dict
-        pilot_list
+        pilot_list : make_reports.report_helper.pilot_list
+            Pilot participants
+        proj_dir : path
+            Location of parent directory for project
+        redcap_dict : make_reports.report_helper.redcap_dict
+            Mapping of survey name to directory organization
 
         """
         self.proj_dir = proj_dir
@@ -43,27 +65,37 @@ class CleanRedcap:
         self.pilot_list = report_helper.pilot_list()
 
     def clean_surveys(self, survey_name):
-        """Title.
+        """Clean original RedCap survey data.
 
-        Desc.
+        Find data_raw csv dataframes and coordinate cleaning methods.
 
         Parameters
         ----------
+        survey_name : str, make_reports.report_helper.redcap_dict key
+            Name of RedCap survey
 
         Attributes
         ----------
-        df_raw
+        df_raw : pd.DataFrame
+            Original RedCap survey data
+
+        Raises
+        ------
+        FileNotFoundError
+            When dataframe not encountered in data_raw
 
         """
-        raw_path = os.path.join(
+        # Load raw data
+        raw_file = os.path.join(
             self.proj_dir,
             "data_survey",
             self.redcap_dict[survey_name],
             "data_raw",
+            f"df_{survey_name}_latest.csv",
         )
-        self.df_raw = pd.read_csv(
-            os.path.join(raw_path, f"df_{survey_name}_latest.csv")
-        )
+        if not os.path.exists(raw_file):
+            raise FileNotFoundError(f"Failed to find {raw_file}.")
+        self.df_raw = pd.read_csv(raw_file)
 
         # Get and run cleaning method
         print(f"Cleaning survey : {survey_name}")
@@ -78,7 +110,8 @@ class CleanRedcap:
     def _dob_convert(self, dob_list):
         """Helper method for _clean_demographics.
 
-        Convert list of date-of-birth responses to datetime objects.
+        Resolves participant free date-of-birth responses by
+        interpreting and converting them into datetime objects.
 
         Parameters
         ----------
@@ -88,6 +121,7 @@ class CleanRedcap:
         Returns
         -------
         list
+            Participant date-of-birth datetime obj
 
         Raises
         ------
@@ -97,8 +131,9 @@ class CleanRedcap:
             When dob response does not match expected formats
 
         """
-
+        # Manage nesting nightmare with inner function
         def _num_convert(dob):
+            """Interpret numeric dates."""
             # Attempt to parse date string, account for formats
             # 20000606, 06062000, and 6062000.
             if dob[:2] == "19" or dob[:2] == "20":
@@ -138,12 +173,14 @@ class CleanRedcap:
     def _get_educ_years(self):
         """Get participant education level.
 
-        Use info from years_education column of df_demo when they are numeric,
-        otherwise use the educate_switch to convert from level of education
+        Use info from years_education column when they are numeric,
+        otherwise use educate_switch to convert from level_education
         to number of years.
 
-
-            Number of years completed of education (int)
+        Returns
+        -------
+        list
+            Years of participant education (int)
 
         """
         # Convert education level to years
@@ -157,7 +194,6 @@ class CleanRedcap:
         # Convert into years (deal with self-reports)
         subj_educate = []
         for h_year, h_level, h_id in zip(edu_year, edu_level, record_id):
-            # print(h_year, h_level, h_id)
             # Patch for 1984 education issue
             if h_year == "1984":
                 subj_educate.append(educate_switch[8])
@@ -169,9 +205,17 @@ class CleanRedcap:
         return subj_educate
 
     def _clean_demographics(self):
-        """Title.
+        """Cleaning method for RedCap demographics survey.
 
-        Desc.
+        Convert RedCap report values and participant responses
+        to usable dataframe types.
+
+        Attributes
+        ----------
+        df_clean : pd.DataFrame
+            Clean demographic info for study participants
+        df_pilot : pd.DataFrame
+            Clean demographic info for pilot participants
 
         """
         # Reorder columns, drop rows without last name response
@@ -201,12 +245,19 @@ class CleanRedcap:
         self.df_clean = self.df_raw.loc[idx_study]
 
     def _clean_consent(self):
-        """Title.
+        """Cleaning method for RedCap consent survey.
 
-        Desc.
+        Only return participants who signed the consent form.
+
+        Attributes
+        ----------
+        df_clean : pd.DataFrame
+            Clean consent info for study participants
+        df_pilot : pd.DataFrame
+            Clean consent info for pilot participants
 
         """
-        # Drop rows without signature
+        # Drop rows without signature, account for multiple consent forms
         col_names = self.df_raw.columns.tolist()
         col_drop = (
             "signature_v2" if "signature_v2" in col_names else "signature"
@@ -223,9 +274,16 @@ class CleanRedcap:
         self.df_clean = df_raw.loc[idx_study]
 
     def _clean_guid(self):
-        """Title.
+        """Cleaning method for RedCap GUID survey.
 
-        Desc.
+        Only return participants who have an assigned GUID.
+
+        Attributes
+        ----------
+        df_clean : pd.DataFrame
+            Clean guid info for study participants
+        df_pilot : pd.DataFrame
+            Clean guid info for pilot participants
 
         """
         # Drop rows without guid
@@ -242,14 +300,14 @@ class CleanRedcap:
         self.df_clean = df_raw.loc[idx_study]
 
     def _clean_bdi_day23(self):
-        """Title.
-
-        Desc.
+        """Cleaning method for RedCap BDI surveys.
 
         Attributes
         ----------
-        df_clean
-        df_pilot
+        df_clean : pd.DataFrame
+            Clean bdi info for study participants
+        df_pilot : pd.DataFrame
+            Clean bdi info for pilot participants
 
         """
         # Remove unneeded columns and reorder
@@ -293,34 +351,62 @@ class CleanRedcap:
 
 # %%
 class CleanQualtrics:
-    """Title.
+    """Clean Qualtrics surveys.
 
-    Desc.
+     Find downloaded original/raw Qualtrics survey responses, and
+     convert values into usable dataframe tyeps and formats.
 
     Parameters
     ----------
+    proj_dir : path
+        Location of parent directory for project
 
     Attributes
     ----------
-    df_clean
-    df_pilot
+    data_clean : dict
+        Cleaned survey data of study participant responses
+        {survey_name: pd.DataFrame}, or
+        {visit: {survey_name: pd.DataFrame}}
+    data_pilot : dict
+        Cleaned survey data of pilot participant responses
+        {survey_name: pd.DataFrame}, or
+        {visit: {survey_name: pd.DataFrame}}
+    df_raw : pd.DataFrame
+        Original qualtrics survey session data
+    pilot_list : make_reports.report_helper.pilot_list
+        Pilot participants
+    proj_dir : path
+        Location of parent directory for project
+    qualtrics_dict : make_reports.report_helper.qualtrics_dict
+        Mapping of survey name to directory organization
+    withdrew_list : make_reports.report_helper.withdrew_list
+        Participant who have withdrawn from study
+
+    Methods
+    -------
+    clean_surveys(survey_name)
+        Load original survey data and coordinate cleaning methods.
 
     """
 
     def __init__(self, proj_dir):
-        """Title.
-
-        Desc.
+        """Set helper attributes.
 
         Parameters
         ----------
-        proj_dir
+        proj_dir : path
+            Location of parent directory for project
 
         Attributes
         ----------
-        proj_dir
-        redcap_dict
-        pilot_list
+        pilot_list : make_reports.report_helper.pilot_list
+            Pilot participants
+        proj_dir : path
+            Location of parent directory for project
+        qualtrics_dict : make_reports.report_helper.qualtrics_dict
+            Mapping of survey name to directory organization
+        withdrew_list : make_reports.report_helper.withdrew_list
+            Participant who have withdrawn from study
 
         """
         self.proj_dir = proj_dir
@@ -329,33 +415,44 @@ class CleanQualtrics:
         self.withdrew_list = report_helper.withdrew_list()
 
     def clean_surveys(self, survey_name):
-        """Title.
+        """Split and clean original Qualtrics survey data.
 
-        Desc.
+        Find original omnibus session data and coordinate cleaning methods.
 
         Parameters
         ----------
+        survey_name : str, make_reports.report_helper.qualtrics_dict key
+            Name of Qualtrics survey session
 
         Attributes
         ----------
-        df_raw
+        df_raw : pd.DataFrame
+            Original qualtrics survey session data
+
+        Raises
+        ------
+        FileNotFoundError
+            When dataframe not encountered in data_raw
 
         """
+        # Find data_raw path, visit_day2 has raw qualtrics for both
+        # visit_day2 and visit_day3
         visit_name = self.qualtrics_dict[survey_name]
         visit_raw = (
             "visit_day2"
             if survey_name == "Session 2 & 3 Survey"
             else self.qualtrics_dict[survey_name]
         )
-        raw_path = os.path.join(
+        raw_file = os.path.join(
             self.proj_dir,
             "data_survey",
             visit_raw,
             "data_raw",
+            f"{survey_name}_latest.csv",
         )
-        self.df_raw = pd.read_csv(
-            os.path.join(raw_path, f"{survey_name}_latest.csv")
-        )
+        if not os.path.exists(raw_file):
+            raise FileNotFoundError(f"Failed to find {raw_file}.")
+        self.df_raw = pd.read_csv(raw_file)
 
         # Get and run cleaning method
         print(f"Cleaning survey : {survey_name}")
@@ -363,16 +460,22 @@ class CleanQualtrics:
         clean_method()
 
     def _clean_visit_day1(self):
-        """Title.
+        """Cleaning method for visit 1 surveys.
 
-        Desc.
+        Split session into individual surveys, convert participant
+        responses to usable dataframe values and types.
 
         Attributes
         ----------
         data_clean : dict
+            Cleaned survey data of study participant responses
+            {survey_name: pd.DataFrame}
         data_pilot : dict
+            Cleaned survey data of pilot participant responses
+            {survey_name: pd.DataFrame}
 
         """
+        # Identify surveys in visit1 session
         surveys_visit1 = [
             "ALS",
             "AIM",
@@ -392,7 +495,7 @@ class CleanQualtrics:
         )
         col_names = self.df_raw.columns
 
-        # Subset dataframe by survey key
+        # Subset session dataframe by survey
         data_clean = {}
         data_pilot = {}
         for sur_name in surveys_visit1:
@@ -438,25 +541,25 @@ class CleanQualtrics:
         self.data_pilot = data_pilot
 
     def _clean_visit_day23(self):
-        """Title.
+        """Cleaning method for visit 2 & 3 surveys.
 
-        Desc.
+        Split session into individual surveys, convert participant
+        responses to usable dataframe values and types. Keep visit
+        day straight.
 
         Attributes
         ----------
-        data_clean
-        data_pilot
+        data_clean : dict
+            Cleaned survey data of study participant responses
+            {visit: {survey_name: pd.DataFrame}}
+        data_pilot : dict
+            Cleaned survey data of pilot participant responses
+            {visit: {survey_name: pd.DataFrame}}
 
         """
+        # Identify surveys in visit1 session and how session is coded
         surveys_visit23 = ["PANAS", "STAI_State"]
-
-        # Identify session, how session is coded in raw data
         day_dict = {"day2": "1", "day3": "2"}
-        # day_str = visit_name.split("_")[1]
-        # if day_str not in day_dict.keys():
-        #     raise ValueError(f"Inapproproiate visit_name : {visit_name}")
-        # print(f"Cleaning raw survey data : {day_str}")
-        # day_code = day_dict[day_str]
 
         # Get dataframe and setup output column names
         subj_cols = ["study_id", "visit", "datetime"]
@@ -471,7 +574,7 @@ class CleanQualtrics:
         )
         col_names = self.df_raw.columns
 
-        # Get relevant info from dataframe
+        # Get relevant info from dataframe for each day
         data_clean = {}
         data_pilot = {}
         for day_str, day_code in day_dict.items():
@@ -532,8 +635,12 @@ class CleanQualtrics:
 
         Attributes
         ----------
-        df_clean
-        df_pilot
+        data_clean : dict
+            Cleaned survey data of study participant responses
+            {survey_name: pd.DataFrame}
+        data_pilot : dict
+            Cleaned survey data of pilot participant responses
+            {survey_name: pd.DataFrame}
 
         """
         pass

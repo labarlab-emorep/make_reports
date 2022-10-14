@@ -1,12 +1,4 @@
-"""Build requested reports.
-
-Each class has the attribute df_report which contains
-the class' output final report that complies to either
-the NDAR data dictionary guidelines (Ndar* classes) or
-the NIH/Duke guidelines (ManagerRegular).
-
-Ndar* classes also have the attribute nda_label that can
-be prepended to the dataframe, per NDARs double-header.
+"""Title.
 
 """
 # %%
@@ -1278,7 +1270,7 @@ class NdarEmrq01:
 
     """
 
-    def __init__(self, qualtrics_data, redcap_demo):
+    def __init__(self, proj_dir, final_demo):
         """Read in survey data and make report.
 
         Get cleaned ERQ Qualtrics survey from visit_day1, and
@@ -1303,23 +1295,33 @@ class NdarEmrq01:
         )
 
         # Get clean survey data
-        qualtrics_data.surveys_visit1 = ["ERQ"]
-        qualtrics_data.make_clean_reports("visit_day1")
-        df_emrq = qualtrics_data.clean_visit["ERQ"]
+        df_pilot = pd.read_csv(
+            os.path.join(
+                proj_dir,
+                "data_pilot/data_survey",
+                "visit_day1/data_clean",
+                "df_ERQ.csv",
+            )
+        )
+        df_study = pd.read_csv(
+            os.path.join(
+                proj_dir,
+                "data_survey",
+                "visit_day1/data_clean",
+                "df_ERQ.csv",
+            )
+        )
+        df_emrq = pd.concat([df_pilot, df_study], ignore_index=True)
+        del df_pilot, df_study
 
         # Rename columns, frop NaN rows
-        df_emrq = df_emrq.rename(columns={"SubID": "src_subject_id"})
+        df_emrq = df_emrq.rename(columns={"study_id": "src_subject_id"})
         df_emrq = df_emrq.replace("NaN", np.nan)
         self.df_emrq = df_emrq[df_emrq["ERQ_1"].notna()]
 
-        # # Get final demographics, make report
-        # final_demo = redcap_demo.final_demo
-        # final_demo = final_demo.replace("NaN", np.nan)
-        # final_demo["sex"] = final_demo["sex"].replace(
-        #     ["Male", "Female", "Neither"], ["M", "F", "O"]
-        # )
-        # self.final_demo = final_demo.dropna(subset=["subjectkey"])
-        self.df_final = report_helper.give_ndar_demo(redcap_demo.final_demo)
+        # Get final demographics, make report
+        final_demo = final_demo.replace("NaN", np.nan)
+        self.final_demo = final_demo.dropna(subset=["subjectkey"])
         self._make_emrq()
 
     def _make_emrq(self):
@@ -1339,8 +1341,8 @@ class NdarEmrq01:
         df_emrq[emrq_cols] = df_emrq[emrq_cols].astype("Int64")
 
         # Calculate reappraisal, suppression scores.
-        # Reappraisal = sum of items 1, 3, 5, 7, 8, 10,
-        # Suppression = sum of items 2, 4, 6, 9.
+        # Reappraisal = sum of items 1, 3, 5, 7, 8, 10
+        # Suppression = sum of items 2, 4, 6, 9
         cols_reap = ["erq_1", "erq_3", "erq_5", "erq_7", "erq_8", "erq_10"]
         cols_supp = ["erq_2", "erq_4", "erq_6", "erq_9"]
         df_emrq["erq_reappraisal"] = df_emrq[cols_reap].sum(axis=1)
@@ -1349,19 +1351,21 @@ class NdarEmrq01:
             ["erq_reappraisal", "erq_suppression"]
         ].astype("Int64")
 
-        # # Combine demo, erq info
-        # df_final = self.final_demo.iloc[:, 0:5]
-        # df_final["interview_date"] = pd.to_datetime(df_final["interview_date"])
-        # df_final["interview_date"] = df_final["interview_date"].dt.strftime(
-        #     "%m/%d/%Y"
-        # )
-        df_final_emrq = pd.merge(self.df_final, df_emrq, on="src_subject_id")
+        # Combine demographic and erq dataframes
+        df_nda = self.final_demo[["subjectkey", "src_subject_id", "sex"]]
+        df_nda["sex"] = df_nda["sex"].replace(
+            ["Male", "Female", "Neither"], ["M", "F", "O"]
+        )
+        df_emrq_nda = pd.merge(df_emrq, df_nda, on="src_subject_id")
+        df_emrq_nda = report_helper.get_survey_age(
+            df_emrq_nda, self.final_demo, "src_subject_id"
+        )
 
         # Build dataframe from nda columns, update with df_final_emrq data
         self.df_report = pd.DataFrame(
-            columns=self.nda_cols, index=df_final_emrq.index
+            columns=self.nda_cols, index=df_emrq_nda.index
         )
-        self.df_report.update(df_final_emrq)
+        self.df_report.update(df_emrq_nda)
 
 
 class NdarImage03:

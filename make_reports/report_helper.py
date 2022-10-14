@@ -288,7 +288,7 @@ def redcap_dict():
 def qualtrics_dict():
     """Return a dict of Qualtrics surveys."""
     # Key : Qualtrics dataframe
-    # Value : output parent directory name
+    # Value : output parent directory identifier
     return {
         "EmoRep_Session_1": "visit_day1",
         "FINAL - EmoRep Stimulus Ratings - fMRI Study": "post_scan_ratings",

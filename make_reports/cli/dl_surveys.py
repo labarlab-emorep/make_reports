@@ -1,13 +1,10 @@
 r"""Download EmoRep survey data.
 
 Pull RedCap and Qualtrics surveys for EmoRep and write out original/raw
-dataframes to Keoki. Pilot and study data are separated.
+dataframes to Keoki.
 
 Study data written to:
     <proj_dir>/data_survey/<visit>/data_raw
-
-Pilot data written to:
-    <proj_dir>/data_pilot/data_survey/<visit>/data_raw
 
 Example
 -------

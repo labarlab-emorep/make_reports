@@ -32,8 +32,7 @@ def _get_args():
         nargs="+",
         help=textwrap.dedent(
             """\
-            [affim01 | als01 | bdi01 | demo_info01]
-            requires --redcap-token and --qualtrics-token.
+            [affim01 | als01 | bdi01 | demo_info01 | emrq01]
             Make specific NDA reports by name.
             e.g. --nda-reports affim01 als01
             """
@@ -44,7 +43,6 @@ def _get_args():
         action="store_true",
         help=textwrap.dedent(
             """\
-            Requires --redcap-token and --qualtrics-token.
             Make all planned NDA reports.
             True if "--nda-reports-all" else False.
             """
@@ -77,7 +75,7 @@ def main():
     proj_dir = args.proj_dir
 
     if nda_reports_all:
-        nda_reports = ["affim01", "als01", "bdi01", "demo_info01"]
+        nda_reports = ["affim01", "als01", "bdi01", "demo_info01", "emrq01"]
     workflow.make_nda_reports(nda_reports, proj_dir)
 
 
