@@ -1,5 +1,7 @@
 """Generate requested reports and organize relevant data."""
 import os
+import glob
+import json
 import pandas as pd
 import numpy as np
 from datetime import datetime
@@ -1420,7 +1422,127 @@ class NdarEmrq01:
 
 
 class NdarImage03:
-    pass
+    """Title.
+
+    Desc.
+
+    Attributes
+    ----------
+
+    """
+
+    def __init__(self, proj_dir, final_demo):
+        """Read in survey data and make report.
+
+
+        Parameters
+        ----------
+        proj_dir : path
+            Project's experiment directory
+        final_demo : make_reports.build_reports.DemoAll.final_demo
+            pd.DataFrame, compiled demographic info
+
+        Attributes
+        ----------
+        nda_cols : list
+            NDA report template column names
+        nda_label : list
+            NDA report template label
+
+        """
+        print("Buiding NDA report : emrq01 ...")
+        # Read in template
+        nda_label, nda_cols = report_helper.mine_template(
+            "image03_template.csv"
+        )
+
+        # Set experiment IDs
+        exp_id = []
+
+        # MRI vars
+        sess_list = ["ses-day2", "ses-day3"]
+        rawdata_dir = os.path.join(proj_dir, "data_scanner_BIDS/rawdata")
+        subj_sess_list = sorted(glob.glob(f"{rawdata_dir}/sub-ER*/ses-day*"))
+
+        # Get demo info
+        final_demo = final_demo.replace("NaN", np.nan)
+        final_demo = final_demo.dropna(subset=["subjectkey"])
+
+    def _info_anat():
+        """Title."""
+        nii_file = sorted(glob.glob(f"{subj_sess}/anat/*.nii.gz"))[0]
+        json_file = sorted(glob.glob(f"{subj_sess}/anat/*.json"))[0]
+
+        # TODO check nii,json_files exist
+
+        with open(json_file, "r") as jf:
+            nii_json = json.load(jf)
+
+        # TODO account for data acquisition facility
+
+        # Setup awkward values
+        acq_mat = f"{nii_json['ReconMatrixPE']} {nii_json['ReconMatrixPE']}"
+        fov = f"{nii_json['ReconMatrixPE']} {nii_json['ReconMatrixPE']}"
+
+        #
+        anat_image03 = {
+            "image_description": "TODO",
+            "experiment_id": exp_id,
+            "scan_type": "MR structural (T1)",
+            "scan_object": "Live",
+            "image_file_format": "NIFTI",
+            "image_modality": f"{nii_json['Modality']}I",
+            "scanner_manufacturer_pd": "TODO",
+            "scanner_software_versions_pd": "TODO",
+            "magnetic_field_strength": str(nii_json["MagneticFieldStrength"]),
+            "mri_repetition_time_pd": nii_json["RepetitionTime"],
+            "mri_echo_time_pd": str(nii_json["EchoTime"]),
+            "flip_angle": str(nii_json["FlipAngle"]),
+            "acquisition_matrix": acq_mat,
+            "mri_field_of_view_pd": fov,
+            "patient_position": "supine",
+            "photomet_interpret": "TODO",
+            "receive_coil": nii_json["CoilString"],
+            "tranfsormation_performed": "No",
+            "image_history": "Face removed",
+            "image_num_dimensions": 3,
+            "image_extent1": nii_json["ReconMatrixPE"],
+            "image_extent2": nii_json["ReconMatrixPE"],
+            "image_extent3": nii_json["AcquisitionMatrixPE"],
+            "image_unit1": "Millimeters",
+            "image_unit2": "Millimeters",
+            "image_unit3": "Millimeters",
+            "image_resolution1": 1.0,
+            "image_resolution2": 1.0,
+            "image_resolution3": float(nii_json["SliceThickness"]),
+            "image_slice_thickness": float(nii_json["SliceThickness"]),
+            "image_orientation": "Axial",
+            "software_preproc": "TODO",
+            "visnum": "TODO",
+        }
+
+    def _info_fmap():
+        pass
+
+    def _info_func():
+        pass
+
+    def _make_image03():
+        """Title."""
+        # for subj_sess in subj_sess_list:
+        subj_sess = subj_sess_list[0]
+        subj = os.path.basename(os.path.dirname(subj_sess))
+        subj_ndar = subj.split("-")[1]
+        sess = os.path.basename(subj_sess)
+
+        scan_type_list = [x for x in os.listdir(subj_sess) if x != "phys"]
+        # for scan_type in scan_type_list:
+        scan_type = scan_type_list[0]
+        info_meth = getattr(self, f"_info_{scan_type}")
+        info_meth()
+
+    def _gather_niis():
+        pass
 
 
 class NdarInclExcl01:
