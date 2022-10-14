@@ -1,12 +1,10 @@
 """Clean survey data from RedCap and Qualtrics."""
-# %%
 import os
 import pandas as pd
 import numpy as np
 from make_reports import report_helper
 
 
-# %%
 class CleanRedcap:
     """Clean RedCap surveys.
 
@@ -349,7 +347,6 @@ class CleanRedcap:
         self.df_clean = df_raw.loc[idx_study]
 
 
-# %%
 class CleanQualtrics:
     """Clean Qualtrics surveys.
 

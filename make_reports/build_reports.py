@@ -1,7 +1,4 @@
-"""Title.
-
-"""
-# %%
+"""Generate requested reports and organize relevant data."""
 import os
 import pandas as pd
 import numpy as np
@@ -9,50 +6,71 @@ from datetime import datetime
 from make_reports import report_helper
 
 
-# %%
 class DemoAll:
-    """Title
+    """Gather demographic information from RedCap surveys.
 
-    Desc.
+    Only includes participants who have signed the consent form,
+    have an assigned GUID, and have completed the demographic
+    survey.
+
+    Parameters
+    ----------
+    proj_dir : path
+        Location of parent directory for project
 
     Attributes
     ----------
+    df_merge : pd.DataFrame
+        Participant data from consent, demographic, and GUID surveys
+    final_demo : pd.DataFrame
+        Complete report containing demographic info for NDA submission,
+        regular manager reports.
+    proj_dir : path
+        Location of parent directory for project
+    race_resp : list
+        Participant responses to race item
+    subj_ethnic : list
+        Participants' ethnicity status
+    subj_minor : list
+        Particiapnts' minority status
+
+    Methods
+    -------
+    make_complete
+        Used for regular manager reports and common NDAR fields
+    remove_withdrawn
+        Remove participants from final_demo that have withdrawn consent
 
     """
 
     def __init__(self, proj_dir):
-        """Title
-
-        Desc.
+        """Read-in data and generate final_demo.
 
         Attributes
         ----------
-        proj_dir
+        proj_dir : path
+            Location of parent directory for project
 
         """
+        # Read-in pilot, study data and combine dataframes
         print(
             "\nBuilding final_demo from RedCap demographic,"
             + " guid, consent reports ..."
         )
         self.proj_dir = proj_dir
-
-        # Read-in pilot, study data and combine dataframes
         self._read_data()
 
-        # Run methods
+        # Generate final_demo
         print("\tCompiling needed demographic info ...")
         self.make_complete()
 
     def _read_data(self):
-        """Title
-
-        Desc.
+        """Get required pilot and study dataframes.
 
         Attributes
         ----------
-        df_guid
-        df_demo
-        df_consent
+        df_merge : pd.DataFrame
+            Participant data from consent, demographic, and GUID surveys
 
         """
         # Set key, df mapping
@@ -110,8 +128,8 @@ class DemoAll:
         df_consent = df_consent.sort_values(by=["record_id"])
         del df_cons_new, df_cons_orig
 
-        # Merge dataframes, use merge how=inner to keep only participants
-        # who have data in all dataframes.
+        # Merge dataframes, use merge how=inner (default) to keep
+        # only participants who have data in all dataframes.
         df_merge = pd.merge(df_consent, df_guid, on="record_id")
         df_merge = pd.merge(df_merge, df_demo, on="record_id")
         self.df_merge = df_merge
@@ -126,10 +144,8 @@ class DemoAll:
 
         Attributes
         ----------
-
-
-        list
-            Participant responses to race question
+        race_resp : list
+            Participant responses to race item
 
         """
         # Get attribute for readibility, testing
@@ -203,20 +219,15 @@ class DemoAll:
     def _get_ethnic_minority(self):
         """Determine if participant is considered a minority.
 
-        Parameters
-        ----------
-        subj_race : list
-            Participant race responses
-
         Attributes
-        -------
-
-        tuple
-            [0] list of participants' ethnicity status
-            [1] list of whether participants' are minority
+        ----------
+        subj_ethnic : list
+            Participants' ethnicity status
+        subj_minor : list
+            Particiapnts' minority status
 
         """
-        # Get ethnicity
+        # Get ethnicity selection, convert to english
         h_ethnic = self.df_merge["ethnicity"].tolist()
         ethnic_switch = {
             1.0: "Hispanic or Latino",
@@ -224,7 +235,7 @@ class DemoAll:
         }
         subj_ethnic = [ethnic_switch[x] for x in h_ethnic]
 
-        # Determine if minority - not white or hispanic
+        # Determine if minority i.e. not white or hispanic
         subj_minor = []
         for race, ethnic in zip(self.race_resp, subj_ethnic):
             if race != "White" and ethnic == "Not Hispanic or Latino":
@@ -235,15 +246,16 @@ class DemoAll:
         self.subj_minor = subj_minor
 
     def make_complete(self):
-        """Make a demographic dataframe with all needed information.
+        """Make a demographic dataframe.
 
         Pull relevant data from consent, GUID, and demographic reports
-        to compile data for all participants in RedCap who have consented.
+        to compile data for all participants in RedCap.
 
         Attributes
         ----------
         final_demo : pd.DataFrame
-            Complete report containing demographic info for NDA submission
+            Complete report containing demographic info for NDA submission,
+            regular manager reports.
 
         """
         # Capture attribute for easy testing
@@ -294,11 +306,7 @@ class DemoAll:
         del df_merge
 
     def remove_withdrawn(self):
-        """Title.
-
-        Desc.
-
-        """
+        """Remove participants from final_demo who have withdrawn consent."""
         withdrew_list = report_helper.withdrew_list()
         self.final_demo = self.final_demo[
             ~self.final_demo.src_subject_id.str.contains(
@@ -308,7 +316,6 @@ class DemoAll:
         self.final_demo = self.final_demo.reset_index(drop=True)
 
 
-# %%
 class ManagerRegular:
     """Make reports regularly submitted by lab manager.
 
@@ -320,9 +327,8 @@ class ManagerRegular:
     ----------
     query_date : datetime
         Date for finding report range
-    final_demo : pd.DataFrame
-        Compiled demographic information, attribute of
-        by general_info.MakeDemographic
+    final_demo : make_reports.build_reports.DemoAll.final_demo
+        pd.DataFrame, compiled demographic info
     report : str
         Type of report e.g. nih4 or duke3
 
@@ -332,47 +338,51 @@ class ManagerRegular:
         Data found within the range_start, range_end period
     df_report : pd.DataFrame
         Relevant info and format for requested report
-    final_demo : pd.DataFrame
-        Compiled demographic information, attribute of
-        by gather_surveys.GetRedcapDemographic
+    final_demo : make_reports.build_reports.DemoAll.final_demo
+        pd.DataFrame, compiled demographic info
     query_date : datetime
         Date for finding report range
-    range_start : datetime
-        Start of period for report
     range_end : datetime
         End of period for report
+    range_start : datetime
+        Start of period for report
     report : str
         Type of report e.g. nih4 or duke3
+
+    Methods
+    -------
+    make_duke3
+        Generate report submitted to Duke every 3 months
+    make_nih4
+        Generate report submitted to NIH every 4 months
+    make_nih12
+        Generate report submitted to NIH every 12 months
 
     """
 
     def __init__(self, query_date, final_demo, report):
-        """Make desired report.
+        """Generate requested report.
 
         Parameters
         ----------
         query_date : datetime
             Date for finding report range
-        final_demo : pd.DataFrame
-            Compiled demographic information, attribute of
-            by make_reports.general_info.MakeDemographic
+        final_demo : make_reports.build_reports.DemoAll.final_demo
+            pd.DataFrame, compiled demographic info
         report : str
-            Type of report e.g. nih4 or duke3
+            [nih4 | nih12 | duke3]
 
         Attributes
         ----------
+        final_demo : make_reports.build_reports.DemoAll.final_demo
+            pd.DataFrame, compiled demographic info
         query_date : datetime
             Date for finding report range
-        final_demo : pd.DataFrame
-            Compiled demographic information, from
-            general_info.MakeDemographic.final_demo
-        report : str
-            Type of report e.g. nih4 or duke3
 
         Raises
         ------
         ValueError
-            If report is not found in valid_reports
+            If improper report argument supplied
 
         """
         print(f"Buiding manager report : {report} ...")
@@ -387,10 +397,7 @@ class ManagerRegular:
         report_method()
 
     def _find_start_end(self, range_list):
-        """Find the period start and end date.
-
-        Identfiy the start and end dates from range_list
-        given the query date.
+        """Find the report period start and end dates.
 
         Parameters
         ----------
@@ -439,18 +446,18 @@ class ManagerRegular:
 
         Attributes
         ----------
-        range_start : datetime
-            Start of period for report
-        range_end : datetime
-            End of period for report
         df_range : pd.DataFrame
             Data found within the range_start, range_end period
+        range_end : datetime
+            End of period for report
+        range_start : datetime
+            Start of period for report
 
         Raises
         ------
         ValueError
             df_range is empty, meaning no participants were consented
-            within the period range
+            within the period range.
 
         """
         # Get date ranges, use known start date if supplied
@@ -590,7 +597,7 @@ class ManagerRegular:
         # Get gender, ethnicity, race responses
         df_hold = self.df_range[["src_subject_id", "sex", "ethnicity", "race"]]
 
-        # Combine responses for easy tabulation, deal with pd warnings
+        # Combine responses for easy tabulation, silence pd warnings
         pd.options.mode.chained_assignment = None
         df_hold["comb"] = (
             df_hold["sex"] + "," + df_hold["ethnicity"] + "," + df_hold["race"]
@@ -605,7 +612,7 @@ class ManagerRegular:
             .reset_index(name="Counts")
         )
 
-        # Reformat dataframe into desired format
+        # Restructure dataframe into desired format
         self.df_report = pd.concat(
             [
                 self.df_report["Groups"].str.split(",", expand=True),
@@ -671,12 +678,15 @@ class ManagerRegular:
         self.df_report["Age Units"] = "Years"
 
 
-# %%
 class NdarAffim01:
     """Make affim01 report for NDAR submission.
 
-    Pull subject demographic info from gather_surveys.GetRedcapDemographic
-    and survey data from gather_surveys.GetQualtricsSurveys.
+    Parameters
+    ----------
+    final_demo : make_reports.build_reports.DemoAll.final_demo
+        pd.DataFrame, compiled demographic info
+    proj_dir : path
+        Project's experiment directory
 
     Attributes
     ----------
@@ -684,10 +694,12 @@ class NdarAffim01:
         Cleaned AIM Qualtrics survey
     df_report : pd.DataFrame
         Report of AIM data that complies with NDAR data definitions
-    final_demo : pd.DataFrame
-        Compiled demographic information
+    final_demo : make_reports.build_reports.DemoAll.final_demo
+        pd.DataFrame, compiled demographic info
+    nda_cols : list
+        NDA report template column names
     nda_label : list
-        NDA report template column label
+        NDA report template label
 
     """
 
@@ -699,16 +711,21 @@ class NdarAffim01:
 
         Parameters
         ----------
-
+        proj_dir : path
+            Project's experiment directory
+        final_demo : make_reports.build_reports.DemoAll.final_demo
+            pd.DataFrame, compiled demographic info
 
         Attributes
         ----------
         df_aim : pd.DataFrame
             Cleaned AIM Qualtrics survey
-        final_demo : pd.DataFrame
-            Compiled demographic information
+        final_demo : make_reports.build_reports.DemoAll.final_demo
+            pd.DataFrame, compiled demographic info
+        nda_cols : list
+            NDA report template column names
         nda_label : list
-            NDA report template column label
+            NDA report template label
 
         """
         print("Buiding NDA report : affim01 ...")
@@ -757,36 +774,39 @@ class NdarAffim01:
             Report of AIM data that complies with NDAR data definitions
 
         """
+        # Get needed demographic info, combine with survey data
         df_nda = self.final_demo[["subjectkey", "src_subject_id", "sex"]]
-        # pd.options.mode.chained_assignment = None
         df_nda["sex"] = df_nda["sex"].replace(
             ["Male", "Female", "Neither"], ["M", "F", "O"]
         )
         df_aim_nda = pd.merge(self.df_aim, df_nda, on="src_subject_id")
 
+        # Find survey age-in-months
         df_aim_nda = report_helper.get_survey_age(
             df_aim_nda, self.final_demo, "src_subject_id"
         )
 
-        # Sum aim responses, toggle pandas warning mode
+        # Sum aim responses
         aim_list = [x for x in df_aim_nda.columns if "aim" in x]
         df_aim_nda[aim_list] = df_aim_nda[aim_list].astype("Int64")
         df_aim_nda["aimtot"] = df_aim_nda[aim_list].sum(axis=1)
-        # pd.options.mode.chained_assignment = "warn"
 
-        # Merge final_demo with aim
+        # Make an empty dataframe from the report column names, fill
         self.df_report = pd.DataFrame(
             columns=self.nda_cols, index=df_aim_nda.index
         )
         self.df_report.update(df_aim_nda)
 
 
-# %%
 class NdarAls01:
     """Make als01 report for NDAR submission.
 
-    Pull subject demographic info from gather_surveys.GetRedcapDemographic
-    and survey data from gather_surveys.GetQualtricsSurveys.
+    Parameters
+    ----------
+    proj_dir : path
+        Project's experiment directory
+    final_demo : make_reports.build_reports.DemoAll.final_demo
+        pd.DataFrame, compiled demographic info
 
     Attributes
     ----------
@@ -794,12 +814,12 @@ class NdarAls01:
         Cleaned ALS Qualtrics survey
     df_report : pd.DataFrame
         Report of ALS data that complies with NDAR data definitions
-    final_demo : pd.DataFrame
-        Compiled demographic information
+    final_demo : make_reports.build_reports.DemoAll.final_demo
+        pd.DataFrame, compiled demographic info
     nda_cols : list
         NDA report template column names
     nda_label : list
-        NDA report template column label
+        NDA report template label
 
     """
 
@@ -811,19 +831,21 @@ class NdarAls01:
 
         Parameters
         ----------
-        qualtrics_data : make_reports.gather_surveys.GetQualtricsSurveys
-        redcap_demo : make_reports.gather_surveys.GetRedcapDemographic
+        proj_dir : path
+            Project's experiment directory
+        final_demo : make_reports.build_reports.DemoAll.final_demo
+            pd.DataFrame, compiled demographic info
 
         Attributes
         ----------
         df_als : pd.DataFrame
             Cleaned ALS Qualtrics survey
-        final_demo : pd.DataFrame
-            Compiled demographic information
+        final_demo : make_reports.build_reports.DemoAll.final_demo
+            pd.DataFrame, compiled demographic info
         nda_cols : list
             NDA report template column names
         nda_label : list
-            NDA report template column label
+            NDA report template label
 
         """
         print("Buiding NDA report : als01 ...")
@@ -863,9 +885,9 @@ class NdarAls01:
         self._make_als()
 
     def _make_als(self):
-        """Make als01 report.
+        """Combine dataframes to generate requested report.
 
-        Remap column names and response values, add demographic info.
+        Remap values and calculate totals.
 
         Attributes
         ----------
@@ -931,12 +953,15 @@ class NdarAls01:
         self.df_report.update(df_als_nda)
 
 
-# %%
 class NdarBdi01:
     """Make bdi01 report for NDAR submission.
 
-    Pull subject demographic info from gather_surveys.GetRedcapDemographic
-    and data from gather_surveys.GetRedcapSurveys.
+    Parameters
+    ----------
+    proj_dir : path
+        Project's experiment directory
+    final_demo : make_reports.build_reports.DemoAll.final_demo
+        pd.DataFrame, compiled demographic info
 
     Attributes
     ----------
@@ -946,12 +971,12 @@ class NdarBdi01:
         Cleaned visit_day3 BDI RedCap survey
     df_report : pd.DataFrame
         Report of BDI data that complies with NDAR data definitions
-    final_demo : pd.DataFrame
-        Compiled demographic information
+    final_demo : make_reports.build_reports.DemoAll.final_demo
+        pd.DataFrame, compiled demographic info
     nda_cols : list
         NDA report template column names
     nda_label : list
-        NDA report template column label
+        NDA report template label
 
     """
 
@@ -960,32 +985,30 @@ class NdarBdi01:
 
         Get cleaned BDI RedCap survey from visit_day2 and
         visit_day3, and finalized demographic information.
+        Generate BDI report.
 
         Parameters
         ----------
-        redcap_data : make_reports.gather_surveys.GetRedcapSurveys
-        redcap_demo : make_reports.gather_surveys.GetRedcapDemographic
+        proj_dir : path
+            Project's experiment directory
+        final_demo : make_reports.build_reports.DemoAll.final_demo
+            pd.DataFrame, compiled demographic info
 
         Attributes
         ----------
-        df_bdi_day2 : pd.DataFrame
-            Cleaned visit_day2 BDI RedCap survey
-        df_bdi_day3 : pd.DataFrame
-            Cleaned visit_day3 BDI RedCap survey
         df_report : pd.DataFrame
             Report of BDI data that complies with NDAR data definitions
-        final_demo : pd.DataFrame
-            Compiled demographic information
+        final_demo : make_reports.build_reports.DemoAll.final_demo
+            pd.DataFrame, compiled demographic info
         nda_cols : list
             NDA report template column names
         nda_label : list
-            NDA report template column label
+            NDA report template label
 
         """
+        # Get needed column values from report template
         print("Buiding NDA report : bdi01 ...")
         self.proj_dir = proj_dir
-
-        # Read in template
         self.nda_label, self.nda_cols = report_helper.mine_template(
             "bdi01_template.csv"
         )
@@ -1010,9 +1033,16 @@ class NdarBdi01:
         self.df_report = df_report[df_report["interview_date"].notna()]
 
     def _get_clean(self):
-        """Title.
+        """Find and combine cleaned BDI data.
 
-        Desc.
+        Get pilot, study data for day2, day3.
+
+        Attributes
+        ----------
+        df_bdi_day2 : pd.DataFrame
+            Cleaned visit_day2 BDI RedCap survey
+        df_bdi_day3 : pd.DataFrame
+            Cleaned visit_day3 BDI RedCap survey
 
         """
         # Get clean survey data
@@ -1032,11 +1062,15 @@ class NdarBdi01:
                 "df_bdi_day2.csv",
             )
         )
+
+        # Combine pilot and study data, updated subj id column, set attribute
         df_bdi_day2 = pd.concat([df_pilot2, df_study2], ignore_index=True)
         df_bdi_day2 = df_bdi_day2.rename(
             columns={"study_id": "src_subject_id"}
         )
+        self.df_bdi_day2 = df_bdi_day2
 
+        # Repeat above for day3
         df_pilot3 = pd.read_csv(
             os.path.join(
                 self.proj_dir,
@@ -1058,8 +1092,6 @@ class NdarBdi01:
             columns={"study_id": "src_subject_id"}
         )
         df_bdi_day3.columns = df_bdi_day2.columns.values
-
-        self.df_bdi_day2 = df_bdi_day2
         self.df_bdi_day3 = df_bdi_day3
 
     def _make_bdi(self, sess):
@@ -1071,13 +1103,24 @@ class NdarBdi01:
         Parameters
         ----------
         sess : str
-            [day2 | day3], visit/session name
+            [day2 | day3]
+            visit/session name
 
         Returns
         -------
         pd.DataFrame
 
+        Raises
+        ------
+        ValueError
+            If sess is not day2 or day3
+
         """
+        # Check sess value
+        sess_list = ["day2", "day3"]
+        if sess not in sess_list:
+            raise ValueError(f"Incorrect visit day : {sess}")
+
         # Get session data
         df_bdi = getattr(self, f"df_bdi_{sess}")
 
@@ -1145,8 +1188,10 @@ class NdarBdi01:
 class NdarDemoInfo01:
     """Make demo_info01 report for NDAR submission.
 
-    Use subject demographic info from gather_surveys.GetRedcapDemographic
-    to build report.
+    Parameters
+    ----------
+    final_demo : make_reports.build_reports.DemoAll.final_demo
+        pd.DataFrame, compiled demographic info
 
     Attributes
     ----------
@@ -1159,23 +1204,25 @@ class NdarDemoInfo01:
 
     """
 
-    def __init__(self, proj_dir, final_demo):
+    def __init__(self, final_demo):
         """Read in demographic info and make report.
 
-        Get demographic info from redcap_demo, and extract required values.
+        Read-in data, setup empty df_report, and coordinate
+        filling df_report.
 
         Parameters
         ----------
-        redcap_demo : make_reports.gather_surveys.GetRedcapDemographic
+        final_demo : make_reports.build_reports.DemoAll.final_demo
+            pd.DataFrame, compiled demographic info
 
         Attributes
         ----------
         df_report : pd.DataFrame
             Report of demographic data that complies with NDAR data definitions
-        final_demo : pd.DataFrame
-            Compiled demographic information
+        final_demo : make_reports.build_reports.DemoAll.final_demo
+            pd.DataFrame, compiled demographic info
         nda_label : list
-            NDA report template column label
+            NDA report template label
 
         """
         print("Buiding NDA report : demo_info01 ...")
@@ -1187,12 +1234,7 @@ class NdarDemoInfo01:
         self._make_demo()
 
     def _make_demo(self):
-        """Extract relevant values and make report.
-
-        Generate demo_info01 report that will comply with NDAR data
-        definition standards by mining data supplied in final_demo.
-
-        """
+        """Update df_report with NDAR-required demographic information."""
         # Get subject key, src_id
         subj_key = self.final_demo["subjectkey"]
         subj_src_id = self.final_demo["src_subject_id"]
@@ -1255,18 +1297,24 @@ class NdarEmoEndo01:
     pass
 
 
-# %%
 class NdarEmrq01:
     """Make emrq01 report for NDAR submission.
 
-    Pull subject demographic info from gather_surveys.GetRedcapDemographic
-    and survey data from gather_surveys.GetQualtricsSurveys.
+    Parameters
+    ----------
+    proj_dir : path
+        Project's experiment directory
+    final_demo : make_reports.build_reports.DemoAll.final_demo
+        pd.DataFrame, compiled demographic info
 
     Attributes
     ----------
-
     df_report : pd.DataFrame
+        Report of EMRQ data that complies with NDAR data definitions
+    nda_cols : list
+        NDA report template column names
     nda_label : list
+        NDA report template label
 
     """
 
@@ -1278,14 +1326,17 @@ class NdarEmrq01:
 
         Parameters
         ----------
-        qualtrics_data : make_reports.gather_surveys.GetQualtricsSurveys
-        redcap_demo : make_reports.gather_surveys.GetRedcapDemographic
+        proj_dir : path
+            Project's experiment directory
+        final_demo : make_reports.build_reports.DemoAll.final_demo
+            pd.DataFrame, compiled demographic info
 
         Attributes
         ----------
-
-        df_report : pd.DataFrame
+        nda_cols : list
+            NDA report template column names
         nda_label : list
+            NDA report template label
 
         """
         print("Buiding NDA report : emrq01 ...")
@@ -1325,14 +1376,14 @@ class NdarEmrq01:
         self._make_emrq()
 
     def _make_emrq(self):
-        """Title.
+        """Generate ERMQ report for NDAR submission.
 
-        Desc.
+        Remap values and calculate totals.
 
         Attributes
         ----------
-
-        df_report
+        df_report : pd.DataFrame
+            Report of EMRQ data that complies with NDAR data definitions
 
         """
         # Update column names, make data integer
@@ -1340,9 +1391,9 @@ class NdarEmrq01:
         emrq_cols = [x for x in df_emrq.columns if "erq" in x]
         df_emrq[emrq_cols] = df_emrq[emrq_cols].astype("Int64")
 
-        # Calculate reappraisal, suppression scores.
-        # Reappraisal = sum of items 1, 3, 5, 7, 8, 10
-        # Suppression = sum of items 2, 4, 6, 9
+        # Calculate reappraisal, suppression scores:
+        #   Reappraisal = sum of items 1, 3, 5, 7, 8, 10
+        #   Suppression = sum of items 2, 4, 6, 9
         cols_reap = ["erq_1", "erq_3", "erq_5", "erq_7", "erq_8", "erq_10"]
         cols_supp = ["erq_2", "erq_4", "erq_6", "erq_9"]
         df_emrq["erq_reappraisal"] = df_emrq[cols_reap].sum(axis=1)

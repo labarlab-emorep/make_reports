@@ -345,7 +345,12 @@ def make_nda_reports(nda_reports, proj_dir):
         h_pkg, h_mod, h_class = nda_switch[report].split(".")
         mod = __import__(f"{h_pkg}.{h_mod}", fromlist=[h_class])
         rep_class = getattr(mod, h_class)
-        rep_obj = rep_class(proj_dir, redcap_demo.final_demo)
+
+        # Generate report
+        if report == "demo_info01":
+            rep_obj = rep_class(redcap_demo.final_demo)
+        else:
+            rep_obj = rep_class(proj_dir, redcap_demo.final_demo)
 
         # Write out report
         out_file = os.path.join(report_dir, f"{report}_dataset.csv")
