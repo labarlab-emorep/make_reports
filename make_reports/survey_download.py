@@ -103,7 +103,7 @@ def download_redcap(proj_dir, redcap_token, survey_name=None):
             "data_raw",
             f"df_{sur_name}_latest.csv",
         )
-        out_dir = os.path.basename(out_file)
+        out_dir = os.path.dirname(out_file)
         if not os.path.exists(out_dir):
             os.makedirs(out_dir)
 
@@ -168,7 +168,7 @@ def download_qualtrics(proj_dir, qualtrics_token, survey_name=None):
                     "data_raw",
                     f"{sur_name}_latest.csv",
                 )
-                out_dir = os.path.basename(out_file)
+                out_dir = os.path.dirname(out_file)
                 if not os.path.exists(out_dir):
                     os.makedirs(out_dir)
 
@@ -184,7 +184,7 @@ def download_qualtrics(proj_dir, qualtrics_token, survey_name=None):
                 "data_raw",
                 f"{sur_name}_latest.csv",
             )
-            out_dir = os.path.basename(out_file)
+            out_dir = os.path.dirname(out_file)
             if not os.path.exists(out_dir):
                 os.makedirs(out_dir)
             df.to_csv(out_file, index=False, na_rep="")
