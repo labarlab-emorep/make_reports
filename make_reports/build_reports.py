@@ -1464,6 +1464,16 @@ class NdarImage03:
         rawdata_dir = os.path.join(proj_dir, "data_scanner_BIDS/rawdata")
         subj_sess_list = sorted(glob.glob(f"{rawdata_dir}/sub-ER*/ses-day*"))
 
+        # Pilot data
+        pilot_dir = os.path.join(
+            proj_dir, "data_pilot/data_scanner_BIDS/ndar_upload"
+        )
+        df_report_pilot = pd.read_csv(
+            os.path.join(pilot_dir, "EMOREP_image03_data_BIAC.csv")
+        )
+        df_report_pilot = df_report_pilot[1:]
+        df_report_pilot.columns = nda_cols
+
         # Get demo info
         final_demo = final_demo.replace("NaN", np.nan)
         final_demo = final_demo.dropna(subset=["subjectkey"])
