@@ -1,5 +1,6 @@
 """Generate requested reports and organize relevant data."""
 import os
+import re
 import glob
 import json
 import subprocess
@@ -1457,15 +1458,19 @@ class NdarImage03:
         nda_label, nda_cols = report_helper.mine_template(
             "image03_template.csv"
         )
-        df_report = pd.DataFrame(columns=nda_cols)
+        self.df_report_study = pd.DataFrame(columns=nda_cols)
 
         # Set experiment IDs
-        exp_id = 1683
+        self.exp_id = 1683
 
         # MRI vars
-        sess_list = ["ses-day2", "ses-day3"]
+        self.proj_dir = proj_dir
+        self.local_path = "TODO"
+        self.sess_list = ["ses-day2", "ses-day3"]
         rawdata_dir = os.path.join(proj_dir, "data_scanner_BIDS/rawdata")
-        source_dir = os.path.join(proj_dir, "data_scanner_BIDS/sourcedata")
+        self.source_dir = os.path.join(
+            proj_dir, "data_scanner_BIDS/sourcedata"
+        )
         subj_sess_list = sorted(glob.glob(f"{rawdata_dir}/sub-ER*/ses-day*"))
 
         # Pilot data
@@ -1475,8 +1480,8 @@ class NdarImage03:
         df_report_pilot = pd.read_csv(
             os.path.join(pilot_dir, "EMOREP_image03_data_BIAC.csv")
         )
-        df_report_pilot = df_report_pilot[1:]
-        df_report_pilot.columns = nda_cols
+        self.df_report_pilot = df_report_pilot[1:]
+        self.df_report_pilot.columns = nda_cols
 
         # Get demo info
         final_demo = final_demo.replace("NaN", np.nan)
@@ -1484,28 +1489,37 @@ class NdarImage03:
         final_demo["sex"] = final_demo["sex"].replace(
             ["Male", "Female", "Neither"], ["M", "F", "O"]
         )
+        self.final_demo = final_demo
 
-        # _make_image03()
+        # Do the work
+        self._make_image03(subj_sess_list)
 
-    def _make_image03():
+        # Combine df_report_study and df_report_pilot
+        # TODO remove rows for subjs not in final_demo
+        df_report = pd.concat([self.df_report_pilot, self.df_report_study])
+        self.df_report = df_report
+
+    def _make_image03(self, subj_sess_list):
         """Title."""
-        # for subj_sess in subj_sess_list:
-        subj_sess = subj_sess_list[0]
-        subj = os.path.basename(os.path.dirname(subj_sess))
-        subj_ndar = subj.split("-")[1]
-        sess = os.path.basename(subj_sess)
+        for subj_sess in subj_sess_list:
+            self.subj = os.path.basename(os.path.dirname(subj_sess))
+            self.subj_nda = self.subj.split("-")[1]
+            self.sess = os.path.basename(subj_sess)
+            print(f"\tMining data for {self.subj}, {self.sess}")
 
-        scan_type_list = [x for x in os.listdir(subj_sess) if x != "phys"]
-        # for scan_type in scan_type_list:
-        scan_type = scan_type_list[0]
-        info_meth = getattr(self, f"_info_{scan_type}")
-        info_meth()
+            # Identify types of data in subject's session, use appropriate
+            # method for data type.
+            scan_type_list = [x for x in os.listdir(subj_sess) if x != "phys"]
+            for scan_type in scan_type_list:
+                info_meth = getattr(self, f"_info_{scan_type}")
+                info_meth(subj_sess)
 
-    def _get_subj_demo(subj_nda, scan_date):
+    def _get_subj_demo(self, scan_date):
         """Title."""
         # Demographic, scan date, interview age
+        final_demo = self.final_demo
         idx_subj = final_demo.index[
-            final_demo["src_subject_id"] == subj_nda
+            final_demo["src_subject_id"] == self.subj_nda
         ].tolist()[0]
         subj_guid = final_demo.iloc[idx_subj]["subjectkey"]
         subj_id = final_demo.iloc[idx_subj]["src_subject_id"]
@@ -1524,7 +1538,7 @@ class NdarImage03:
             "gender": subj_sex,
         }
 
-    def _get_std_info(nii_json, dicom_hdr, sess):
+    def _get_std_info(self, nii_json, dicom_hdr):
         """Title."""
         scanner_manu = dicom_hdr[0x08, 0x70].value.split(" ")[0]
         scanner_type = dicom_hdr[0x08, 0x1090].value
@@ -1560,10 +1574,10 @@ class NdarImage03:
             "image_unit2": "Millimeters",
             "image_unit3": "Millimeters",
             "image_orientation": "Axial",
-            "visnum": float(sess[-1]),
+            "visnum": float(self.sess[-1]),
         }
 
-    def _info_anat():
+    def _info_anat(self, subj_sess):
         """Title."""
 
         # TODO check json, DICOM exist
@@ -1574,29 +1588,27 @@ class NdarImage03:
             nii_json = json.load(jf)
 
         # Get DICOM info
-        subj_nda = subj.split("-")[1]
-        day = sess.split("-")[1]
+        day = self.sess.split("-")[1]
         dicom_file = glob.glob(
-            f"{source_dir}/{subj_nda}/{day}*/DICOM/EmoRep_anat/*.dcm"
+            f"{self.source_dir}/{self.subj_nda}/{day}*/DICOM/EmoRep_anat/*.dcm"
         )[0]
         dicom_hdr = pydicom.read_file(dicom_file)
 
         # Get demographic info
         scan_date = datetime.strptime(dicom_hdr[0x08, 0x20].value, "%Y%m%d")
-        demo_dict = _get_subj_demo(subj_nda, scan_date)
+        demo_dict = self._get_subj_demo(scan_date)
 
         # Setup host file
         # TODO check that file exists
         # TODO setup local path
         deface_file = os.path.join(
-            proj_dir,
+            self.proj_dir,
             "data_scanner_BIDS/derivatives/deface",
-            subj,
-            sess,
-            f"{subj}_{sess}_T1w_defaced.nii.gz",
+            self.subj,
+            self.sess,
+            f"{self.subj}_{self.sess}_T1w_defaced.nii.gz",
         )
-        local_path = "TODO"
-        host_dir = os.path.join(proj_dir, "ndar_upload/data_mri")
+        host_dir = os.path.join(self.proj_dir, "ndar_upload/data_mri")
         host_file = os.path.join(
             host_dir, f"{demo_dict['subjectkey']}_{day}_T1_anat.nii.gz"
         )
@@ -1609,9 +1621,9 @@ class NdarImage03:
             h_sp.wait()
 
         # Get general, anat specific acquisition info
-        std_dict = _get_std_info(nii_json, dicom_hdr, sess)
+        std_dict = self._get_std_info(nii_json, dicom_hdr)
         anat_image03 = {
-            "image_file": f"{local_path}/{os.path.basename(host_file)}",
+            "image_file": f"{self.local_path}/{os.path.basename(host_file)}",
             "image_description": "MPRAGE",
             "scan_type": "MR structural (T1)",
             "image_history": "Face removed",
@@ -1629,18 +1641,61 @@ class NdarImage03:
 
         # Add scan info to report
         new_row = pd.DataFrame(anat_image03, index=[0])
-        df_report = pd.concat([df_report.loc[:], new_row]).reset_index(
-            drop=True
-        )
+        self.df_report_study = pd.concat(
+            [self.df_report_study.loc[:], new_row]
+        ).reset_index(drop=True)
 
-    def _info_fmap():
+    def _info_fmap(subj_sess):
         pass
 
-    def _info_func():
-        pass
+    def _info_func(self, subj_sess):
+        """Title."""
 
-    def _gather_niis():
-        pass
+        nii_list = sorted(glob.glob(f"{subj_sess}/func/*.nii.gz"))
+        for nii_path in nii_list:
+
+            # Get JSON for func run
+            json_path = re.sub(".nii.gz$", ".json", nii_path)
+            with open(json_path, "r") as jf:
+                nii_json = json.load(jf)
+
+            # Identify appropriate DICOM, load header
+            _, _, task, run, _ = os.path.basename(nii_path).split("_")
+            day = self.sess.split("-")[1]
+            task_dir = (
+                "Rest_run01"
+                if task == "task-rest"
+                else f"EmoRep_run{run.split('-')[1]}"
+            )
+            task_source = os.path.join(
+                self.source_dir, self.subj_nda, f"{day}*/DICOM", task_dir
+            )
+            dicom_file = glob.glob(f"{task_source}/*.dcm")[0]
+            dicom_hdr = pydicom.read_file(dicom_file)
+
+            # Get demographic info
+            scan_date = datetime.strptime(
+                dicom_hdr[0x08, 0x20].value, "%Y%m%d"
+            )
+            demo_dict = self._get_subj_demo(scan_date)
+
+            # Setup host file
+            # TODO check that file exists
+            # TODO setup local path
+            host_dir = os.path.join(self.proj_dir, "ndar_upload/data_mri")
+            h_guid = demo_dict["subjectkey"]
+            h_task = task.split("-")[1]
+            h_run = run[-1]
+            host_file = os.path.join(
+                host_dir, f"{h_guid}_{day}_func_{h_task}_{h_run}.nii.gz"
+            )
+            if not os.path.exists(host_file):
+                bash_cmd = f"cp {nii_path} {host_file}"
+                h_sp = subprocess.Popen(
+                    bash_cmd, shell=True, stdout=subprocess.PIPE
+                )
+                h_out, h_err = h_sp.communicate()
+                h_sp.wait()
 
 
 class NdarInclExcl01:
