@@ -2,9 +2,11 @@
 import os
 import glob
 import json
+import subprocess
 import pandas as pd
 import numpy as np
 from datetime import datetime
+import pydicom
 from make_reports import report_helper
 
 
@@ -1451,17 +1453,19 @@ class NdarImage03:
 
         """
         print("Buiding NDA report : emrq01 ...")
-        # Read in template
+        # Read in template, start empty dataframe
         nda_label, nda_cols = report_helper.mine_template(
             "image03_template.csv"
         )
+        df_report = pd.DataFrame(columns=nda_cols)
 
         # Set experiment IDs
-        exp_id = []
+        exp_id = 1683
 
         # MRI vars
         sess_list = ["ses-day2", "ses-day3"]
         rawdata_dir = os.path.join(proj_dir, "data_scanner_BIDS/rawdata")
+        source_dir = os.path.join(proj_dir, "data_scanner_BIDS/sourcedata")
         subj_sess_list = sorted(glob.glob(f"{rawdata_dir}/sub-ER*/ses-day*"))
 
         # Pilot data
@@ -1477,65 +1481,11 @@ class NdarImage03:
         # Get demo info
         final_demo = final_demo.replace("NaN", np.nan)
         final_demo = final_demo.dropna(subset=["subjectkey"])
+        final_demo["sex"] = final_demo["sex"].replace(
+            ["Male", "Female", "Neither"], ["M", "F", "O"]
+        )
 
-    def _info_anat():
-        """Title."""
-        nii_file = sorted(glob.glob(f"{subj_sess}/anat/*.nii.gz"))[0]
-        json_file = sorted(glob.glob(f"{subj_sess}/anat/*.json"))[0]
-
-        # TODO check nii,json_files exist
-
-        with open(json_file, "r") as jf:
-            nii_json = json.load(jf)
-
-        # TODO account for data acquisition facility
-
-        # Setup awkward values
-        acq_mat = f"{nii_json['ReconMatrixPE']} {nii_json['ReconMatrixPE']}"
-        fov = f"{nii_json['ReconMatrixPE']} {nii_json['ReconMatrixPE']}"
-
-        #
-        anat_image03 = {
-            "image_description": "TODO",
-            "experiment_id": exp_id,
-            "scan_type": "MR structural (T1)",
-            "scan_object": "Live",
-            "image_file_format": "NIFTI",
-            "image_modality": f"{nii_json['Modality']}I",
-            "scanner_manufacturer_pd": "TODO",
-            "scanner_software_versions_pd": "TODO",
-            "magnetic_field_strength": str(nii_json["MagneticFieldStrength"]),
-            "mri_repetition_time_pd": nii_json["RepetitionTime"],
-            "mri_echo_time_pd": str(nii_json["EchoTime"]),
-            "flip_angle": str(nii_json["FlipAngle"]),
-            "acquisition_matrix": acq_mat,
-            "mri_field_of_view_pd": fov,
-            "patient_position": "supine",
-            "photomet_interpret": "TODO",
-            "receive_coil": nii_json["CoilString"],
-            "tranfsormation_performed": "No",
-            "image_history": "Face removed",
-            "image_num_dimensions": 3,
-            "image_extent1": nii_json["ReconMatrixPE"],
-            "image_extent2": nii_json["ReconMatrixPE"],
-            "image_extent3": nii_json["AcquisitionMatrixPE"],
-            "image_unit1": "Millimeters",
-            "image_unit2": "Millimeters",
-            "image_unit3": "Millimeters",
-            "image_resolution1": 1.0,
-            "image_resolution2": 1.0,
-            "image_resolution3": float(nii_json["SliceThickness"]),
-            "image_slice_thickness": float(nii_json["SliceThickness"]),
-            "image_orientation": "Axial",
-            "software_preproc": "TODO",
-            "visnum": "TODO",
-        }
-
-    def _info_fmap():
-        pass
-
-    def _info_func():
-        pass
+        # _make_image03()
 
     def _make_image03():
         """Title."""
@@ -1550,6 +1500,144 @@ class NdarImage03:
         scan_type = scan_type_list[0]
         info_meth = getattr(self, f"_info_{scan_type}")
         info_meth()
+
+    def _get_subj_demo(subj_nda, scan_date):
+        """Title."""
+        # Demographic, scan date, interview age
+        idx_subj = final_demo.index[
+            final_demo["src_subject_id"] == subj_nda
+        ].tolist()[0]
+        subj_guid = final_demo.iloc[idx_subj]["subjectkey"]
+        subj_id = final_demo.iloc[idx_subj]["src_subject_id"]
+        subj_sex = final_demo.iloc[idx_subj]["sex"]
+        subj_dob = datetime.strptime(
+            final_demo.iloc[idx_subj]["dob"], "%Y-%m-%d"
+        )
+        interview_age = report_helper.calc_age_mo([subj_dob], [scan_date])[0]
+        interview_date = datetime.strftime(scan_date, "%m/%d/%Y")
+
+        return {
+            "subjectkey": subj_guid,
+            "src_subject_id": subj_id,
+            "interview_date": interview_date,
+            "interview_age": interview_age,
+            "gender": subj_sex,
+        }
+
+    def _get_std_info(nii_json, dicom_hdr, sess):
+        """Title."""
+        scanner_manu = dicom_hdr[0x08, 0x70].value.split(" ")[0]
+        scanner_type = dicom_hdr[0x08, 0x1090].value
+        phot_int = dicom_hdr[0x08, 0x9205].value
+
+        num_frames = int(dicom_hdr[0x28, 0x08].value)
+        num_rows = int(dicom_hdr[0x28, 0x10].value)
+        num_cols = int(dicom_hdr[0x28, 0x11].value)
+        acq_mat = f"{num_frames} {num_frames}"
+        acq_fov = f"{num_rows} {num_cols}"
+
+        return {
+            "scan_object": "Live",
+            "image_file_format": "NIFTI",
+            "image_modality": f"{nii_json['Modality']}I",
+            "scanner_manufacturer_pd": scanner_manu,
+            "scanner_type_pd": scanner_type,
+            "scanner_software_versions_pd": str(nii_json["SoftwareVersions"]),
+            "magnetic_field_strength": str(nii_json["MagneticFieldStrength"]),
+            "mri_repetition_time_pd": nii_json["RepetitionTime"],
+            "mri_echo_time_pd": str(nii_json["EchoTime"]),
+            "flip_angle": str(nii_json["FlipAngle"]),
+            "acquisition_matrix": acq_mat,
+            "mri_field_of_view_pd": acq_fov,
+            "patient_position": "supine",
+            "photomet_interpret": phot_int,
+            "receive_coil": nii_json["CoilString"],
+            "tranfsormation_performed": "No",
+            "image_extent1": num_rows,
+            "image_extent2": num_cols,
+            "image_extent3": num_frames,
+            "image_unit1": "Millimeters",
+            "image_unit2": "Millimeters",
+            "image_unit3": "Millimeters",
+            "image_orientation": "Axial",
+            "visnum": float(sess[-1]),
+        }
+
+    def _info_anat():
+        """Title."""
+
+        # TODO check json, DICOM exist
+
+        # Get JSON info
+        json_file = sorted(glob.glob(f"{subj_sess}/anat/*.json"))[0]
+        with open(json_file, "r") as jf:
+            nii_json = json.load(jf)
+
+        # Get DICOM info
+        subj_nda = subj.split("-")[1]
+        day = sess.split("-")[1]
+        dicom_file = glob.glob(
+            f"{source_dir}/{subj_nda}/{day}*/DICOM/EmoRep_anat/*.dcm"
+        )[0]
+        dicom_hdr = pydicom.read_file(dicom_file)
+
+        # Get demographic info
+        scan_date = datetime.strptime(dicom_hdr[0x08, 0x20].value, "%Y%m%d")
+        demo_dict = _get_subj_demo(subj_nda, scan_date)
+
+        # Setup host file
+        # TODO check that file exists
+        # TODO setup local path
+        deface_file = os.path.join(
+            proj_dir,
+            "data_scanner_BIDS/derivatives/deface",
+            subj,
+            sess,
+            f"{subj}_{sess}_T1w_defaced.nii.gz",
+        )
+        local_path = "TODO"
+        host_dir = os.path.join(proj_dir, "ndar_upload/data_mri")
+        host_file = os.path.join(
+            host_dir, f"{demo_dict['subjectkey']}_{day}_T1_anat.nii.gz"
+        )
+        if not os.path.exists(host_file):
+            bash_cmd = f"cp {deface_file} {host_file}"
+            h_sp = subprocess.Popen(
+                bash_cmd, shell=True, stdout=subprocess.PIPE
+            )
+            h_out, h_err = h_sp.communicate()
+            h_sp.wait()
+
+        # Get general, anat specific acquisition info
+        std_dict = _get_std_info(nii_json, dicom_hdr, sess)
+        anat_image03 = {
+            "image_file": f"{local_path}/{os.path.basename(host_file)}",
+            "image_description": "MPRAGE",
+            "scan_type": "MR structural (T1)",
+            "image_history": "Face removed",
+            "image_num_dimensions": 3,
+            "image_resolution1": 1.0,
+            "image_resolution2": 1.0,
+            "image_resolution3": float(nii_json["SliceThickness"]),
+            "image_slice_thickness": float(nii_json["SliceThickness"]),
+            "software_preproc": "pydeface version=2.0.2",
+        }
+
+        # Combine all dicts
+        anat_image03.update(demo_dict)
+        anat_image03.update(std_dict)
+
+        # Add scan info to report
+        new_row = pd.DataFrame(anat_image03, index=[0])
+        df_report = pd.concat([df_report.loc[:], new_row]).reset_index(
+            drop=True
+        )
+
+    def _info_fmap():
+        pass
+
+    def _info_func():
+        pass
 
     def _gather_niis():
         pass
