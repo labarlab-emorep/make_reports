@@ -4,6 +4,7 @@ import re
 import glob
 import json
 import subprocess
+import distutils.spawn
 import pandas as pd
 import numpy as np
 from datetime import datetime
@@ -681,6 +682,224 @@ class ManagerRegular:
         }
         self.df_report = self.df_report.rename(columns=col_names)
         self.df_report["Age Units"] = "Years"
+
+
+class GenerateGuids:
+    """Generate GUIDs for EmoRep.
+
+    Use existing RedCap demographic information to produce
+    a batch of GUIDs via NDA's guid-tool.
+
+    Parameters
+    ----------
+    proj_dir : path
+        Project's experiment directory
+    user_name : str
+        NDA user name
+    user_pass : str
+        NDA user password
+
+    Attributes
+    ----------
+    df_guid : pd.DataFrame
+        Formatted for use with guid-tool
+    df_guid_file : path
+        Location of intermediate file for subprocess accessibility
+    proj_dir : path
+        Project's experiment directory
+    user_name : str
+        NDA user name
+    user_pass : str
+        NDA user password
+
+    Methods
+    -------
+    make_guids
+        Use compiled demographic info from _get_demo to generate GUIDs
+
+    """
+
+    def __init__(self, proj_dir, user_pass, user_name):
+        """Setup instance and compile demographic information.
+
+        Parameters
+        ----------
+        proj_dir : path
+            Project's experiment directory
+        user_name : str
+            NDA user name
+        user_pass : str
+            NDA user password
+
+        Attributes
+        ----------
+        proj_dir : path
+            Project's experiment directory
+        user_name : str
+            NDA user name
+        user_pass : str
+            NDA user password
+
+        """
+        self.proj_dir = proj_dir
+        self.user_name = user_name
+        self.user_pass = user_pass
+        self._get_demo()
+
+    def _get_demo(self):
+        """Make a dataframe with fields required by guid-tool.
+
+        Mine cleaned RedCap demographics survey and compile needed
+        fields for the guid-tool.
+
+        Attributes
+        ----------
+        df_guid : pd.DataFrame
+            Formatted for use with guid-tool
+        df_guid_file : path
+            Location of intermediate file for subprocess accessibility
+
+        Raises
+        ------
+        FileNotFoundError
+            Cleaned RedCap demographic information not found
+
+        Notes
+        -----
+        Writes df_guid to df_guid_file.
+
+        """
+        print("Compiling RedCap demographic info ...")
+
+        # Check for, read-in demographic info
+        chk_demo = os.path.join(
+            self.proj_dir,
+            "data_survey/redcap_demographics/data_clean",
+            "df_demographics.csv",
+        )
+        if not os.path.exists(chk_demo):
+            raise FileNotFoundError(
+                f"Missing expected demographic info : {chk_demo}"
+            )
+        df_demo = pd.read_csv(chk_demo)
+
+        # Remap, extract relevant columns
+        demo_cols = [
+            "record_id",
+            "firstname",
+            "middle_name",
+            "lastname",
+            "dob",
+            "city",
+            "gender",
+        ]
+        guid_cols = [
+            "ID",
+            "FIRSTNAME",
+            "MIDDLENAME",
+            "LASTNAME",
+            "dob_datetime",
+            "COB",
+            "SEX",
+        ]
+        cols_remap = {}
+        for demo, guid in zip(demo_cols, guid_cols):
+            cols_remap[demo] = guid
+        df_guid = df_demo[demo_cols]
+        df_guid = df_guid.rename(columns=cols_remap)
+        del df_demo
+
+        # Split date-of-birth and make needed columns
+        dt_list = df_guid["dob_datetime"].tolist()
+        mob_list = []
+        dob_list = []
+        yob_list = []
+        for h_dob in dt_list:
+            yob, mob, dob = h_dob.split("-")
+            yob_list.append(yob)
+            mob_list.append(mob)
+            dob_list.append(dob)
+        df_guid["DOB"] = dob_list
+        df_guid["MOB"] = mob_list
+        df_guid["YOB"] = yob_list
+        df_guid = df_guid.drop("dob_datetime", axis=1)
+
+        # Make sex column compliant, provide whether participants
+        # have a middle name.
+        df_guid["SEX"] = df_guid["SEX"].map({1.0: "M", 2.0: "F"})
+        df_guid["SUBJECTHASMIDDLENAME"] = "Yes"
+        df_guid.loc[
+            df_guid["MIDDLENAME"].isnull(), "SUBJECTHASMIDDLENAME"
+        ] = "No"
+
+        # Write out intermediate dataframe
+        # TODO validate required fields
+        self.df_guid_file = os.path.join(
+            os.path.join(
+                self.proj_dir,
+                "data_survey/redcap_demographics/data_clean",
+                "tmp_df_for_guid_tool.csv",
+            )
+        )
+        df_guid.to_csv(self.df_guid_file, index=False, na_rep="")
+        self.df_guid = df_guid
+
+    def make_guids(self):
+        """Generate GUIDs via guid-tool.
+
+        Output of guid-tool is written to:
+            <proj_dir>/data_survey/redcap_demographics/data_clean/output_guid_*.txt
+
+        Attributes
+        ----------
+        guid_file : path
+            Location, file out guid-tool output
+
+        Raises
+        ------
+        FileNotFoundError
+            Intermediate demographic info from _get_demo is not found
+            A new guid_file is not detected in output directory
+        BaseException
+            guid-tool is not installed or available in sub-shell
+
+        Notes
+        -----
+        Requires guid-tool to be installed in operating system and available
+        in the sub-shell environment.
+
+        """
+        # Check for guid file
+        if not os.path.exists(self.df_guid_file):
+            raise FileNotFoundError(
+                f"Missing expected file : {self.df_guid_file}"
+            )
+
+        # Check for tool
+        if not distutils.spawn.find_executable("guid-tool"):
+            raise BaseException("Failed to find guid-tools in OS")
+
+        # Existing guid list
+        guid_path = os.path.dirname(self.df_guid_file)
+        guid_old = sorted(glob.glob(f"{guid_path}/output_guid_*.txt"))
+
+        # Run guid command
+        bash_guid = f"""\
+            guid-tool \
+                -a get \
+                -u {self.user_name} \
+                -p {self.user_pass} \
+                -b "{self.df_guid_file}"
+        """
+        h_sp = subprocess.Popen(bash_guid, shell=True, stdout=subprocess.PIPE)
+        h_out, h_err = h_sp.communicate()
+        h_sp.wait()
+
+        # Check for file
+        guid_output = sorted(glob.glob(f"{guid_path}/output_guid_*.txt"))
+        if not len(guid_output) > len(guid_old) or not guid_output:
+            raise FileNotFoundError("Failed to generate new GUID output.")
+        self.guid_file = guid_output[-1]
 
 
 class NdarAffim01:

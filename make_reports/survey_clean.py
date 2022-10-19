@@ -1,5 +1,6 @@
 """Clean survey data from RedCap and Qualtrics."""
 import os
+import string
 import pandas as pd
 import numpy as np
 from make_reports import report_helper
@@ -202,6 +203,71 @@ class CleanRedcap:
                     subj_educate.append(educate_switch[h_level])
         return subj_educate
 
+    def _clean_city_state(self):
+        """Fix city-of-birth free response.
+
+        Account for formats:
+            1. San Jose
+            2. San Jose, California
+            4. San Jose CA
+
+        """
+        self.df_raw = self.df_raw.rename(columns={"city": "city-state"})
+        city_state = self.df_raw["city-state"].tolist()
+        city_list = []
+        state_list = []
+        for cs in city_state:
+            cs = cs.strip()
+            if "," in cs:
+                h_city, h_st = cs.split(",")
+                h_state = h_st.lstrip()
+            elif " " in cs:
+                h_split = cs.rsplit(" ", 1)[-1]
+                if h_split.isupper():
+                    h_state = h_split
+                    h_city = cs.rsplit(" ", 1)[0]
+                else:
+                    h_city = cs
+                    h_state = np.nan
+            else:
+                h_city = cs
+                h_state = np.nan
+            city_list.append(h_city)
+            state_list.append(h_state)
+
+        self.df_raw["city"] = city_list
+        self.df_raw["state"] = state_list
+
+        self.df_raw = self.df_raw.drop("city-state", axis=1)
+        col_reorder = [
+            "record_id",
+            "demographics_complete",
+            "firstname",
+            "middle_name",
+            "lastname",
+            "dob",
+            "city",
+            "state",
+            "country_birth",
+            "age",
+            "gender",
+            "gender_other",
+            "race___1",
+            "race___2",
+            "race___3",
+            "race___4",
+            "race___5",
+            "race___6",
+            "race___7",
+            "race___8",
+            "race_other",
+            "ethnicity",
+            "years_education",
+            "level_education",
+            "handedness",
+        ]
+        self.df_raw = self.df_raw[col_reorder]
+
     def _clean_demographics(self):
         """Cleaning method for RedCap demographics survey.
 
@@ -231,16 +297,33 @@ class CleanRedcap:
         yrs_edu = self._get_educ_years()
         self.df_raw["years_education"] = yrs_edu
 
+        # Fix City, State of birth
+        self._clean_city_state()
+
+        # Clean middle name responses for NA and special characters
+        df_raw = self.df_raw
+        na_mask = (
+            df_raw.middle_name.eq("na")
+            | df_raw.middle_name.eq("NA")
+            | df_raw.middle_name.eq("N/A")
+            | df_raw.middle_name.eq(" ")
+        )
+        df_raw.loc[na_mask, ["middle_name"]] = np.nan
+
+        special_list = [x for x in string.punctuation]
+        sp_mask = (df_raw["middle_name"].str.len() == 1) & df_raw[
+            "middle_name"
+        ].astype("str").isin(special_list)
+        df_raw.loc[sp_mask, ["middle_name"]] = np.nan
+
         # Separate pilot from study data
         pilot_list = [int(x[-1]) for x in self.pilot_list]
-        idx_pilot = self.df_raw[
-            self.df_raw["record_id"].isin(pilot_list)
+        idx_pilot = df_raw[df_raw["record_id"].isin(pilot_list)].index.tolist()
+        idx_study = df_raw[
+            ~df_raw["record_id"].isin(pilot_list)
         ].index.tolist()
-        idx_study = self.df_raw[
-            ~self.df_raw["record_id"].isin(pilot_list)
-        ].index.tolist()
-        self.df_pilot = self.df_raw.loc[idx_pilot]
-        self.df_clean = self.df_raw.loc[idx_study]
+        self.df_pilot = df_raw.loc[idx_pilot]
+        self.df_clean = df_raw.loc[idx_study]
 
     def _clean_consent(self):
         """Cleaning method for RedCap consent survey.
