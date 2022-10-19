@@ -370,3 +370,25 @@ def make_nda_reports(nda_reports, proj_dir):
         del rep_obj
 
     pd.options.mode.chained_assignment = "warn"
+
+
+def generate_guids(proj_dir, user_name, user_pass):
+    """Title.
+
+    Desc.
+
+    """
+    # Check for clean RedCap data, generate if needed
+    chk_demo = os.path.join(
+        proj_dir,
+        "data_survey/redcap_demographics/data_clean",
+        "df_demographics.csv",
+    )
+    if not os.path.exists(chk_demo):
+        print("Missing clean RedCap demographics, cleaning ...")
+        clean_surveys(proj_dir, clean_redcap=True)
+        print("\tDone.")
+
+    guid_obj = build_reports.GenerateGuids(proj_dir, user_pass, user_name)
+    guid_obj.make_guids()
+    os.remove(guid_obj.df_guid_file)

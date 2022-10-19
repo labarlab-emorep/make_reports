@@ -1,5 +1,8 @@
 """Generate requested reports and organize relevant data."""
 import os
+import glob
+import subprocess
+import distutils.spawn
 import pandas as pd
 import numpy as np
 from datetime import datetime
@@ -676,6 +679,173 @@ class ManagerRegular:
         }
         self.df_report = self.df_report.rename(columns=col_names)
         self.df_report["Age Units"] = "Years"
+
+
+class GenerateGuids:
+    """Title.
+
+    Desc.
+
+    Parameters
+    ----------
+
+    Attributes
+    ----------
+    df_guid_file
+    df_guid
+    proj_dir
+    user_name
+    user_pass
+
+    Methods
+    -------
+    make_guids
+
+    """
+
+    def __init__(self, proj_dir, user_pass, user_name):
+        """Title.
+
+        Desc.
+
+        Attributes
+        ----------
+        proj_dir
+        user_name
+        user_pass
+
+        """
+        self.proj_dir = proj_dir
+        self.user_name = user_name
+        self.user_pass = user_pass
+        self._get_demo()
+
+    def _get_demo(self):
+        """Title.
+
+        Desc.
+
+        Attributes
+        ----------
+        df_guid_file
+        df_guid
+
+        Notes
+        -----
+        Writes ...
+
+        """
+        df_demo = pd.read_csv(
+            os.path.join(
+                self.proj_dir,
+                "data_survey/redcap_demographics/data_clean",
+                "df_demographics.csv",
+            )
+        )
+        demo_cols = [
+            "record_id",
+            "firstname",
+            "middle_name",
+            "lastname",
+            "dob",
+            "city",
+            "gender",
+        ]
+        guid_cols = [
+            "ID",
+            "FIRSTNAME",
+            "MIDDLENAME",
+            "LASTNAME",
+            "dob_datetime",
+            "COB",
+            "SEX",
+        ]
+        cols_remap = {}
+        for demo, guid in zip(demo_cols, guid_cols):
+            cols_remap[demo] = guid
+        df_guid = df_demo[demo_cols]
+        df_guid = df_guid.rename(columns=cols_remap)
+        del df_demo
+
+        dt_list = df_guid["dob_datetime"].tolist()
+        mob_list = []
+        dob_list = []
+        yob_list = []
+        for h_dob in dt_list:
+            yob, mob, dob = h_dob.split("-")
+            yob_list.append(yob)
+            mob_list.append(mob)
+            dob_list.append(dob)
+        df_guid["DOB"] = dob_list
+        df_guid["MOB"] = mob_list
+        df_guid["YOB"] = yob_list
+        df_guid = df_guid.drop("dob_datetime", axis=1)
+
+        df_guid["SEX"] = df_guid["SEX"].map({1.0: "M", 2.0: "F"})
+        df_guid["SUBJECTHASMIDDLENAME"] = "Yes"
+        df_guid.loc[
+            df_guid["MIDDLENAME"].isnull(), "SUBJECTHASMIDDLENAME"
+        ] = "No"
+
+        self.df_guid_file = os.path.join(
+            os.path.join(
+                self.proj_dir,
+                "data_survey/redcap_demographics/data_clean",
+                "tmp_df_for_guid_tool.csv",
+            )
+        )
+        df_guid.to_csv(self.df_guid_file, index=False, na_rep="")
+        self.df_guid = df_guid
+
+    def make_guids(self):
+        """Title.
+
+        Desc.
+
+        Attributes
+        ----------
+        guid_file
+
+        Raises
+        ------
+
+        Notes
+        -----
+        Requires
+        Writes
+
+        """
+        # Check for guid file
+        if not os.path.exists(self.df_guid_file):
+            raise FileNotFoundError(
+                f"Missing expected file : {self.df_guid_file}"
+            )
+
+        # Check for tool
+        if not distutils.spawn.find_executable("guid-tool"):
+            raise BaseException("Failed to find guid-tools in OS")
+
+        # Existing guid list
+        guid_path = os.path.dirname(self.df_guid_file)
+        guid_old = sorted(glob.glob(f"{guid_path}/output_guid_*.txt"))
+
+        # Run guid command
+        bash_guid = f"""\
+            guid-tool \
+                -a get \
+                -u {self.user_name} \
+                -p {self.user_pass} \
+                -b "{self.df_guid_file}"
+        """
+        h_sp = subprocess.Popen(bash_guid, shell=True, stdout=subprocess.PIPE)
+        h_out, h_err = h_sp.communicate()
+        h_sp.wait()
+
+        # Check for file
+        guid_output = sorted(glob.glob(f"{guid_path}/output_guid_*.txt"))
+        if not len(guid_output) > len(guid_old) or not guid_output:
+            raise FileNotFoundError("Failed to generate new GUID output.")
+        self.guid_file = guid_output[-1]
 
 
 class NdarAffim01:
