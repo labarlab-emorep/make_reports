@@ -1,9 +1,14 @@
-r"""Generate GUIDs
+r"""Generate GUIDs for EmoRep.
+
+Utilize RedCap demographic information to generate a batch
+of GUIDs using the NDA's guid-tool for linux.
+
+Generated GUIDs are written to:
+    <proj_dir>/data_survey/redcap_demographics/data_clean/output_guid_*.txt
 
 Example
 -------
 gen_guids --user-name nmuncy
-
 
 """
 import sys
@@ -48,6 +53,7 @@ def main():
     proj_dir = args.proj_dir
     user_name = args.user_name
 
+    # Get, check for password
     user_pass = getpass(
         """
         Please provide NDA password used with the GUID tool
@@ -61,6 +67,8 @@ def main():
         print("\nNo password provided, exiting.")
         sys.exit(0)
 
+    # Start workflow
+    print("\nStarting workflow ...")
     workflow.generate_guids(proj_dir, user_name, user_pass)
 
 

@@ -682,37 +682,60 @@ class ManagerRegular:
 
 
 class GenerateGuids:
-    """Title.
+    """Generate GUIDs for EmoRep.
 
-    Desc.
+    Use existing RedCap demographic information to produce
+    a batch of GUIDs via NDA's guid-tool.
 
     Parameters
     ----------
+    proj_dir : path
+        Project's experiment directory
+    user_name : str
+        NDA user name
+    user_pass : str
+        NDA user password
 
     Attributes
     ----------
-    df_guid_file
-    df_guid
-    proj_dir
-    user_name
-    user_pass
+    df_guid : pd.DataFrame
+        Formatted for use with guid-tool
+    df_guid_file : path
+        Location of intermediate file for subprocess accessibility
+    proj_dir : path
+        Project's experiment directory
+    user_name : str
+        NDA user name
+    user_pass : str
+        NDA user password
 
     Methods
     -------
     make_guids
+        Use compiled demographic info from _get_demo to generate GUIDs
 
     """
 
     def __init__(self, proj_dir, user_pass, user_name):
-        """Title.
+        """Setup instance and compile demographic information.
 
-        Desc.
+        Parameters
+        ----------
+        proj_dir : path
+            Project's experiment directory
+        user_name : str
+            NDA user name
+        user_pass : str
+            NDA user password
 
         Attributes
         ----------
-        proj_dir
-        user_name
-        user_pass
+        proj_dir : path
+            Project's experiment directory
+        user_name : str
+            NDA user name
+        user_pass : str
+            NDA user password
 
         """
         self.proj_dir = proj_dir
@@ -721,27 +744,43 @@ class GenerateGuids:
         self._get_demo()
 
     def _get_demo(self):
-        """Title.
+        """Make a dataframe with fields required by guid-tool.
 
-        Desc.
+        Mine cleaned RedCap demographics survey and compile needed
+        fields for the guid-tool.
 
         Attributes
         ----------
-        df_guid_file
-        df_guid
+        df_guid : pd.DataFrame
+            Formatted for use with guid-tool
+        df_guid_file : path
+            Location of intermediate file for subprocess accessibility
+
+        Raises
+        ------
+        FileNotFoundError
+            Cleaned RedCap demographic information not found
 
         Notes
         -----
-        Writes ...
+        Writes df_guid to df_guid_file.
 
         """
-        df_demo = pd.read_csv(
-            os.path.join(
-                self.proj_dir,
-                "data_survey/redcap_demographics/data_clean",
-                "df_demographics.csv",
-            )
+        print("Compiling RedCap demographic info ...")
+
+        # Check for, read-in demographic info
+        chk_demo = os.path.join(
+            self.proj_dir,
+            "data_survey/redcap_demographics/data_clean",
+            "df_demographics.csv",
         )
+        if not os.path.exists(chk_demo):
+            raise FileNotFoundError(
+                f"Missing expected demographic info : {chk_demo}"
+            )
+        df_demo = pd.read_csv(chk_demo)
+
+        # Remap, extract relevant columns
         demo_cols = [
             "record_id",
             "firstname",
@@ -767,6 +806,7 @@ class GenerateGuids:
         df_guid = df_guid.rename(columns=cols_remap)
         del df_demo
 
+        # Split date-of-birth and make needed columns
         dt_list = df_guid["dob_datetime"].tolist()
         mob_list = []
         dob_list = []
@@ -781,12 +821,16 @@ class GenerateGuids:
         df_guid["YOB"] = yob_list
         df_guid = df_guid.drop("dob_datetime", axis=1)
 
+        # Make sex column compliant, provide whether participants
+        # have a middle name.
         df_guid["SEX"] = df_guid["SEX"].map({1.0: "M", 2.0: "F"})
         df_guid["SUBJECTHASMIDDLENAME"] = "Yes"
         df_guid.loc[
             df_guid["MIDDLENAME"].isnull(), "SUBJECTHASMIDDLENAME"
         ] = "No"
 
+        # Write out intermediate dataframe
+        # TODO validate required fields
         self.df_guid_file = os.path.join(
             os.path.join(
                 self.proj_dir,
@@ -798,21 +842,28 @@ class GenerateGuids:
         self.df_guid = df_guid
 
     def make_guids(self):
-        """Title.
+        """Generate GUIDs via guid-tool.
 
-        Desc.
+        Output of guid-tool is written to:
+            <proj_dir>/data_survey/redcap_demographics/data_clean/output_guid_*.txt
 
         Attributes
         ----------
-        guid_file
+        guid_file : path
+            Location, file out guid-tool output
 
         Raises
         ------
+        FileNotFoundError
+            Intermediate demographic info from _get_demo is not found
+            A new guid_file is not detected in output directory
+        BaseException
+            guid-tool is not installed or available in sub-shell
 
         Notes
         -----
-        Requires
-        Writes
+        Requires guid-tool to be installed in operating system and available
+        in the sub-shell environment.
 
         """
         # Check for guid file
