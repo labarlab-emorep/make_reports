@@ -1748,7 +1748,7 @@ class NdarImage03:
         self.df_report_study = pd.DataFrame(columns=nda_cols)
 
         # Set experiment IDs
-        self.exp_id = 1683
+        self.exp_dict = {"old": 1683, "new": 2113}
 
         # MRI vars
         self.proj_dir = proj_dir
@@ -1864,6 +1864,19 @@ class NdarImage03:
             "visnum": float(self.sess[-1]),
         }
 
+    def _make_host(self, raw_file, out_name):
+        """Title."""
+        host_file = os.path.join(
+            self.proj_dir, "ndar_upload/data_mri", out_name
+        )
+        if not os.path.exists(host_file):
+            bash_cmd = f"cp {raw_file} {host_file}"
+            h_sp = subprocess.Popen(
+                bash_cmd, shell=True, stdout=subprocess.PIPE
+            )
+            h_out, h_err = h_sp.communicate()
+            h_sp.wait()
+
     def _info_anat(self, subj_sess):
         """Title."""
 
@@ -1895,22 +1908,13 @@ class NdarImage03:
             self.sess,
             f"{self.subj}_{self.sess}_T1w_defaced.nii.gz",
         )
-        host_dir = os.path.join(self.proj_dir, "ndar_upload/data_mri")
-        host_file = os.path.join(
-            host_dir, f"{demo_dict['subjectkey']}_{day}_T1_anat.nii.gz"
-        )
-        if not os.path.exists(host_file):
-            bash_cmd = f"cp {deface_file} {host_file}"
-            h_sp = subprocess.Popen(
-                bash_cmd, shell=True, stdout=subprocess.PIPE
-            )
-            h_out, h_err = h_sp.communicate()
-            h_sp.wait()
+        host_name = f"{demo_dict['subjectkey']}_{day}_T1_anat.nii.gz"
+        self._make_host(deface_file, host_name)
 
         # Get general, anat specific acquisition info
         std_dict = self._get_std_info(nii_json, dicom_hdr)
         anat_image03 = {
-            "image_file": f"{self.local_path}/{os.path.basename(host_file)}",
+            "image_file": f"{self.local_path}/{host_name}",
             "image_description": "MPRAGE",
             "scan_type": "MR structural (T1)",
             "image_history": "Face removed",
@@ -1939,6 +1943,9 @@ class NdarImage03:
         """Title."""
 
         nii_list = sorted(glob.glob(f"{subj_sess}/func/*.nii.gz"))
+
+        # TODO check for >1 nii
+
         for nii_path in nii_list:
 
             # Get JSON for func run
@@ -1957,7 +1964,8 @@ class NdarImage03:
             task_source = os.path.join(
                 self.source_dir, self.subj_nda, f"{day}*/DICOM", task_dir
             )
-            dicom_file = glob.glob(f"{task_source}/*.dcm")[0]
+            dicom_list = glob.glob(f"{task_source}/*.dcm")
+            dicom_fie = dicom_list[0]
             dicom_hdr = pydicom.read_file(dicom_file)
 
             # Get demographic info
@@ -1966,23 +1974,46 @@ class NdarImage03:
             )
             demo_dict = self._get_subj_demo(scan_date)
 
-            # Setup host file
+            # Setup host files
             # TODO check that file exists
-            # TODO setup local path
-            host_dir = os.path.join(self.proj_dir, "ndar_upload/data_mri")
             h_guid = demo_dict["subjectkey"]
             h_task = task.split("-")[1]
             h_run = run[-1]
-            host_file = os.path.join(
-                host_dir, f"{h_guid}_{day}_func_{h_task}_{h_run}.nii.gz"
+            host_nii = f"{h_guid}_{day}_func_{h_task}_run{h_run}.nii.gz"
+            events_path = re.sub("_bold.nii.gz$", "_events.tsv", nii_path)
+            host_events = f"{h_guid}_{day}_func_{h_task}_run{h_run}_events.tsv"
+            self._make_host(nii_path, host_nii)
+            self._make_host(events_path, host_events)
+
+            # Get general, anat specific acquisition info
+            std_dict = self._get_std_info(nii_json, dicom_hdr)
+
+            # Determine if participant is pilot
+            pilot_list = report_helper.pilot_list()
+            exp_id = (
+                exp_dict["old"] if subj_nda in pilot_list else exp_dict["new"]
             )
-            if not os.path.exists(host_file):
-                bash_cmd = f"cp {nii_path} {host_file}"
-                h_sp = subprocess.Popen(
-                    bash_cmd, shell=True, stdout=subprocess.PIPE
-                )
-                h_out, h_err = h_sp.communicate()
-                h_sp.wait()
+
+            # Setup func-specific values
+            func_image03 = {
+                "image_file": f"{self.local_path}/{host_nii}",
+                "image_description": "EPI fMRI",
+                "experiment_id": exp_id,
+                "scan_type": "fMRI",
+                "data_file2": f"{self.local_path}/{host_events}",
+                "data_file2_type": "task event information",
+                "image_history": "No modifications",
+                "image_num_dimensions": 4,
+                "image_extent4": len(dicom_list),
+                "extent4_type": "time",
+                "image_unit4": "Seconds",
+                "image_resolution1": 2.0,
+                "image_resolution2": 2.0,
+                "image_resolution3": float(nii_json["SliceThickness"]),
+                "image_resolution4": float(nii_json["RepetitionTime"]),
+                "image_slice_thickness": float(nii_json["SliceThickness"]),
+                "slice_timing": nii_json["SliceTiming"],
+            }
 
 
 class NdarInclExcl01:
