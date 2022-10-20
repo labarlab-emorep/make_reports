@@ -705,6 +705,9 @@ class GenerateGuids:
         Formatted for use with guid-tool
     df_guid_file : path
         Location of intermediate file for subprocess accessibility
+    mismatch_list : list
+        Record IDs of participants who differ between RedCap and
+        generated GUIDs
     proj_dir : path
         Project's experiment directory
     user_name : str
@@ -714,6 +717,8 @@ class GenerateGuids:
 
     Methods
     -------
+    check_guids
+        Compare generate GUIDs to those in RedCap
     make_guids
         Use compiled demographic info from _get_demo to generate GUIDs
 
@@ -869,6 +874,8 @@ class GenerateGuids:
         in the sub-shell environment.
 
         """
+        print("Generating GUIDs ...")
+
         # Check for guid file
         if not os.path.exists(self.df_guid_file):
             raise FileNotFoundError(
@@ -899,7 +906,68 @@ class GenerateGuids:
         guid_output = sorted(glob.glob(f"{guid_path}/output_guid_*.txt"))
         if not len(guid_output) > len(guid_old) or not guid_output:
             raise FileNotFoundError("Failed to generate new GUID output.")
+        print(f"\tWrote : {guid_output[-1]}")
         self.guid_file = guid_output[-1]
+
+    def check_guids(self):
+        """Check RedCap GUID database against newly generate GUIDs.
+
+        Useful for identifying copy-paste error in manual GUID
+        generation or entry.
+
+        Attributes
+        ----------
+        mismatch_list : list
+            Record IDs of participants who differ between RedCap and
+            generated GUIDs
+
+        Raises
+        ------
+        FileNotFoundError
+            Cleaned version of RedCap GUID survey missing
+
+        """
+        print("Comparing RedCap to generated GUIDs ...")
+
+        # Get cleaned RedCap GUID survey
+        guid_redcap = os.path.join(
+            self.proj_dir,
+            "data_survey/redcap_demographics/data_clean",
+            "df_guid.csv",
+        )
+        if not os.path.exists(guid_redcap):
+            raise FileNotFoundError(
+                f"Missing required GUID info : {guid_redcap}"
+            )
+        df_guid_rc = pd.read_csv(guid_redcap)
+
+        # Get generated GUIDs
+        try:
+            df_guid_gen = pd.read_csv(
+                self.guid_file,
+                sep="-",
+                names=["record_id", "guid_new", "notes"],
+            )
+        except AttributeError:
+            print(
+                "\tAttribute guid_file does not exist in instance, "
+                + "attempting to generate now ..."
+            )
+            self.make_guids()
+            df_guid_gen = pd.read_csv(
+                self.guid_file,
+                sep="-",
+                names=["record_id", "guid_new", "notes"],
+            )
+
+        # Merge, keep only those existing in RedCap
+        df_merge = pd.merge(df_guid_rc, df_guid_gen, on="record_id")
+
+        # Identify mismatching GUIDs
+        df_merge["mismatch"] = df_merge["guid"] == df_merge["guid_new"]
+        self.mismatch_list = df_merge.loc[
+            df_merge["mismatch"], "record_id"
+        ].tolist()
 
 
 class NdarAffim01:

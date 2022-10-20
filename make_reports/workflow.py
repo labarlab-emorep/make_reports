@@ -373,7 +373,7 @@ def make_nda_reports(nda_reports, proj_dir):
     pd.options.mode.chained_assignment = "warn"
 
 
-def generate_guids(proj_dir, user_name, user_pass):
+def generate_guids(proj_dir, user_name, user_pass, find_mismatch):
     """Compile needed demographic info and make GUIDs.
 
     Generated GUIDs are written to:
@@ -404,3 +404,10 @@ def generate_guids(proj_dir, user_name, user_pass):
     guid_obj = build_reports.GenerateGuids(proj_dir, user_pass, user_name)
     guid_obj.make_guids()
     os.remove(guid_obj.df_guid_file)
+
+    if find_mismatch:
+        guid_obj.check_guids()
+        if guid_obj.mismatch_list:
+            print(f"Mismatching GUIDs :\n\t{guid_obj.mismatch_list}")
+        else:
+            print("No mismatches found!")
