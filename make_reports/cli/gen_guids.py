@@ -1,7 +1,8 @@
 r"""Generate GUIDs for EmoRep.
 
 Utilize RedCap demographic information to generate a batch
-of GUIDs using the NDA's guid-tool for linux.
+of GUIDs using the NDA's guid-tool for linux. Compare generated
+GUIDs to those in RedCap survey.
 
 Generated GUIDs are written to:
     <proj_dir>/data_survey/redcap_demographics/data_clean/output_guid_*.txt
@@ -9,6 +10,7 @@ Generated GUIDs are written to:
 Example
 -------
 gen_guids --user-name nmuncy
+gen_guids --user-name nmuncy --find-mismatch
 
 """
 import sys
@@ -22,6 +24,17 @@ def _get_args():
     """Get and parse arguments."""
     parser = ArgumentParser(
         description=__doc__, formatter_class=RawTextHelpFormatter
+    )
+    parser.add_argument(
+        "--find-mismatch",
+        action="store_true",
+        help=textwrap.dedent(
+            """\
+            Whether to check for mismatches between generated
+            GUIDs and those in the RedCap survey,
+            True if "--get-redcap" else False.
+            """
+        ),
     )
     parser.add_argument(
         "--proj-dir",
@@ -52,6 +65,7 @@ def main():
     args = _get_args().parse_args()
     proj_dir = args.proj_dir
     user_name = args.user_name
+    find_mismatch = args.find_mismatch
 
     # Get, check for password
     user_pass = getpass(
@@ -69,7 +83,7 @@ def main():
 
     # Start workflow
     print("\nStarting workflow ...")
-    workflow.generate_guids(proj_dir, user_name, user_pass)
+    workflow.generate_guids(proj_dir, user_name, user_pass, find_mismatch)
 
 
 if __name__ == "__main__":
