@@ -1745,19 +1745,21 @@ class NdarImage03:
         nda_label, nda_cols = report_helper.mine_template(
             "image03_template.csv"
         )
-        self.df_report_study = pd.DataFrame(columns=nda_cols)
+        df_report_study = pd.DataFrame(columns=nda_cols)
 
         # Set experiment IDs
-        self.exp_dict = {"old": 1683, "new": 2113}
+        exp_dict = {"old": 1683, "new": 2113}
 
         # MRI vars
-        self.proj_dir = proj_dir
-        self.local_path = "TODO"
-        self.sess_list = ["ses-day2", "ses-day3"]
-        rawdata_dir = os.path.join(proj_dir, "data_scanner_BIDS/rawdata")
-        self.source_dir = os.path.join(
-            proj_dir, "data_scanner_BIDS/sourcedata"
+        proj_dir = proj_dir
+        local_path = (
+            "/run/user/1001/gvfs/smb-share:server"
+            + "=ccn-keoki.win.duke.edu,share=experiments2/EmoRep/"
+            + "Exp2_Compute_Emotion/ndar_upload/data_mri"
         )
+        sess_list = ["ses-day2", "ses-day3"]
+        rawdata_dir = os.path.join(proj_dir, "data_scanner_BIDS/rawdata")
+        source_dir = os.path.join(proj_dir, "data_scanner_BIDS/sourcedata")
         subj_sess_list = sorted(glob.glob(f"{rawdata_dir}/sub-ER*/ses-day*"))
 
         # Pilot data
@@ -1767,8 +1769,8 @@ class NdarImage03:
         df_report_pilot = pd.read_csv(
             os.path.join(pilot_dir, "EMOREP_image03_data_BIAC.csv")
         )
-        self.df_report_pilot = df_report_pilot[1:]
-        self.df_report_pilot.columns = nda_cols
+        df_report_pilot = df_report_pilot[1:]
+        df_report_pilot.columns = nda_cols
 
         # Get demo info
         final_demo = final_demo.replace("NaN", np.nan)
@@ -1776,37 +1778,39 @@ class NdarImage03:
         final_demo["sex"] = final_demo["sex"].replace(
             ["Male", "Female", "Neither"], ["M", "F", "O"]
         )
-        self.final_demo = final_demo
+        # final_demo = final_demo
 
         # Do the work
-        self._make_image03(subj_sess_list)
+        _make_image03(subj_sess_list)
 
         # Combine df_report_study and df_report_pilot
         # TODO remove rows for subjs not in final_demo
-        df_report = pd.concat([self.df_report_pilot, self.df_report_study])
-        self.df_report = df_report
+        df_report = pd.concat([df_report_pilot, df_report_study])
+        df_report = df_report
 
     def _make_image03(self, subj_sess_list):
         """Title."""
         for subj_sess in subj_sess_list:
-            self.subj = os.path.basename(os.path.dirname(subj_sess))
-            self.subj_nda = self.subj.split("-")[1]
-            self.sess = os.path.basename(subj_sess)
-            print(f"\tMining data for {self.subj}, {self.sess}")
+            subj = os.path.basename(os.path.dirname(subj_sess))
+            subj_nda = subj.split("-")[1]
+            sess = os.path.basename(subj_sess)
+            print(f"\tMining data for {subj}, {sess}")
 
             # Identify types of data in subject's session, use appropriate
             # method for data type.
-            scan_type_list = [x for x in os.listdir(subj_sess) if x != "phys"]
+            scan_type_list = [
+                x for x in os.listdir(subj_sess) if x != "phys" and x != "beh"
+            ]
             for scan_type in scan_type_list:
                 info_meth = getattr(self, f"_info_{scan_type}")
                 info_meth(subj_sess)
 
-    def _get_subj_demo(self, scan_date):
+    def _get_subj_demo(scan_date):
         """Title."""
         # Demographic, scan date, interview age
-        final_demo = self.final_demo
+        # final_demo = final_demo
         idx_subj = final_demo.index[
-            final_demo["src_subject_id"] == self.subj_nda
+            final_demo["src_subject_id"] == subj_nda
         ].tolist()[0]
         subj_guid = final_demo.iloc[idx_subj]["subjectkey"]
         subj_id = final_demo.iloc[idx_subj]["src_subject_id"]
@@ -1825,7 +1829,7 @@ class NdarImage03:
             "gender": subj_sex,
         }
 
-    def _get_std_info(self, nii_json, dicom_hdr):
+    def _get_std_info(nii_json, dicom_hdr):
         """Title."""
         scanner_manu = dicom_hdr[0x08, 0x70].value.split(" ")[0]
         scanner_type = dicom_hdr[0x08, 0x1090].value
@@ -1834,8 +1838,10 @@ class NdarImage03:
         num_frames = int(dicom_hdr[0x28, 0x08].value)
         num_rows = int(dicom_hdr[0x28, 0x10].value)
         num_cols = int(dicom_hdr[0x28, 0x11].value)
-        acq_mat = f"{num_frames} {num_frames}"
-        acq_fov = f"{num_rows} {num_cols}"
+        h_mat = nii_json["AcquisitionMatrixPE"]
+        acq_mat = f"{h_mat} {h_mat}"
+        # h_fov = dicom_hdr[0x18, 0x9058].value
+        acq_fov = "256 256"
 
         return {
             "scan_object": "Live",
@@ -1861,15 +1867,15 @@ class NdarImage03:
             "image_unit2": "Millimeters",
             "image_unit3": "Millimeters",
             "image_orientation": "Axial",
-            "visnum": float(self.sess[-1]),
+            "visnum": float(sess[-1]),
         }
 
-    def _make_host(self, raw_file, out_name):
+    def _make_host(raw_file, out_name):
         """Title."""
-        host_file = os.path.join(
-            self.proj_dir, "ndar_upload/data_mri", out_name
-        )
+        # _make_host(events_path, host_events)
+        host_file = os.path.join(proj_dir, "ndar_upload/data_mri", out_name)
         if not os.path.exists(host_file):
+            print(f"\tMaking host file : {host_file}")
             bash_cmd = f"cp {raw_file} {host_file}"
             h_sp = subprocess.Popen(
                 bash_cmd, shell=True, stdout=subprocess.PIPE
@@ -1877,7 +1883,7 @@ class NdarImage03:
             h_out, h_err = h_sp.communicate()
             h_sp.wait()
 
-    def _info_anat(self, subj_sess):
+    def _info_anat(subj_sess):
         """Title."""
 
         # TODO check json, DICOM exist
@@ -1888,33 +1894,33 @@ class NdarImage03:
             nii_json = json.load(jf)
 
         # Get DICOM info
-        day = self.sess.split("-")[1]
+        day = sess.split("-")[1]
         dicom_file = glob.glob(
-            f"{self.source_dir}/{self.subj_nda}/{day}*/DICOM/EmoRep_anat/*.dcm"
+            f"{source_dir}/{subj_nda}/{day}*/DICOM/EmoRep_anat/*.dcm"
         )[0]
         dicom_hdr = pydicom.read_file(dicom_file)
 
         # Get demographic info
         scan_date = datetime.strptime(dicom_hdr[0x08, 0x20].value, "%Y%m%d")
-        demo_dict = self._get_subj_demo(scan_date)
+        demo_dict = _get_subj_demo(scan_date)
 
         # Setup host file
         # TODO check that file exists
         # TODO setup local path
         deface_file = os.path.join(
-            self.proj_dir,
+            proj_dir,
             "data_scanner_BIDS/derivatives/deface",
-            self.subj,
-            self.sess,
-            f"{self.subj}_{self.sess}_T1w_defaced.nii.gz",
+            subj,
+            sess,
+            f"{subj}_{sess}_T1w_defaced.nii.gz",
         )
         host_name = f"{demo_dict['subjectkey']}_{day}_T1_anat.nii.gz"
-        self._make_host(deface_file, host_name)
+        _make_host(deface_file, host_name)
 
         # Get general, anat specific acquisition info
-        std_dict = self._get_std_info(nii_json, dicom_hdr)
+        std_dict = _get_std_info(nii_json, dicom_hdr)
         anat_image03 = {
-            "image_file": f"{self.local_path}/{host_name}",
+            "image_file": f"{local_path}/{host_name}",
             "image_description": "MPRAGE",
             "scan_type": "MR structural (T1)",
             "image_history": "Face removed",
@@ -1932,12 +1938,67 @@ class NdarImage03:
 
         # Add scan info to report
         new_row = pd.DataFrame(anat_image03, index=[0])
-        self.df_report_study = pd.concat(
-            [self.df_report_study.loc[:], new_row]
+        df_report_study = pd.concat(
+            [df_report_study.loc[:], new_row]
         ).reset_index(drop=True)
 
     def _info_fmap(subj_sess):
-        pass
+        """Title."""
+        # Get JSON info
+        nii_file = sorted(glob.glob(f"{subj_sess}/fmap/*.nii.gz"))[0]
+        json_file = sorted(glob.glob(f"{subj_sess}/fmap/*.json"))[0]
+        with open(json_file, "r") as jf:
+            nii_json = json.load(jf)
+
+        # Get DICOM info
+        day = sess.split("-")[1]
+        dicom_list = glob.glob(
+            f"{source_dir}/{subj_nda}/{day}*/DICOM/Field_Map_PA/*.dcm"
+        )
+        dicom_file = dicom_list[0]
+        dicom_hdr = pydicom.read_file(dicom_file)
+
+        # Get demographic info
+        scan_date = datetime.strptime(dicom_hdr[0x08, 0x20].value, "%Y%m%d")
+        demo_dict = _get_subj_demo(scan_date)
+
+        # Make host
+        h_guid = demo_dict["subjectkey"]
+        host_nii = f"{h_guid}_{day}_fmap1_revpol.nii.gz"
+        _make_host(nii_file, host_nii)
+
+        # Get general, anat specific acquisition info
+        std_dict = _get_std_info(nii_json, dicom_hdr)
+
+        # Setup fmap-specific values
+        fmap_image03 = {
+            "image_file": f"{local_path}/{host_nii}",
+            "image_description": "fmap (reverse phase polarity)",
+            "scan_type": "Field Map",
+            "data_file2": f"{local_path}/{host_events}",
+            "data_file2_type": "task event information",
+            "image_history": "No modifications",
+            "image_num_dimensions": 4,
+            "image_extent4": len(dicom_list),
+            "extent4_type": "time",
+            "image_unit4": "number of Volumes (across time)",
+            "image_resolution1": 2.0,
+            "image_resolution2": 2.0,
+            "image_resolution3": float(nii_json["SliceThickness"]),
+            "image_resolution4": float(nii_json["RepetitionTime"]),
+            "image_slice_thickness": float(nii_json["SliceThickness"]),
+            "slice_timing": nii_json["SliceTiming"],
+        }
+
+        # Combine all dicts
+        fmap_image03.update(demo_dict)
+        fmap_image03.update(std_dict)
+
+        # Add scan info to report
+        new_row = pd.DataFrame(fmap_image03, index=[0])
+        df_report_study = pd.concat(
+            [df_report_study.loc[:], new_row]
+        ).reset_index(drop=True)
 
     def _info_func(self, subj_sess):
         """Title."""
@@ -1949,30 +2010,31 @@ class NdarImage03:
         for nii_path in nii_list:
 
             # Get JSON for func run
+            # TODO check json_path exists
             json_path = re.sub(".nii.gz$", ".json", nii_path)
             with open(json_path, "r") as jf:
                 nii_json = json.load(jf)
 
             # Identify appropriate DICOM, load header
             _, _, task, run, _ = os.path.basename(nii_path).split("_")
-            day = self.sess.split("-")[1]
+            day = sess.split("-")[1]
             task_dir = (
                 "Rest_run01"
                 if task == "task-rest"
                 else f"EmoRep_run{run.split('-')[1]}"
             )
             task_source = os.path.join(
-                self.source_dir, self.subj_nda, f"{day}*/DICOM", task_dir
+                source_dir, subj_nda, f"{day}*/DICOM", task_dir
             )
             dicom_list = glob.glob(f"{task_source}/*.dcm")
-            dicom_fie = dicom_list[0]
+            dicom_file = dicom_list[0]
             dicom_hdr = pydicom.read_file(dicom_file)
 
             # Get demographic info
             scan_date = datetime.strptime(
                 dicom_hdr[0x08, 0x20].value, "%Y%m%d"
             )
-            demo_dict = self._get_subj_demo(scan_date)
+            demo_dict = _get_subj_demo(scan_date)
 
             # Setup host files
             # TODO check that file exists
@@ -1982,11 +2044,11 @@ class NdarImage03:
             host_nii = f"{h_guid}_{day}_func_{h_task}_run{h_run}.nii.gz"
             events_path = re.sub("_bold.nii.gz$", "_events.tsv", nii_path)
             host_events = f"{h_guid}_{day}_func_{h_task}_run{h_run}_events.tsv"
-            self._make_host(nii_path, host_nii)
-            self._make_host(events_path, host_events)
+            _make_host(nii_path, host_nii)
+            _make_host(events_path, host_events)
 
             # Get general, anat specific acquisition info
-            std_dict = self._get_std_info(nii_json, dicom_hdr)
+            std_dict = _get_std_info(nii_json, dicom_hdr)
 
             # Determine if participant is pilot
             pilot_list = report_helper.pilot_list()
@@ -1996,17 +2058,17 @@ class NdarImage03:
 
             # Setup func-specific values
             func_image03 = {
-                "image_file": f"{self.local_path}/{host_nii}",
+                "image_file": f"{local_path}/{host_nii}",
                 "image_description": "EPI fMRI",
                 "experiment_id": exp_id,
                 "scan_type": "fMRI",
-                "data_file2": f"{self.local_path}/{host_events}",
+                "data_file2": f"{local_path}/{host_events}",
                 "data_file2_type": "task event information",
                 "image_history": "No modifications",
                 "image_num_dimensions": 4,
                 "image_extent4": len(dicom_list),
                 "extent4_type": "time",
-                "image_unit4": "Seconds",
+                "image_unit4": "number of Volumes (across time)",
                 "image_resolution1": 2.0,
                 "image_resolution2": 2.0,
                 "image_resolution3": float(nii_json["SliceThickness"]),
@@ -2014,6 +2076,16 @@ class NdarImage03:
                 "image_slice_thickness": float(nii_json["SliceThickness"]),
                 "slice_timing": nii_json["SliceTiming"],
             }
+
+            # Combine all dicts
+            func_image03.update(demo_dict)
+            func_image03.update(std_dict)
+
+            # Add scan info to report
+            new_row = pd.DataFrame(func_image03, index=[0])
+            df_report_study = pd.concat(
+                [df_report_study.loc[:], new_row]
+            ).reset_index(drop=True)
 
 
 class NdarInclExcl01:
