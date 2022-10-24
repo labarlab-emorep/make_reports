@@ -1729,8 +1729,6 @@ class NdarImage03:
     ----------
     df_report_study : pd.DataFrame
         Image03 values for experiment/study participants
-    exp_dict : dict
-        Experiment IDs for task versions
     final_demo : make_reports.build_reports.DemoAll.final_demo
         pd.DataFrame, compiled demographic info
     local_path : str
@@ -1752,6 +1750,14 @@ class NdarImage03:
     subj_sess_list : list
         Paths to all participant's sessions,
         e.g. ["/path/sub-12/ses-A", "/path/sub-12/ses-B"]
+
+    Methods
+    -------
+    _make_image03
+        Conducts all work by matching MRI type to _info_<mri-type> method
+        _info_anat = Get anatomical information
+        _info_fmap = Get field map information
+        _info_func = Get functional information
 
     """
 
@@ -1775,8 +1781,6 @@ class NdarImage03:
         ----------
         df_report_study : pd.DataFrame
             Image03 values for experiment/study participants
-        exp_dict : dict
-            Experiment IDs for task versions
         final_demo : make_reports.build_reports.DemoAll.final_demo
             pd.DataFrame, compiled demographic info
         local_path : str
@@ -1808,7 +1812,6 @@ class NdarImage03:
         self.df_report_study = pd.DataFrame(columns=nda_cols)
 
         # Set reference and orienting attributes
-        self.exp_dict = {"old": 1683, "new": 2113}
         self.proj_dir = proj_dir
         self.local_path = (
             "/run/user/1001/gvfs/smb-share:server"
@@ -1821,11 +1824,8 @@ class NdarImage03:
 
         # Identify all session in rawdata, check that data is found
         rawdata_dir = os.path.join(proj_dir, "data_scanner_BIDS/rawdata")
-        # self.subj_sess_list = sorted(
-        #     glob.glob(f"{rawdata_dir}/sub-ER*/ses-day*")
-        # )
         self.subj_sess_list = sorted(
-            glob.glob(f"{rawdata_dir}/sub-ER0009/ses-day*")
+            glob.glob(f"{rawdata_dir}/sub-ER*/ses-day*")
         )
         if not self.subj_sess_list:
             raise ValueError(
@@ -2285,10 +2285,9 @@ class NdarImage03:
         """
         # Determine if participant is pilot, set experiment ID
         pilot_list = report_helper.pilot_list()
+        exp_dict = {"old": 1683, "new": 2113}
         exp_id = (
-            self.exp_dict["old"]
-            if self.subj_nda in pilot_list
-            else self.exp_dict["new"]
+            exp_dict["old"] if self.subj_nda in pilot_list else exp_dict["new"]
         )
 
         # Find all func niftis
