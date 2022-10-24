@@ -1,4 +1,12 @@
-"""Generate requested reports and organize relevant data."""
+"""Generate requested reports and organize relevant data.
+
+All Ndar* classes contain the following attributes (in addition to others):
+    df_report : pd.DataFrame
+        NDAR-compliant dataframe, without the NDA template label
+    nda_label : list
+        NDAR report template label, e.g. ["image", "03"]
+
+"""
 import os
 import re
 import glob
@@ -1718,12 +1726,17 @@ class NdarImage03:
     MRI file in rawdata. Utilize BIDS JSON sidecar and DICOM header
     information to identify required values.
 
+    Make copies of study participants' NIfTI and events files in:
+        <proj_dir>/ndar_report/data_mri
+
     Parameters
     ----------
     proj_dir : path
         Project's experiment directory
     final_demo : make_reports.build_reports.DemoAll.final_demo
         pd.DataFrame, compiled demographic info
+    test_subj : str, optional
+        BIDS subject identifier, for testing class
 
     Attributes
     ----------
@@ -1761,7 +1774,7 @@ class NdarImage03:
 
     """
 
-    def __init__(self, proj_dir, final_demo):
+    def __init__(self, proj_dir, final_demo, test_subj=None):
         """Coordinate report generation for MRI data.
 
         Assumes BIDS organization of <proj_dir>/data_scanner_BIDS. Identify
@@ -1776,6 +1789,8 @@ class NdarImage03:
             Project's experiment directory
         final_demo : make_reports.build_reports.DemoAll.final_demo
             pd.DataFrame, compiled demographic info
+        test_subj : str, optional
+            BIDS subject identifier, for testing class
 
         Attributes
         ----------
@@ -1824,9 +1839,14 @@ class NdarImage03:
 
         # Identify all session in rawdata, check that data is found
         rawdata_dir = os.path.join(proj_dir, "data_scanner_BIDS/rawdata")
-        self.subj_sess_list = sorted(
-            glob.glob(f"{rawdata_dir}/sub-ER*/ses-day*")
-        )
+        if test_subj:
+            self.subj_sess_list = sorted(
+                glob.glob(f"{rawdata_dir}/{test_subj}/ses-day*")
+            )
+        else:
+            self.subj_sess_list = sorted(
+                glob.glob(f"{rawdata_dir}/sub-ER*/ses-day*")
+            )
         if not self.subj_sess_list:
             raise ValueError(
                 f"Subject, session paths not found in {rawdata_dir}"
@@ -1865,7 +1885,6 @@ class NdarImage03:
 
         Iterate through subj_sess_list, identify the data types of
         the session, and for each data type trigger appropriate method.
-
         Each iteration resets the attributes of sess, subj, subj_nda, and
         subj_sess so they are available for private methods.
 
@@ -2343,17 +2362,17 @@ class NdarImage03:
             host_nii = f"{h_guid}_{day}_func_{h_task}_run{h_run}.nii.gz"
             self._make_host(nii_path, host_nii)
 
-            # Setup host events, account for no rest events
+            # Setup host events, account for no rest
+            # events and missing task files.
+            events_exists = False
             if not h_task == "rest":
                 host_events = (
                     f"{h_guid}_{day}_func_{h_task}_run{h_run}_events.tsv"
                 )
                 events_path = re.sub("_bold.nii.gz$", "_events.tsv", nii_path)
-                if not os.path.exists(events_path):
-                    raise FileNotFoundError(
-                        f"Expected to find events file : {events_path}"
-                    )
-                self._make_host(events_path, host_events)
+                events_exists = True if os.path.exists(events_path) else False
+                if events_exists:
+                    self._make_host(events_path, host_events)
 
             # Get general, anat specific acquisition info
             std_dict = self._get_std_info(nii_json, dicom_hdr)
@@ -2376,7 +2395,7 @@ class NdarImage03:
                 "image_slice_thickness": float(nii_json["SliceThickness"]),
                 "slice_timing": f"{nii_json['SliceTiming']}",
             }
-            if not h_task == "rest":
+            if not h_task == "rest" and events_exists:
                 func_image03["data_file2"] = f"{self.local_path}/{host_events}"
                 func_image03["data_file2_type"] = "task event information"
 
