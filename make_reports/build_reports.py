@@ -1669,7 +1669,7 @@ class NdarEmrq01:
         df_emrq = pd.concat([df_pilot, df_study], ignore_index=True)
         del df_pilot, df_study
 
-        # Rename columns, frop NaN rows
+        # Rename columns, drop NaN rows
         df_emrq = df_emrq.rename(columns={"study_id": "src_subject_id"})
         df_emrq = df_emrq.replace("NaN", np.nan)
         self.df_emrq = df_emrq[df_emrq["ERQ_1"].notna()]
@@ -2683,7 +2683,119 @@ class NdarPhysio01:
 
 
 class NdarPswq01:
-    pass
+    """Make pswq01 report for NDAR submission.
+
+    Parameters
+    ----------
+    proj_dir : path
+        Project's experiment directory
+    final_demo : make_reports.build_reports.DemoAll.final_demo
+        pd.DataFrame, compiled demographic info
+
+    Attributes
+    ----------
+    df_report : pd.DataFrame
+        Report of PSWQ data that complies with NDAR data definitions
+    nda_cols : list
+        NDA report template column names
+    nda_label : list
+        NDA report template label
+
+    """
+
+    def __init__(self, proj_dir, final_demo):
+        """Read in survey data and make report.
+
+        Get cleaned PSWQ Qualtrics survey from visit_day1, and
+        finalized demographic information.
+
+        Parameters
+        ----------
+        proj_dir : path
+            Project's experiment directory
+        final_demo : make_reports.build_reports.DemoAll.final_demo
+            pd.DataFrame, compiled demographic info
+
+        Attributes
+        ----------
+        nda_cols : list
+            NDA report template column names
+        nda_label : list
+            NDA report template label
+
+        """
+        print("Buiding NDA report : pswq01 ...")
+        # Read in template
+        self.nda_label, self.nda_cols = report_helper.mine_template(
+            "pswq01_template.csv"
+        )
+
+        # Get clean survey data
+        df_pilot = pd.read_csv(
+            os.path.join(
+                proj_dir,
+                "data_pilot/data_survey",
+                "visit_day1/data_clean",
+                "df_PSWQ.csv",
+            )
+        )
+        df_study = pd.read_csv(
+            os.path.join(
+                proj_dir,
+                "data_survey",
+                "visit_day1/data_clean",
+                "df_PSWQ.csv",
+            )
+        )
+        df_pswq = pd.concat([df_pilot, df_study], ignore_index=True)
+        del df_pilot, df_study
+
+        # Rename columns, drop NaN rows
+        df_pswq = df_pswq.replace("NaN", np.nan)
+        self.df_pswq = df_pswq[df_pswq["PSWQ_1"].notna()]
+
+        # Get final demographics, make report
+        final_demo = final_demo.replace("NaN", np.nan)
+        final_demo["sex"] = final_demo["sex"].replace(
+            ["Male", "Female", "Neither"], ["M", "F", "O"]
+        )
+        self.final_demo = final_demo.dropna(subset=["subjectkey"])
+        self._make_pswq()
+
+    def _make_pswq(self):
+        """Generate PSWQ report for NDAR submission.
+
+        Remap values and calculate totals.
+
+        Attributes
+        ----------
+        df_report : pd.DataFrame
+            Report of PSWQ data that complies with NDAR data definitions
+
+        """
+        # Update column names, make data integer
+        df_pswq = self.df_pswq.rename(columns=str.lower)
+        df_pswq.columns = df_pswq.columns.str.replace("_", "")
+        pswq_cols = [x for x in df_pswq.columns if "pswq" in x]
+        df_pswq[pswq_cols] = df_pswq[pswq_cols].astype("Int64")
+        df_pswq = df_pswq.rename(columns={"studyid": "src_subject_id"})
+
+        # Calculate sum
+        df_pswq["pswq_total"] = df_pswq[pswq_cols].sum(axis=1)
+        df_pswq["pswq_total"] = df_pswq["pswq_total"].astype("Int64")
+
+        # Combine demographic and erq dataframes
+        df_nda = self.final_demo[["subjectkey", "src_subject_id", "sex"]]
+        df_pswq_nda = pd.merge(df_pswq, df_nda, on="src_subject_id")
+        df_pswq_nda = report_helper.get_survey_age(
+            df_pswq_nda, self.final_demo, "src_subject_id"
+        )
+
+        # Build dataframe from nda columns, update with df_final_emrq data
+        self.df_report = pd.DataFrame(
+            columns=self.nda_cols, index=df_pswq_nda.index
+        )
+        self.df_report.update(df_pswq_nda)
 
 
 class NdarRest01:
