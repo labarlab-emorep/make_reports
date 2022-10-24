@@ -1277,6 +1277,8 @@ class NdarBdi01:
         NDA report template column names
     nda_label : list
         NDA report template label
+    proj_dir : path
+        Project's experiment directory
 
     """
 
@@ -1304,6 +1306,8 @@ class NdarBdi01:
             NDA report template column names
         nda_label : list
             NDA report template label
+        proj_dir : path
+            Project's experiment directory
 
         """
         # Get needed column values from report template
@@ -2411,13 +2415,40 @@ class NdarImage03:
 
 
 class NdarPanas01:
-    """Title.
+    """Make panas01 report for NDAR submission.
 
-    Desc.
+    Parameters
+    ----------
+    proj_dir : path
+        Project's experiment directory
+    final_demo : make_reports.build_reports.DemoAll.final_demo
+        pd.DataFrame, compiled demographic info
+
+    Attributes
+    ----------
+    df_panas_day2 : pd.DataFrame
+        Cleaned visit_day2 PANAS Qualtrics survey
+    df_panas_day3 : pd.DataFrame
+        Cleaned visit_day3 PANAS Qualtrics survey
+    df_report : pd.DataFrame
+        Report of PANAS data that complies with NDAR data definitions
+    final_demo : make_reports.build_reports.DemoAll.final_demo
+        pd.DataFrame, compiled demographic info
+    nda_cols : list
+        NDA report template column names
+    nda_label : list
+        NDA report template label
+    proj_dir : path
+        Project's experiment directory
+
     """
 
     def __init__(self, proj_dir, final_demo):
-        """Title.
+        """Read in survey data and make report.
+
+        Get cleaned PANAS Qualtrics survey from visit_day2 and
+        visit_day3, and finalized demographic information.
+        Generate PANAS report.
 
         Parameters
         ----------
@@ -2426,11 +2457,24 @@ class NdarPanas01:
         final_demo : make_reports.build_reports.DemoAll.final_demo
             pd.DataFrame, compiled demographic info
 
+        Attributes
+        ----------
+        df_report : pd.DataFrame
+            Report of PANAS data that complies with NDAR data definitions
+        final_demo : make_reports.build_reports.DemoAll.final_demo
+            pd.DataFrame, compiled demographic info
+        nda_cols : list
+            NDA report template column names
+        nda_label : list
+            NDA report template label
+        proj_dir : path
+            Project's experiment directory
+
         """
         # Get needed column values from report template
         print("Buiding NDA report : panas01 ...")
-        # self.proj_dir = proj_dir
-        nda_label, nda_cols = report_helper.mine_template(
+        self.proj_dir = proj_dir
+        self.nda_label, self.nda_cols = report_helper.mine_template(
             "panas01_template.csv"
         )
 
@@ -2442,6 +2486,7 @@ class NdarPanas01:
         final_demo["sex"] = final_demo["sex"].replace(
             ["Male", "Female", "Neither"], ["M", "F", "O"]
         )
+        self.final_demo = final_demo
 
         # Make reports for each visit
         df_nda_day2 = self._make_panas("day2")
@@ -2461,14 +2506,14 @@ class NdarPanas01:
         ----------
         df_panas_day2 : pd.DataFrame
             Cleaned visit_day2 PANAS Qualtrics survey
-        df_bdi_day3 : pd.DataFrame
+        df_panas_day3 : pd.DataFrame
             Cleaned visit_day3 PANAS Qualtrics survey
 
         """
         # Get clean survey data
         df_pilot2 = pd.read_csv(
             os.path.join(
-                proj_dir,
+                self.proj_dir,
                 "data_pilot/data_survey",
                 "visit_day2/data_clean",
                 "df_PANAS.csv",
@@ -2476,7 +2521,7 @@ class NdarPanas01:
         )
         df_study2 = pd.read_csv(
             os.path.join(
-                proj_dir,
+                self.proj_dir,
                 "data_survey",
                 "visit_day2/data_clean",
                 "df_PANAS.csv",
@@ -2488,12 +2533,12 @@ class NdarPanas01:
         df_panas_day2 = df_panas_day2.rename(
             columns={"study_id": "src_subject_id"}
         )
-        # self.df_panas_day2 = df_panas_day2
+        self.df_panas_day2 = df_panas_day2
 
         # Repeat above for day3
         df_pilot3 = pd.read_csv(
             os.path.join(
-                proj_dir,
+                self.proj_dir,
                 "data_pilot/data_survey",
                 "visit_day3/data_clean",
                 "df_PANAS.csv",
@@ -2501,7 +2546,7 @@ class NdarPanas01:
         )
         df_study3 = pd.read_csv(
             os.path.join(
-                proj_dir,
+                self.proj_dir,
                 "data_survey",
                 "visit_day3/data_clean",
                 "df_PANAS.csv",
@@ -2512,12 +2557,28 @@ class NdarPanas01:
             columns={"study_id": "src_subject_id"}
         )
         df_panas_day3.columns = df_panas_day2.columns.values
-        # self.df_panas_day3 = df_panas_day3
+        self.df_panas_day3 = df_panas_day3
 
-    def _make_panas(sess):
-        """Title.
+    def _make_panas(self, sess):
+        """Make an NDAR compliant report for visit.
 
-        Desc.
+        Remap column names, add demographic info, get session
+        age, and generate report.
+
+        Parameters
+        ----------
+        sess : str
+            [day2 | day3]
+            visit/session name
+
+        Returns
+        -------
+        pd.DataFrame
+
+        Raises
+        ------
+        ValueError
+            If sess is not day2 or day3
 
         """
         # Check sess value
@@ -2526,10 +2587,9 @@ class NdarPanas01:
             raise ValueError(f"Incorrect visit day : {sess}")
 
         # Get session data
-        # df_panas = getattr(self, f"df_panas_{sess}")
-        df_panas = df_panas_day2
+        df_panas = getattr(self, f"df_panas_{sess}")
 
-        # Convert response values to int
+        # Convert response values to int, set answer_type
         p_cols = [x for x in df_panas.columns if "PANAS_" in x]
         df_panas[p_cols] = df_panas[p_cols].astype("Int64")
         df_panas["answer_type"] = 1
@@ -2559,7 +2619,7 @@ class NdarPanas01:
         }
         df_panas_remap = df_panas.rename(columns=map_item)
 
-        # Determine positive metrics
+        # Calculate positive metrics (sum, mean, SD)
         cols_pos = [
             "interested_q1",
             "excited_q3",
@@ -2580,7 +2640,7 @@ class NdarPanas01:
             df_panas_remap[cols_pos].std(axis=1, skipna=True).round(3)
         )
 
-        # Determine negative metrics
+        # Calculate negative metrics (sum, mean, SD)
         cols_neg = [
             "distressed_q2",
             "upset1_q4",
@@ -2606,14 +2666,14 @@ class NdarPanas01:
         df_panas_remap["visit"] = sess
 
         # Combine demo and panas dataframes, get survey age
-        df_nda = final_demo[["subjectkey", "src_subject_id", "sex"]]
+        df_nda = self.final_demo[["subjectkey", "src_subject_id", "sex"]]
         df_panas_demo = pd.merge(df_panas_remap, df_nda, on="src_subject_id")
         df_panas_demo = report_helper.get_survey_age(
-            df_panas_demo, final_demo, "src_subject_id"
+            df_panas_demo, self.final_demo, "src_subject_id"
         )
 
         # Build dataframe from nda columns, update with df_panas_demo data
-        df_nda = pd.DataFrame(columns=nda_cols, index=df_panas_demo.index)
+        df_nda = pd.DataFrame(columns=self.nda_cols, index=df_panas_demo.index)
         df_nda.update(df_panas_demo)
         return df_nda
 
