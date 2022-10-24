@@ -27,15 +27,15 @@ def _get_args():
         description=__doc__, formatter_class=RawTextHelpFormatter
     )
     parser.add_argument(
-        "---report-names",
+        "--report-names",
         type=str,
         nargs="+",
         help=textwrap.dedent(
             """\
             [affim01 | als01 | bdi01 | demo_info01 | emrq01 | image03 |
-                panas01]
+                panas01 | pswq01]
             Make specific NDA reports by name.
-            e.g. --nda-reports affim01 als01
+            e.g. --report-names affim01 als01
             """
         ),
     )
@@ -45,7 +45,7 @@ def _get_args():
         help=textwrap.dedent(
             """\
             Make all planned NDA reports.
-            True if "--nda-reports-all" else False.
+            True if "--report-all" else False.
             """
         ),
     )
@@ -84,6 +84,7 @@ def main():
             "emrq01",
             "image03",
             "panas01",
+            "pswq01",
         ]
     workflow.make_nda_reports(nda_reports, proj_dir)
 
