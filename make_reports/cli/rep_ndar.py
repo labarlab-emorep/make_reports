@@ -32,7 +32,7 @@ def _get_args():
         nargs="+",
         help=textwrap.dedent(
             """\
-            [affim01 | als01 | bdi01 | demo_info01 | emrq01]
+            [affim01 | als01 | bdi01 | demo_info01 | emrq01 | image03]
             Make specific NDA reports by name.
             e.g. --nda-reports affim01 als01
             """
@@ -75,7 +75,14 @@ def main():
     proj_dir = args.proj_dir
 
     if nda_reports_all:
-        nda_reports = ["affim01", "als01", "bdi01", "demo_info01", "emrq01"]
+        nda_reports = [
+            "affim01",
+            "als01",
+            "bdi01",
+            "demo_info01",
+            "emrq01",
+            "image03",
+        ]
     workflow.make_nda_reports(nda_reports, proj_dir)
 
 
