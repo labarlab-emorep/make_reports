@@ -1485,6 +1485,10 @@ class NdarBdi01:
         return df_nda
 
 
+class NdarBrd01:
+    pass
+
+
 class NdarDemoInfo01:
     """Make demo_info01 report for NDAR submission.
 
@@ -1591,10 +1595,6 @@ class NdarDemoInfo01:
         }
         for h_col, h_value in report_dict.items():
             self.df_report[h_col] = h_value
-
-
-class NdarEmoEndo01:
-    pass
 
 
 class NdarEmrq01:
@@ -2410,23 +2410,19 @@ class NdarImage03:
             ).reset_index(drop=True)
 
 
-class NdarInclExcl01:
-    pass
-
-
-class NdarSubject01:
-    pass
-
-
 class NdarPanas01:
     pass
 
 
-class NdarPhysioRec01:
+class NdarPhysio01:
     pass
 
 
 class NdarPswq01:
+    pass
+
+
+class NdarRest01:
     pass
 
 
