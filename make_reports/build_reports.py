@@ -2803,7 +2803,126 @@ class NdarRest01:
 
 
 class NdarRrs01:
-    pass
+    """Make rrs01 report for NDAR submission.
+
+    Parameters
+    ----------
+    proj_dir : path
+        Project's experiment directory
+    final_demo : make_reports.build_reports.DemoAll.final_demo
+        pd.DataFrame, compiled demographic info
+
+    Attributes
+    ----------
+    df_rrs : pd.DataFrame
+        Cleaned RRS Qualtrics survey
+    df_report : pd.DataFrame
+        Report of RRS data that complies with NDAR data definitions
+    final_demo : make_reports.build_reports.DemoAll.final_demo
+        pd.DataFrame, compiled demographic info
+    nda_cols : list
+        NDA report template column names
+    nda_label : list
+        NDA report template label
+
+    """
+
+    def __init__(self, proj_dir, final_demo):
+        """Read in survey data and make report.
+
+        Get cleaned RRS Qualtrics survey from visit_day1, and
+        finalized demographic information.
+
+        Parameters
+        ----------
+        proj_dir : path
+            Project's experiment directory
+        final_demo : make_reports.build_reports.DemoAll.final_demo
+            pd.DataFrame, compiled demographic info
+
+        Attributes
+        ----------
+        df_rrs : pd.DataFrame
+            Cleaned RRS Qualtrics survey
+        final_demo : make_reports.build_reports.DemoAll.final_demo
+            pd.DataFrame, compiled demographic info
+        nda_cols : list
+            NDA report template column names
+        nda_label : list
+            NDA report template label
+
+        """
+        print("Buiding NDA report : rrs01 ...")
+        # Read in template
+        self.nda_label, self.nda_cols = report_helper.mine_template(
+            "rrs01_template.csv"
+        )
+
+        # Get clean survey data
+        df_pilot = pd.read_csv(
+            os.path.join(
+                proj_dir,
+                "data_pilot/data_survey",
+                "visit_day1/data_clean",
+                "df_RRS.csv",
+            )
+        )
+        df_study = pd.read_csv(
+            os.path.join(
+                proj_dir,
+                "data_survey",
+                "visit_day1/data_clean",
+                "df_RRS.csv",
+            )
+        )
+        df_rrs = pd.concat([df_pilot, df_study], ignore_index=True)
+        del df_pilot, df_study
+
+        # Rename columns, frop NaN rows
+        df_rrs = df_rrs.rename(columns={"study_id": "src_subject_id"})
+        df_rrs = df_rrs.replace("NaN", np.nan)
+        self.df_rrs = df_rrs[df_rrs["RRS_1"].notna()]
+
+        # Get final demographics, make report
+        final_demo = final_demo.replace("NaN", np.nan)
+        final_demo["sex"] = final_demo["sex"].replace(
+            ["Male", "Female", "Neither"], ["M", "F", "O"]
+        )
+        self.final_demo = final_demo.dropna(subset=["subjectkey"])
+        self._make_rrs()
+
+    def _make_rrs(self):
+        """Combine dataframes to generate requested report.
+
+        Calculate totals and determine survey age.
+
+        Attributes
+        ----------
+        df_report : pd.DataFrame
+            Report of RRS data that complies with NDAR data definitions
+
+        """
+        # Update column names, make data integer
+        df_rrs = self.df_rrs.rename(columns=str.lower)
+        rrs_cols = [x for x in df_rrs.columns if "rrs" in x]
+        df_rrs[rrs_cols] = df_rrs[rrs_cols].astype("Int64")
+
+        # Calculate sum
+        df_rrs["rrs_total"] = df_rrs[rrs_cols].sum(axis=1)
+        df_rrs["rrs_total"] = df_rrs["rrs_total"].astype("Int64")
+
+        # Combine demographic and rrs dataframes
+        df_nda = self.final_demo[["subjectkey", "src_subject_id", "sex"]]
+        df_rrs_nda = pd.merge(df_rrs, df_nda, on="src_subject_id")
+        df_rrs_nda = report_helper.get_survey_age(
+            df_rrs_nda, self.final_demo, "src_subject_id"
+        )
+
+        # Build dataframe from nda columns, update with demo and als data
+        self.df_report = pd.DataFrame(
+            columns=self.nda_cols, index=df_rrs_nda.index
+        )
+        self.df_report.update(df_rrs_nda)
 
 
 class NdarStai01:
