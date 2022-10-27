@@ -2940,7 +2940,7 @@ class NdarStai01:
     df_stai : pd.DataFrame
         Cleaned STAI Qualtrics survey
     df_report : pd.DataFrame
-        Report of RRS data that complies with NDAR data definitions
+        Report of STAI data that complies with NDAR data definitions
     final_demo : make_reports.build_reports.DemoAll.final_demo
         pd.DataFrame, compiled demographic info
     nda_cols : list
@@ -3077,4 +3077,122 @@ class NdarStai01:
 
 
 class NdarTas01:
-    pass
+    """Make tas01 report for NDAR submission.
+
+    Parameters
+    ----------
+    proj_dir : path
+        Project's experiment directory
+    final_demo : make_reports.build_reports.DemoAll.final_demo
+        pd.DataFrame, compiled demographic info
+
+    Attributes
+    ----------
+    df_tas : pd.DataFrame
+        Cleaned TAS Qualtrics survey
+    df_report : pd.DataFrame
+        Report of TAS data that complies with NDAR data definitions
+    final_demo : make_reports.build_reports.DemoAll.final_demo
+        pd.DataFrame, compiled demographic info
+    nda_cols : list
+        NDA report template column names
+    nda_label : list
+        NDA report template label
+
+    """
+
+    def __init__(self, proj_dir, final_demo):
+        """Read in survey data and make report.
+
+        Get cleaned TAS Qualtrics survey from visit_day1, and
+        finalized demographic information.
+
+        Parameters
+        ----------
+        proj_dir : path
+            Project's experiment directory
+        final_demo : make_reports.build_reports.DemoAll.final_demo
+            pd.DataFrame, compiled demographic info
+
+        Attributes
+        ----------
+        df_stai : pd.DataFrame
+            Cleaned TAS Qualtrics survey
+        final_demo : make_reports.build_reports.DemoAll.final_demo
+            pd.DataFrame, compiled demographic info
+        nda_cols : list
+            NDA report template column names
+        nda_label : list
+            NDA report template label
+
+        """
+        print("Buiding NDA report : tas01 ...")
+        # Read in template
+        self.nda_label, self.nda_cols = report_helper.mine_template(
+            "tas01_template.csv"
+        )
+
+        # Get clean survey data
+        df_pilot = pd.read_csv(
+            os.path.join(
+                proj_dir,
+                "data_pilot/data_survey",
+                "visit_day1/data_clean",
+                "df_TAS.csv",
+            )
+        )
+        df_study = pd.read_csv(
+            os.path.join(
+                proj_dir,
+                "data_survey",
+                "visit_day1/data_clean",
+                "df_TAS.csv",
+            )
+        )
+        df_tas = pd.concat([df_pilot, df_study], ignore_index=True)
+        del df_pilot, df_study
+
+        # Rename columns, drop NaN rows
+        df_tas = df_tas.rename(columns={"study_id": "src_subject_id"})
+        df_tas = df_tas.replace("NaN", np.nan)
+        self.df_tas = df_tas[df_tas["TAS_1"].notna()]
+
+        # Get final demographics, make report
+        final_demo = final_demo.replace("NaN", np.nan)
+        final_demo["sex"] = final_demo["sex"].replace(
+            ["Male", "Female", "Neither"], ["M", "F", "O"]
+        )
+        self.final_demo = final_demo.dropna(subset=["subjectkey"])
+        self._make_tas()
+
+    def _make_tas(self):
+        """Combine dataframes to generate requested report.
+
+        Rename columns, calculate totals, and determine survey age.
+
+        Attributes
+        ----------
+        df_report : pd.DataFrame
+            Report of TAS data that complies with NDAR data definitions
+
+        """
+        # Make data integer, calculate sum, and rename columns
+        df_tas = self.df_tas
+        tas_cols = [x for x in df_tas.columns if "TAS" in x]
+        df_tas[tas_cols] = df_tas[tas_cols].astype("Int64")
+        df_tas["tas_totalscore"] = df_tas[tas_cols].sum(axis=1)
+        df_tas["tas_totalscore"] = df_tas["tas_totalscore"].astype("Int64")
+        df_tas.columns = df_tas.columns.str.replace("TAS", "tas20")
+
+        # Combine demographic and stai dataframes
+        df_nda = self.final_demo[["subjectkey", "src_subject_id", "sex"]]
+        df_tas_nda = pd.merge(df_tas, df_nda, on="src_subject_id")
+        df_tas_nda = report_helper.get_survey_age(
+            df_tas_nda, self.final_demo, "src_subject_id"
+        )
+
+        # Build dataframe from nda columns, update with demo and stai data
+        self.df_report = pd.DataFrame(
+            columns=self.nda_cols, index=df_tas_nda.index
+        )
+        self.df_report.update(df_tas_nda)
