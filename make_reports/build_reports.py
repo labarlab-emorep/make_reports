@@ -1174,7 +1174,7 @@ class NdarAls01:
         df_als = pd.concat([df_pilot, df_study], ignore_index=True)
         del df_pilot, df_study
 
-        # Rename columns, frop NaN rows
+        # Rename columns, drop NaN rows
         df_als = df_als.rename(columns={"study_id": "src_subject_id"})
         df_als = df_als.replace("NaN", np.nan)
         self.df_als = df_als[df_als["ALS_1"].notna()]
@@ -2878,7 +2878,7 @@ class NdarRrs01:
         df_rrs = pd.concat([df_pilot, df_study], ignore_index=True)
         del df_pilot, df_study
 
-        # Rename columns, frop NaN rows
+        # Rename columns, drop NaN rows
         df_rrs = df_rrs.rename(columns={"study_id": "src_subject_id"})
         df_rrs = df_rrs.replace("NaN", np.nan)
         self.df_rrs = df_rrs[df_rrs["RRS_1"].notna()]
@@ -2918,7 +2918,7 @@ class NdarRrs01:
             df_rrs_nda, self.final_demo, "src_subject_id"
         )
 
-        # Build dataframe from nda columns, update with demo and als data
+        # Build dataframe from nda columns, update with demo and rrs data
         self.df_report = pd.DataFrame(
             columns=self.nda_cols, index=df_rrs_nda.index
         )
@@ -2926,7 +2926,154 @@ class NdarRrs01:
 
 
 class NdarStai01:
-    pass
+    """Make stai01 report for NDAR submission.
+
+    Parameters
+    ----------
+    proj_dir : path
+        Project's experiment directory
+    final_demo : make_reports.build_reports.DemoAll.final_demo
+        pd.DataFrame, compiled demographic info
+
+    Attributes
+    ----------
+    df_stai : pd.DataFrame
+        Cleaned STAI Qualtrics survey
+    df_report : pd.DataFrame
+        Report of RRS data that complies with NDAR data definitions
+    final_demo : make_reports.build_reports.DemoAll.final_demo
+        pd.DataFrame, compiled demographic info
+    nda_cols : list
+        NDA report template column names
+    nda_label : list
+        NDA report template label
+
+    """
+
+    def __init__(self, proj_dir, final_demo):
+        """Read in survey data and make report.
+
+        Get cleaned STAI Qualtrics survey from visit_day1, and
+        finalized demographic information.
+
+        Parameters
+        ----------
+        proj_dir : path
+            Project's experiment directory
+        final_demo : make_reports.build_reports.DemoAll.final_demo
+            pd.DataFrame, compiled demographic info
+
+        Attributes
+        ----------
+        df_stai : pd.DataFrame
+            Cleaned STAI Qualtrics survey
+        final_demo : make_reports.build_reports.DemoAll.final_demo
+            pd.DataFrame, compiled demographic info
+        nda_cols : list
+            NDA report template column names
+        nda_label : list
+            NDA report template label
+
+        """
+        print("Buiding NDA report : stai01 ...")
+        # Read in template
+        self.nda_label, self.nda_cols = report_helper.mine_template(
+            "stai01_template.csv"
+        )
+
+        # Get clean survey data
+        df_pilot = pd.read_csv(
+            os.path.join(
+                proj_dir,
+                "data_pilot/data_survey",
+                "visit_day1/data_clean",
+                "df_STAI.csv",
+            )
+        )
+        df_study = pd.read_csv(
+            os.path.join(
+                proj_dir,
+                "data_survey",
+                "visit_day1/data_clean",
+                "df_STAI.csv",
+            )
+        )
+        df_stai = pd.concat([df_pilot, df_study], ignore_index=True)
+        del df_pilot, df_study
+
+        # Rename columns, drop NaN rows
+        df_stai = df_stai.rename(columns={"study_id": "src_subject_id"})
+        df_stai = df_stai.replace("NaN", np.nan)
+        self.df_stai = df_stai[df_stai["STAI_Trait_1"].notna()]
+
+        # Get final demographics, make report
+        final_demo = final_demo.replace("NaN", np.nan)
+        final_demo["sex"] = final_demo["sex"].replace(
+            ["Male", "Female", "Neither"], ["M", "F", "O"]
+        )
+        self.final_demo = final_demo.dropna(subset=["subjectkey"])
+        self._make_stai()
+
+    def _make_stai(self):
+        """Combine dataframes to generate requested report.
+
+        Remap columns, calculate totals, and determine survey age.
+
+        Attributes
+        ----------
+        df_report : pd.DataFrame
+            Report of STAI data that complies with NDAR data definitions
+
+        """
+        # Make data integer
+        df_stai = self.df_stai
+        stai_cols = [x for x in df_stai.columns if "STAI" in x]
+        df_stai[stai_cols] = df_stai[stai_cols].astype("Int64")
+
+        # Remap column names
+        map_item = {
+            "STAI_Trait_1": "stai21",
+            "STAI_Trait_2": "stai22",
+            "STAI_Trait_3": "stai23",
+            "STAI_Trait_4": "stai24",
+            "STAI_Trait_5": "stai25",
+            "STAI_Trait_6": "stai26",
+            "STAI_Trait_7": "stai27",
+            "STAI_Trait_8": "stai28",
+            "STAI_Trait_9": "stai29",
+            "STAI_Trait_10": "stai30",
+            "STAI_Trait_11": "stai31",
+            "STAI_Trait_12": "stai32",
+            "STAI_Trait_13": "stai33",
+            "STAI_Trait_14": "stai34",
+            "STAI_Trait_15": "stai35",
+            "STAI_Trait_16": "stai36",
+            "STAI_Trait_17": "stai37",
+            "STAI_Trait_18": "stai38",
+            "STAI_Trait_19": "stai39",
+            "STAI_Trait_20": "stai40",
+        }
+        df_stai_remap = df_stai.rename(columns=map_item)
+
+        # Get trait sum
+        trait_cols = [x for x in df_stai_remap.columns if "stai" in x]
+        df_stai_remap["staiy_trait"] = df_stai_remap[trait_cols].sum(axis=1)
+        df_stai_remap["staiy_trait"] = df_stai_remap["staiy_trait"].astype(
+            "Int64"
+        )
+
+        # Combine demographic and stai dataframes
+        df_nda = self.final_demo[["subjectkey", "src_subject_id", "sex"]]
+        df_stai_nda = pd.merge(df_stai_remap, df_nda, on="src_subject_id")
+        df_stai_nda = report_helper.get_survey_age(
+            df_stai_nda, self.final_demo, "src_subject_id"
+        )
+
+        # Build dataframe from nda columns, update with demo and stai data
+        self.df_report = pd.DataFrame(
+            columns=self.nda_cols, index=df_stai_nda.index
+        )
+        self.df_report.update(df_stai_nda)
 
 
 class NdarTas01:
