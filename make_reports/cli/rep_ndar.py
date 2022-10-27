@@ -33,7 +33,7 @@ def _get_args():
         help=textwrap.dedent(
             """\
             [affim01 | als01 | bdi01 | demo_info01 | emrq01 | image03 |
-                panas01 | pswq01 | rrs01 | stai01]
+                panas01 | pswq01 | rrs01 | stai01 | tas01]
             Make specific NDA reports by name.
             e.g. --report-names affim01 als01
             """
@@ -87,6 +87,7 @@ def main():
             "pswq01",
             "rrs01",
             "stai01",
+            "tas01",
         ]
     workflow.make_nda_reports(nda_reports, proj_dir)
 
