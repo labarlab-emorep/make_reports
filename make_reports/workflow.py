@@ -42,7 +42,9 @@ def download_surveys(
     print("\nDone with survey download!")
 
 
-def clean_surveys(proj_dir, clean_redcap=False, clean_qualtrics=False):
+def clean_surveys(
+    proj_dir, clean_redcap=False, clean_qualtrics=False, clean_rest=False
+):
     """Coordinate survey cleaning and writing resources.
 
     Parameters
@@ -53,6 +55,8 @@ def clean_surveys(proj_dir, clean_redcap=False, clean_qualtrics=False):
         Whether to clean RedCap surveys
     clean_qualtrics : bool
         Whether to clean Qualtrics surveys
+    clean_rest : bool
+        Whether to clean resting state ratings
 
     Returns
     -------
@@ -127,21 +131,20 @@ def clean_surveys(proj_dir, clean_redcap=False, clean_qualtrics=False):
             print(f"\tWriting : {out_file}")
             h_df.to_csv(out_file, index=False, na_rep="")
 
-    # Check that all raw data exist
-    visit_raw = glob.glob(
-        f"{proj_dir}/data_survey/visit*/data_raw/*latest.csv"
-    )
-    redcap_raw = glob.glob(
-        f"{proj_dir}/data_survey/redcap*/data_raw/*latest.csv"
-    )
-    if len(visit_raw) != 5 and len(redcap_raw) != 4:
-        raise FileNotFoundError(
-            "Missing raw survey data in redcap or visit directories,"
-            + " please download raw data via rep_dl."
-        )
-
     # Trigger redcap cleaning methods
     if clean_redcap:
+
+        # Check for data
+        redcap_raw = glob.glob(
+            f"{proj_dir}/data_survey/redcap*/data_raw/*latest.csv"
+        )
+        if len(redcap_raw) != 4:
+            raise FileNotFoundError(
+                "Missing raw survey data in redcap directories,"
+                + " please download raw data via rep_dl."
+            )
+
+        # Get cleaning obj
         redcap_dict = report_helper.redcap_dict()
         clean_redcap = survey_clean.CleanRedcap(proj_dir)
 
@@ -157,6 +160,18 @@ def clean_surveys(proj_dir, clean_redcap=False, clean_qualtrics=False):
 
     # Trigger qualtrics cleaning methods
     if clean_qualtrics:
+
+        # Check for data
+        visit_raw = glob.glob(
+            f"{proj_dir}/data_survey/visit*/data_raw/*latest.csv"
+        )
+        if len(visit_raw) != 5:
+            raise FileNotFoundError(
+                "Missing raw survey data in visit directories,"
+                + " please download raw data via rep_dl."
+            )
+
+        # Get cleaning obj
         qualtrics_dict = report_helper.qualtrics_dict()
         clean_qualtrics = survey_clean.CleanQualtrics(proj_dir)
 
@@ -180,6 +195,41 @@ def clean_surveys(proj_dir, clean_redcap=False, clean_qualtrics=False):
                         clean_qualtrics.data_pilot[vis_name],
                         vis_name,
                     )
+
+    # Aggregate rest rating responses
+    if clean_rest:
+        print("Cleaning survey : rest ratings")
+
+        # Check for data
+        raw_path = os.path.join(
+            proj_dir,
+            "data_scanner_BIDS",
+            "rawdata",
+        )
+        rest_list = glob.glob(f"{raw_path}/sub-*/ses-*/beh/*rest-ratings.tsv")
+        if not rest_list:
+            raise FileNotFoundError(
+                "Missing rest ratings, try running dcm_conversion."
+            )
+
+        # Aggregate rest ratings, for each session day
+        agg_rest = survey_clean.CombineRestRatings(proj_dir)
+        for day in ["day2", "day3"]:
+            agg_rest.get_study_ratings(day)
+
+            # Write out session data
+            out_file = os.path.join(
+                proj_dir,
+                "data_survey",
+                f"visit_{day}",
+                "data_clean",
+                "df_rest-ratings.csv",
+            )
+            out_dir = os.path.dirname(out_file)
+            if not os.path.exists(out_dir):
+                os.makedirs(out_dir)
+            print(f"\tWriting : {out_file}")
+            agg_rest.df_sess.to_csv(out_file, index=False, na_rep="")
 
 
 def make_manager_reports(manager_reports, query_date, proj_dir):

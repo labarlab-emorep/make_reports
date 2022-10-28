@@ -1,6 +1,8 @@
 """Clean survey data from RedCap and Qualtrics."""
 import os
 import string
+import glob
+from fnmatch import fnmatch
 import pandas as pd
 import numpy as np
 from make_reports import report_helper
@@ -724,3 +726,96 @@ class CleanQualtrics:
 
         """
         pass
+
+
+class CombineRestRatings:
+    """Title.
+
+    Desc.
+
+    """
+
+    def __init__(self, proj_dir):
+        """Title.
+
+        Desc.
+
+        """
+        self.rawdata_study = os.path.join(
+            proj_dir, "data_scanner_BIDS", "rawdata"
+        )
+        self.sess_valid = ["day2", "day3"]
+
+    def get_study_ratings(self, sess):
+        """Title.
+
+        Desc.
+
+        Parameters
+        ----------
+        sess : str
+            [day2 | day3]
+
+        Attributes
+        ----------
+        pd.DataFrame
+
+        Raises
+        ------
+
+        """
+        # Check arg
+        if sess not in self.sess_valid:
+            raise ValueError(f"Improper session argument : sess={sess}")
+
+        # Setup session dataframe
+        col_names = [
+            "study_id",
+            "visit",
+            "resp_type",
+            "AMUSEMENT",
+            "ANGER",
+            "ANXIETY",
+            "AWE",
+            "CALMNESS",
+            "CRAVING",
+            "DISGUST",
+            "EXCITEMENT",
+            "FEAR",
+            "HORROR",
+            "JOY",
+            "NEUTRAL",
+            "ROMANCE",
+            "SADNESS",
+            "SURPRISE",
+        ]
+        df_sess = pd.DataFrame(columns=col_names)
+
+        # Find all session files
+        beh_path = f"{self.rawdata_study}/sub-*/ses-{sess}/beh"
+        beh_list = sorted(glob.glob(f"{beh_path}/*rest-ratings.tsv"))
+        if not beh_list:
+            raise ValueError(
+                f"No rest-ratings files found in {beh_path}."
+                + "\n\tTry running dcm_conversion."
+            )
+
+        # Add each participant's responses to df_sess
+        for beh_file in beh_list:
+
+            # Read in participant data
+            subj_str = os.path.basename(beh_file).split("_")[0].split("-")[1]
+            df_beh = pd.read_csv(beh_file, sep="\t", index_col="prompt")
+
+            # Organize for concat with df_sess
+            df_beh_trans = df_beh.T
+            df_beh_trans.reset_index(inplace=True)
+            df_beh_trans = df_beh_trans.rename(columns={"index": "resp_type"})
+            df_beh_trans["study_id"] = subj_str
+            df_beh_trans["visit"] = sess
+
+            # Add info to df_sess
+            df_sess = pd.concat([df_sess, df_beh_trans], ignore_index=True)
+            del df_beh, df_beh_trans
+
+        self.df_sess = df_sess
