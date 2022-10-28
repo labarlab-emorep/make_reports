@@ -2,7 +2,6 @@
 import os
 import string
 import glob
-from fnmatch import fnmatch
 import pandas as pd
 import numpy as np
 from make_reports import report_helper
@@ -729,16 +728,40 @@ class CleanQualtrics:
 
 
 class CombineRestRatings:
-    """Title.
+    """Aggregate post resting ratings.
 
-    Desc.
+    Find and combine subject rest ratings, output by dcm_conversion.
+
+    Attributes
+    ----------
+    df_sess : pd.DataFrame
+        Aggregated rest ratings for session
+    proj_dir : path
+        Location of parent directory for project
+    sess_valid : list
+        Valid session days
+
+    Methods
+    -------
+    get_study_ratings
+        Aggregate session rest ratings
 
     """
 
     def __init__(self, proj_dir):
-        """Title.
+        """Setup helper attributes.
 
-        Desc.
+        Parameters
+        ----------
+        proj_dir : path
+            Location of parent directory for project
+
+        Attributes
+        ----------
+        proj_dir : path
+            Location of parent directory for project
+        sess_valid : list
+            Valid session days
 
         """
         self.rawdata_study = os.path.join(
@@ -747,21 +770,24 @@ class CombineRestRatings:
         self.sess_valid = ["day2", "day3"]
 
     def get_study_ratings(self, sess):
-        """Title.
-
-        Desc.
+        """Find and aggregate participant rest ratings for session.
 
         Parameters
         ----------
         sess : str
-            [day2 | day3]
+            ["day2" | "day3"]
 
         Attributes
         ----------
-        pd.DataFrame
+        df_sess : pd.DataFrame
+            Aggregated rest ratings for session
 
         Raises
         ------
+        ValueError
+            Invalid sess argument supplied
+        FileNotFoundError
+            Participant rest-rating files are not found
 
         """
         # Check arg
@@ -795,7 +821,7 @@ class CombineRestRatings:
         beh_path = f"{self.rawdata_study}/sub-*/ses-{sess}/beh"
         beh_list = sorted(glob.glob(f"{beh_path}/*rest-ratings.tsv"))
         if not beh_list:
-            raise ValueError(
+            raise FileNotFoundError(
                 f"No rest-ratings files found in {beh_path}."
                 + "\n\tTry running dcm_conversion."
             )
