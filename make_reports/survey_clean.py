@@ -736,14 +736,12 @@ class CombineRestRatings:
     ----------
     df_sess : pd.DataFrame
         Aggregated rest ratings for session
-    proj_dir : path
-        Location of parent directory for project
     sess_valid : list
         Valid session days
 
     Methods
     -------
-    get_study_ratings
+    get_rest_ratings
         Aggregate session rest ratings
 
     """
@@ -758,24 +756,21 @@ class CombineRestRatings:
 
         Attributes
         ----------
-        proj_dir : path
-            Location of parent directory for project
         sess_valid : list
             Valid session days
 
         """
-        self.rawdata_study = os.path.join(
-            proj_dir, "data_scanner_BIDS", "rawdata"
-        )
         self.sess_valid = ["day2", "day3"]
 
-    def get_study_ratings(self, sess):
+    def get_rest_ratings(self, sess, rawdata_path):
         """Find and aggregate participant rest ratings for session.
 
         Parameters
         ----------
         sess : str
             ["day2" | "day3"]
+        rawdata_path : path
+            Location of BIDS rawdata
 
         Attributes
         ----------
@@ -818,7 +813,7 @@ class CombineRestRatings:
         df_sess = pd.DataFrame(columns=col_names)
 
         # Find all session files
-        beh_path = f"{self.rawdata_study}/sub-*/ses-{sess}/beh"
+        beh_path = f"{rawdata_path}/sub-*/ses-{sess}/beh"
         beh_list = sorted(glob.glob(f"{beh_path}/*rest-ratings.tsv"))
         if not beh_list:
             raise FileNotFoundError(

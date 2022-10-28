@@ -215,12 +215,30 @@ def clean_surveys(
         # Aggregate rest ratings, for each session day
         agg_rest = survey_clean.CombineRestRatings(proj_dir)
         for day in ["day2", "day3"]:
-            agg_rest.get_study_ratings(day)
 
-            # Write out session data
+            # Get, write out study data
+            agg_rest.get_rest_ratings(day, raw_path)
             out_file = os.path.join(
                 proj_dir,
                 "data_survey",
+                f"visit_{day}",
+                "data_clean",
+                "df_rest-ratings.csv",
+            )
+            out_dir = os.path.dirname(out_file)
+            if not os.path.exists(out_dir):
+                os.makedirs(out_dir)
+            print(f"\tWriting : {out_file}")
+            agg_rest.df_sess.to_csv(out_file, index=False, na_rep="")
+
+            # Get, write out pilot data
+            rawdata_pilot = os.path.join(
+                proj_dir, "data_pilot/data_scanner_BIDS", "rawdata"
+            )
+            agg_rest.get_rest_ratings(day, rawdata_pilot)
+            out_file = os.path.join(
+                proj_dir,
+                "data_pilot/data_survey",
                 f"visit_{day}",
                 "data_clean",
                 "df_rest-ratings.csv",
