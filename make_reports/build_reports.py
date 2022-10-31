@@ -1744,12 +1744,16 @@ class NdarImage03:
 
     Attributes
     ----------
+    df_report_pilot : pd.DataFrame
+        Image03 for pilot participants
     df_report_study : pd.DataFrame
         Image03 values for experiment/study participants
     final_demo : make_reports.build_reports.DemoAll.final_demo
         pd.DataFrame, compiled demographic info
     local_path : str
         Output location for NDA's report package builder
+    nda_cols : list
+        NDA report template column names
     nda_label : list
         NDA report template label
     proj_dir : path
@@ -1804,6 +1808,8 @@ class NdarImage03:
             pd.DataFrame, compiled demographic info
         local_path : str
             Output location for NDA's report package builder
+        nda_cols : list
+            NDA report template column names
         nda_label : list
             NDA report template label
         proj_dir : path
@@ -1825,10 +1831,10 @@ class NdarImage03:
         print("Buiding NDA report : image03 ...")
 
         # Read in template, start empty dataframe
-        self.nda_label, nda_cols = report_helper.mine_template(
+        self.nda_label, self.nda_cols = report_helper.mine_template(
             "image03_template.csv"
         )
-        self.df_report_study = pd.DataFrame(columns=nda_cols)
+        self.df_report_study = pd.DataFrame(columns=self.nda_cols)
 
         # Set reference and orienting attributes
         self.proj_dir = proj_dir
@@ -1864,25 +1870,43 @@ class NdarImage03:
         )
         self.final_demo = final_demo
 
-        # Make df_report for all study participants
+        # Get pilot df, make df_report for all study participants
+        self._make_pilot()
         self._make_image03()
 
+        # Combine df_report_study and df_report_pilot
+        self.df_report = pd.concat(
+            [self.df_report_pilot, self.df_report_study]
+        )
+
+    def _make_pilot(self):
+        """Read previously-generated NDAR report for pilot participants.
+
+        Attributes
+        ----------
+        df_report_pilot : pd.DataFrame
+            Image03 for pilot participants
+
+        Raises
+        ------
+        FileNotFoundError
+            Expected pilot image dataset not found
+
+        """
         # Read-in dataframe of pilot participants
         pilot_report = os.path.join(
-            proj_dir,
-            "data_pilot/data_scanner_BIDS/ndar_upload",
-            "EMOREP_image03_data_BIAC.csv",
+            self.proj_dir,
+            "data_pilot/ndar_resources",
+            "image03_dataset.csv",
         )
         if not os.path.exists(pilot_report):
             raise FileNotFoundError(
                 f"Expected to find pilot image03 at {pilot_report}"
             )
-        df_report_pilot = pd.read_csv(os.path.join(pilot_report))
+        df_report_pilot = pd.read_csv(pilot_report)
         df_report_pilot = df_report_pilot[1:]
-        df_report_pilot.columns = nda_cols
-
-        # Combine df_report_study and df_report_pilot
-        self.df_report = pd.concat([df_report_pilot, self.df_report_study])
+        df_report_pilot.columns = self.nda_cols
+        self.df_report_pilot = df_report_pilot
 
     def _make_image03(self):
         """Generate image03 report for study participants.
@@ -2363,15 +2387,19 @@ class NdarImage03:
             h_guid = demo_dict["subjectkey"]
             h_task = task.split("-")[1]
             h_run = run[-1]
-            host_nii = f"{h_guid}_{day}_func_{h_task}_run{h_run}.nii.gz"
+            # host_nii = f"{h_guid}_{day}_func_{h_task}_run{h_run}.nii.gz"
+            host_nii = f"{h_guid}_{day}_func_emostim_run{h_run}.nii.gz"
             self._make_host(nii_path, host_nii)
 
             # Setup host events, account for no rest
             # events and missing task files.
             events_exists = False
             if not h_task == "rest":
+                # host_events = (
+                #     f"{h_guid}_{day}_func_{h_task}_run{h_run}_events.tsv"
+                # )
                 host_events = (
-                    f"{h_guid}_{day}_func_{h_task}_run{h_run}_events.tsv"
+                    f"{h_guid}_{day}_func_emostim_run{h_run}_events.tsv"
                 )
                 events_path = re.sub("_bold.nii.gz$", "_events.tsv", nii_path)
                 events_exists = True if os.path.exists(events_path) else False
@@ -2479,6 +2507,7 @@ class NdarPanas01:
         )
 
         # Get pilot, study data for both day2, day3
+        df_pilot = self._get_pilot()
         self._get_clean()
 
         # Get final demographics
@@ -2493,9 +2522,99 @@ class NdarPanas01:
         df_nda_day3 = self._make_panas("day3")
 
         # Combine into final report
-        df_report = pd.concat([df_nda_day2, df_nda_day3])
+        df_report = pd.concat([df_pilot, df_nda_day2, df_nda_day3])
         df_report = df_report.sort_values(by=["src_subject_id"])
         self.df_report = df_report[df_report["interview_date"].notna()]
+
+    def _calc_metrics(self, df):
+        """Calculate positive and negative metrics.
+
+        Parameters
+        ----------
+        df : pd.DataFrame
+            Uses NDAR column names
+
+        Returns
+        -------
+        pd.DataFrame
+
+        """
+        cols_pos = [
+            "interested_q1",
+            "excited_q3",
+            "strong_q5",
+            "enthusiastic_q9",
+            "proud_q10",
+            "alert_q12",
+            "determined_q16",
+            "attentive_q17",
+            "active_q19",
+        ]
+        cols_neg = [
+            "distressed_q2",
+            "upset1_q4",
+            "guilty_q6",
+            "scared_q7",
+            "hostile_q8",
+            "irritable_q11",
+            "ashamed_q13",
+            "nervous_q15",
+            "jittery_q18",
+            "afraid_q20",
+        ]
+
+        # Calculate positive metrics
+        df["sum_pos"] = df[cols_pos].sum(axis=1)
+        df["sum_pos"] = df["sum_pos"].astype("Int64")
+        df["mean_pos_moment"] = df[cols_pos].mean(axis=1, skipna=True).round(3)
+        df["mean_pos_moment_sd"] = (
+            df[cols_pos].std(axis=1, skipna=True).round(3)
+        )
+
+        # Calculate negative metrics
+        df["sum_neg"] = df[cols_neg].sum(axis=1)
+        df["sum_neg"] = df["sum_neg"].astype("Int64")
+        df["mean_neg_moment"] = df[cols_neg].mean(axis=1, skipna=True).round(3)
+        df["mean_neg_moment_sd"] = (
+            df[cols_neg].std(axis=1, skipna=True).round(3)
+        )
+        return df
+
+    def _get_pilot(self):
+        """Get PANAS data of pilot participants.
+
+        Import data from previous NDAR submission.
+
+        Returns
+        -------
+        pd.DataFrame
+
+        Raises
+        ------
+        FileNotFoundError
+            Missing dataframe of pilot data
+
+        """
+        # Read-in dataframe of pilot participants
+        pilot_report = os.path.join(
+            self.proj_dir,
+            "data_pilot/ndar_resources",
+            "panas01_dataset.csv",
+        )
+        if not os.path.exists(pilot_report):
+            raise FileNotFoundError(
+                f"Expected to find pilot panas01 at {pilot_report}"
+            )
+        df_pilot = pd.read_csv(pilot_report)
+        df_pilot = df_pilot[1:]
+        df_pilot.columns = self.nda_cols
+
+        # Add visit, get metrics
+        df_pilot["visit"] = "day1"
+        p_cols = [x for x in df_pilot.columns if "_q" in x]
+        df_pilot[p_cols] = df_pilot[p_cols].astype("Int64")
+        df_pilot = self._calc_metrics(df_pilot)
+        return df_pilot
 
     def _get_clean(self):
         """Find and combine cleaned PANAS data.
@@ -2510,16 +2629,8 @@ class NdarPanas01:
             Cleaned visit_day3 PANAS Qualtrics survey
 
         """
-        # Get clean survey data
-        df_pilot2 = pd.read_csv(
-            os.path.join(
-                self.proj_dir,
-                "data_pilot/data_survey",
-                "visit_day2/data_clean",
-                "df_PANAS.csv",
-            )
-        )
-        df_study2 = pd.read_csv(
+        # Get visit_day2 data
+        df_panas_day2 = pd.read_csv(
             os.path.join(
                 self.proj_dir,
                 "data_survey",
@@ -2527,24 +2638,13 @@ class NdarPanas01:
                 "df_PANAS.csv",
             )
         )
-
-        # Combine pilot and study data, updated subj id column, set attribute
-        df_panas_day2 = pd.concat([df_pilot2, df_study2], ignore_index=True)
         df_panas_day2 = df_panas_day2.rename(
             columns={"study_id": "src_subject_id"}
         )
         self.df_panas_day2 = df_panas_day2
 
-        # Repeat above for day3
-        df_pilot3 = pd.read_csv(
-            os.path.join(
-                self.proj_dir,
-                "data_pilot/data_survey",
-                "visit_day3/data_clean",
-                "df_PANAS.csv",
-            )
-        )
-        df_study3 = pd.read_csv(
+        # Get visit_day3 data
+        df_panas_day3 = pd.read_csv(
             os.path.join(
                 self.proj_dir,
                 "data_survey",
@@ -2552,7 +2652,6 @@ class NdarPanas01:
                 "df_PANAS.csv",
             )
         )
-        df_panas_day3 = pd.concat([df_pilot3, df_study3], ignore_index=True)
         df_panas_day3 = df_panas_day3.rename(
             columns={"study_id": "src_subject_id"}
         )
@@ -2594,7 +2693,7 @@ class NdarPanas01:
         df_panas[p_cols] = df_panas[p_cols].astype("Int64")
         df_panas["answer_type"] = 1
 
-        # Remap column names
+        # Remap column names, get metrics
         map_item = {
             "PANAS_1": "interested_q1",
             "PANAS_2": "distressed_q2",
@@ -2618,49 +2717,7 @@ class NdarPanas01:
             "PANAS_20": "afraid_q20",
         }
         df_panas_remap = df_panas.rename(columns=map_item)
-
-        # Calculate positive metrics (sum, mean, SD)
-        cols_pos = [
-            "interested_q1",
-            "excited_q3",
-            "strong_q5",
-            "enthusiastic_q9",
-            "proud_q10",
-            "alert_q12",
-            "determined_q16",
-            "attentive_q17",
-            "active_q19",
-        ]
-        df_panas_remap["sum_pos"] = df_panas_remap[cols_pos].sum(axis=1)
-        df_panas_remap["sum_pos"] = df_panas_remap["sum_pos"].astype("Int64")
-        df_panas_remap["mean_pos_moment"] = (
-            df_panas_remap[cols_pos].mean(axis=1, skipna=True).round(3)
-        )
-        df_panas_remap["mean_pos_moment_sd"] = (
-            df_panas_remap[cols_pos].std(axis=1, skipna=True).round(3)
-        )
-
-        # Calculate negative metrics (sum, mean, SD)
-        cols_neg = [
-            "distressed_q2",
-            "upset1_q4",
-            "guilty_q6",
-            "scared_q7",
-            "hostile_q8",
-            "irritable_q11",
-            "ashamed_q13",
-            "nervous_q15",
-            "jittery_q18",
-            "afraid_q20",
-        ]
-        df_panas_remap["sum_neg"] = df_panas_remap[cols_neg].sum(axis=1)
-        df_panas_remap["sum_neg"] = df_panas_remap["sum_neg"].astype("Int64")
-        df_panas_remap["mean_neg_moment"] = (
-            df_panas_remap[cols_neg].mean(axis=1, skipna=True).round(3)
-        )
-        df_panas_remap["mean_neg_moment_sd"] = (
-            df_panas_remap[cols_neg].std(axis=1, skipna=True).round(3)
-        )
+        df_panas_remap = self._calc_metrics(df_panas_remap)
 
         # Add visit
         df_panas_remap["visit"] = sess
