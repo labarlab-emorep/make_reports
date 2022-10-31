@@ -2752,8 +2752,131 @@ class NdarPanas01:
         return df_nda
 
 
-class NdarPhysio01:
-    pass
+class NdarPhysio:
+    """Title.
+
+    Desc.
+
+    """
+
+    def __init__(self, proj_dir, final_demo):
+        """Title.
+
+        Desc.
+
+        """
+        print("Buiding NDA report : psychophys_subj_exp01 ...")
+        # Read in template
+        nda_label, nda_cols = report_helper.mine_template(
+            "psychophys_subj_exp01_template.csv"
+        )
+        df_report = pd.DataFrame(columns=nda_cols)
+
+        local_path = (
+            "/run/user/1001/gvfs/smb-share:server"
+            + "=ccn-keoki.win.duke.edu,share=experiments2/EmoRep/"
+            + "Exp2_Compute_Emotion/ndar_upload/data_phys"
+        )
+
+        pilot_list = report_helper.pilot_list()
+
+        # Identify all physio sessions
+        rawdata_pilot = os.path.join(
+            proj_dir, "data_pilot/data_scanner_BIDS/rawdata"
+        )
+        rawdata_study = os.path.join(proj_dir, "data_scanner_BIDS/rawdata")
+        physio_pilot = sorted(
+            glob.glob(f"{rawdata_pilot}/sub-ER*/ses-day*/phys/*acq")
+        )
+        physio_study = sorted(
+            glob.glob(f"{rawdata_study}/sub-ER*/ses-day*/phys/*acq")
+        )
+        physio_all = physio_pilot + physio_study
+
+        # Get final demographics
+        final_demo = final_demo.replace("NaN", np.nan)
+        final_demo["sex"] = final_demo["sex"].replace(
+            ["Male", "Female", "Neither"], ["M", "F", "O"]
+        )
+        final_demo = final_demo.dropna(subset=["subjectkey"])
+
+    def _get_std_info(self):
+        """Title.
+
+        Desc.
+
+        Returns
+        -------
+        dict
+
+        """
+        std_dict = {
+            "data_file1_type": "physiological recordings",
+            "experiment_description": "emotion induction (see design file in "
+            + "linked experiment)",
+            "hardware_manufacturer": "BIOPAC",
+            "hardware_model": "MP160",
+            "sampling_rate": 2000,
+            "collection_settings": "Resp: high-pass filter=0.05Hz, Gain=200;"
+            + " Pulse Ox.: high-pass filter=DC, DC=10Hz, Gain=100;"
+            + " GSR: low-pass filter=10Hz, Gain=10",
+            "connections_used": "pneumatic respiration belt, finger pulse"
+            + " oximeter, electrodes on left hand for GSR",
+            "imaging_present": 1,
+            "image_modality": "MRI",
+        }
+        return std_dict
+
+    def _make_physio(self):
+        """Title.
+
+        Desc.
+
+        """
+        exp_dict = {"old": 1683, "new": 2113}
+
+        for phys_path in physio_all:
+            phys_file = os.path.basename(phys_path)
+            subj, sess, task, run, _, _ = phys_file.split("_")
+
+            # TODO determine datetime
+
+            # TODO get demographic info
+
+            #
+            subj_nda = subj.split("-")[1]
+            exp_id = (
+                exp_dict["old"] if subj_nda in pilot_list else exp_dict["new"]
+            )
+            stim_pres = 0 if task == "task-rest" else 1
+            visit = sess[-1]
+
+            # host file
+            host_path = os.path.join(
+                proj_dir, "ndar_upload/data_phys", phys_file
+            )
+            if not os.path.exists(host_path):
+                bash_cmd = f"cp {phys_path} {host_path}"
+                h_sp = subprocess.Popen(
+                    bash_cmd, shell=True, stdout=subprocess.PIPE
+                )
+                h_out, h_err = h_sp.communicate()
+                h_sp.wait()
+
+            #
+            local_file = os.path.join(local_path, phys_file)
+            phys_dict = {
+                "experiment_id": exp_id,
+                "data_file1": local_file,
+                "stimulus_present": stim_pres,
+            }
+            phys_dict.update(_get_std_info())
+
+            #
+            new_row = pd.DataFrame(phys_dict, index=[0])
+            df_report = pd.concat([df_report.loc[:], new_row]).reset_index(
+                drop=True
+            )
 
 
 class NdarPswq01:
