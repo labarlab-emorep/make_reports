@@ -2871,8 +2871,6 @@ class NdarRrs01:
 
     Attributes
     ----------
-    df_rrs : pd.DataFrame
-        Cleaned RRS Qualtrics survey
     df_report : pd.DataFrame
         Report of RRS data that complies with NDAR data definitions
     final_demo : make_reports.build_reports.DemoAll.final_demo
@@ -2899,14 +2897,16 @@ class NdarRrs01:
 
         Attributes
         ----------
-        df_rrs : pd.DataFrame
-            Cleaned RRS Qualtrics survey
+        df_report : pd.DataFrame
+            Report of RRS data that complies with NDAR data definitions
         final_demo : make_reports.build_reports.DemoAll.final_demo
             pd.DataFrame, compiled demographic info
         nda_cols : list
             NDA report template column names
         nda_label : list
             NDA report template label
+        proj_dir : path
+            Project's experiment directory
 
         """
         print("Buiding NDA report : rrs01 ...")
@@ -2914,53 +2914,87 @@ class NdarRrs01:
         self.nda_label, self.nda_cols = report_helper.mine_template(
             "rrs01_template.csv"
         )
+        self.proj_dir = proj_dir
 
-        # Get clean survey data
-        df_pilot = pd.read_csv(
-            os.path.join(
-                proj_dir,
-                "data_pilot/data_survey",
-                "visit_day1/data_clean",
-                "df_RRS.csv",
-            )
-        )
-        df_study = pd.read_csv(
-            os.path.join(
-                proj_dir,
-                "data_survey",
-                "visit_day1/data_clean",
-                "df_RRS.csv",
-            )
-        )
-        df_rrs = pd.concat([df_pilot, df_study], ignore_index=True)
-        del df_pilot, df_study
-
-        # Rename columns, drop NaN rows
-        df_rrs = df_rrs.rename(columns={"study_id": "src_subject_id"})
-        df_rrs = df_rrs.replace("NaN", np.nan)
-        self.df_rrs = df_rrs[df_rrs["RRS_1"].notna()]
-
-        # Get final demographics, make report
+        # Get final demographics
         final_demo = final_demo.replace("NaN", np.nan)
         final_demo["sex"] = final_demo["sex"].replace(
             ["Male", "Female", "Neither"], ["M", "F", "O"]
         )
         self.final_demo = final_demo.dropna(subset=["subjectkey"])
-        self._make_rrs()
+
+        # Make pilot, study dataframes
+        df_pilot = self._get_pilot()
+        df_study = self._make_rrs()
+
+        # Combine into final report
+        df_report = pd.concat([df_pilot, df_study])
+        self.df_report = df_report[df_report["interview_date"].notna()]
+
+    def _get_pilot(self):
+        """Get RRS data of pilot participants.
+
+        Import data from previous NDAR submission.
+
+        Returns
+        -------
+        pd.DataFrame
+
+        Raises
+        ------
+        FileNotFoundError
+            Missing dataframe of pilot data
+
+        """
+        # Read in pilot report
+        pilot_report = os.path.join(
+            self.proj_dir,
+            "data_pilot/ndar_resources",
+            "rrs01_dataset.csv",
+        )
+        if not os.path.exists(pilot_report):
+            raise FileNotFoundError(
+                f"Expected to find pilot rrs01 at {pilot_report}"
+            )
+        df_pilot = pd.read_csv(pilot_report)
+        df_pilot = df_pilot[1:]
+        df_pilot.columns = self.nda_cols
+
+        # Calculate sum
+        p_cols = [x for x in df_pilot.columns if "rrs" in x]
+        df_pilot[p_cols] = df_pilot[p_cols].astype("Int64")
+        df_pilot["rrs_total"] = df_pilot[p_cols].sum(axis=1)
+        df_pilot["rrs_total"] = df_pilot["rrs_total"].astype("Int64")
+        return df_pilot
 
     def _make_rrs(self):
         """Combine dataframes to generate requested report.
 
         Calculate totals and determine survey age.
 
-        Attributes
-        ----------
-        df_report : pd.DataFrame
-            Report of RRS data that complies with NDAR data definitions
+        Returns
+        -------
+        pd.DataFrame
+            Report of study RRS data that complies with NDAR data definitions
 
         """
+        # Get clean survey data
+        df_rrs = pd.read_csv(
+            os.path.join(
+                self.proj_dir,
+                "data_survey",
+                "visit_day1/data_clean",
+                "df_RRS.csv",
+            )
+        )
+
+        # Rename columns, drop NaN rows
+        df_rrs = df_rrs.rename(columns={"study_id": "src_subject_id"})
+        df_rrs = df_rrs.replace("NaN", np.nan)
+        df_rrs = df_rrs[df_rrs["RRS_1"].notna()]
+
         # Update column names, make data integer
-        df_rrs = self.df_rrs.rename(columns=str.lower)
+        df_rrs = df_rrs.rename(columns=str.lower)
         rrs_cols = [x for x in df_rrs.columns if "rrs" in x]
         df_rrs[rrs_cols] = df_rrs[rrs_cols].astype("Int64")
 
@@ -2976,10 +3010,11 @@ class NdarRrs01:
         )
 
         # Build dataframe from nda columns, update with demo and rrs data
-        self.df_report = pd.DataFrame(
+        df_study_report = pd.DataFrame(
             columns=self.nda_cols, index=df_rrs_nda.index
         )
-        self.df_report.update(df_rrs_nda)
+        df_study_report.update(df_rrs_nda)
+        return df_study_report
 
 
 class NdarStai01:
