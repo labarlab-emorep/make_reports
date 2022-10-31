@@ -1334,6 +1334,13 @@ class NdarBdi01:
         # Combine into final report
         df_report = pd.concat([df_nda_day2, df_nda_day3])
         df_report = df_report.sort_values(by=["src_subject_id"])
+
+        # Add pilot notes for certain subjects
+        pilot_list = report_helper.pilot_list()
+        idx_pilot = df_report[
+            df_report["src_subject_id"].isin(pilot_list)
+        ].index.tolist()
+        df_report.loc[idx_pilot, "comments_misc"] = "PILOT PARTICIPANT"
         self.df_report = df_report[df_report["interview_date"].notna()]
 
     def _get_clean(self):
@@ -1717,10 +1724,18 @@ class NdarEmrq01:
         )
 
         # Build dataframe from nda columns, update with df_final_emrq data
-        self.df_report = pd.DataFrame(
+        df_report = pd.DataFrame(
             columns=self.nda_cols, index=df_emrq_nda.index
         )
-        self.df_report.update(df_emrq_nda)
+        df_report.update(df_emrq_nda)
+
+        # Add pilot comments
+        pilot_list = report_helper.pilot_list()
+        idx_pilot = df_report[
+            df_report["src_subject_id"].isin(pilot_list)
+        ].index.tolist()
+        df_report.loc[idx_pilot, "comments_misc"] = "PILOT PARTICIPANT"
+        self.df_report = df_report
 
 
 class NdarImage03:
@@ -1906,6 +1921,7 @@ class NdarImage03:
         df_report_pilot = pd.read_csv(pilot_report)
         df_report_pilot = df_report_pilot[1:]
         df_report_pilot.columns = self.nda_cols
+        df_report_pilot["comments_misc"] = "PILOT PARTICIPANT"
         self.df_report_pilot = df_report_pilot
 
     def _make_image03(self):
@@ -2614,6 +2630,7 @@ class NdarPanas01:
         p_cols = [x for x in df_pilot.columns if "_q" in x]
         df_pilot[p_cols] = df_pilot[p_cols].astype("Int64")
         df_pilot = self._calc_metrics(df_pilot)
+        df_pilot["comments_misc"] = "PILOT PARTICIPANT"
         return df_pilot
 
     def _get_clean(self):
@@ -2849,10 +2866,16 @@ class NdarPswq01:
         )
 
         # Build dataframe from nda columns, update with df_final_emrq data
-        self.df_report = pd.DataFrame(
+        df_report = pd.DataFrame(
             columns=self.nda_cols, index=df_pswq_nda.index
         )
-        self.df_report.update(df_pswq_nda)
+        df_report.update(df_pswq_nda)
+        pilot_list = report_helper.pilot_list()
+        idx_pilot = df_report[
+            df_report["src_subject_id"].isin(pilot_list)
+        ].index.tolist()
+        df_report.loc[idx_pilot, "comments_misc"] = "PILOT PARTICIPANT"
+        self.df_report = df_report
 
 
 class NdarRest01:
@@ -2928,7 +2951,7 @@ class NdarRrs01:
         df_study = self._make_rrs()
 
         # Combine into final report
-        df_report = pd.concat([df_pilot, df_study])
+        df_report = pd.concat([df_pilot, df_study], ignore_index=True)
         self.df_report = df_report[df_report["interview_date"].notna()]
 
     def _get_pilot(self):
@@ -2959,6 +2982,7 @@ class NdarRrs01:
         df_pilot = pd.read_csv(pilot_report)
         df_pilot = df_pilot[1:]
         df_pilot.columns = self.nda_cols
+        df_pilot["comments_misc"] = "PILOT PARTICIPANT"
 
         # Calculate sum
         p_cols = [x for x in df_pilot.columns if "rrs" in x]
