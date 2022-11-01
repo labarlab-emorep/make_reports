@@ -8,15 +8,20 @@ All Ndar* classes contain the following attributes (in addition to others):
 
 """
 import os
+
+# import sys
 import re
 import glob
 import json
 import subprocess
+
+# import contextlib
 import distutils.spawn
 import pandas as pd
 import numpy as np
 from datetime import datetime
 import pydicom
+from bioread.runners import acq_info
 from make_reports import report_helper
 
 
@@ -2753,34 +2758,74 @@ class NdarPanas01:
 
 
 class NdarPhysio:
-    """Title.
+    """Make psychophys_subj_exp01 report line-by-line.
 
-    Desc.
+    Identify all physio data in rawdata and add a line the NDAR report
+    for each file.
+
+    Make copies of physio files in:
+        <proj_dir>/ndar_report/data_phys
+
+    Parameters
+    ----------
+    proj_dir : path
+        Project's experiment directory
+    final_demo : make_reports.build_reports.DemoAll.final_demo
+        pd.DataFrame, compiled demographic info
+
+    Attributes
+    ----------
+    df_report : pd.DataFrame
+        Report of physio data that complies with NDAR data definitions
+    final_demo : make_reports.build_reports.DemoAll.final_demo
+        pd.DataFrame, compiled demographic info
+    nda_cols : list
+        NDA report template column names
+    nda_label : list
+        NDA report template label
+    physio_all : list
+        Locations of all physio files
+    proj_dir : path
+        Project's experiment directory
 
     """
 
     def __init__(self, proj_dir, final_demo):
-        """Title.
+        """Coordinate report generation for physio data.
 
-        Desc.
+        Assumes physio data exists within a BIDS-organized "phys"
+        directory, within each participants' session.
+
+        Parameters
+        ----------
+        proj_dir : path
+            Project's experiment directory
+        final_demo : make_reports.build_reports.DemoAll.final_demo
+            pd.DataFrame, compiled demographic info
+
+        Attributes
+        ----------
+        final_demo : make_reports.build_reports.DemoAll.final_demo
+            pd.DataFrame, compiled demographic info
+        nda_cols : list
+            NDA report template column names
+        nda_label : list
+            NDA report template label
+        physio_all : list
+            Locations of all physio files
+        proj_dir : path
+            Project's experiment directory
 
         """
         print("Buiding NDA report : psychophys_subj_exp01 ...")
+        self.proj_dir = proj_dir
+
         # Read in template
-        nda_label, nda_cols = report_helper.mine_template(
+        self.nda_label, self.nda_cols = report_helper.mine_template(
             "psychophys_subj_exp01_template.csv"
         )
-        df_report = pd.DataFrame(columns=nda_cols)
 
-        local_path = (
-            "/run/user/1001/gvfs/smb-share:server"
-            + "=ccn-keoki.win.duke.edu,share=experiments2/EmoRep/"
-            + "Exp2_Compute_Emotion/ndar_upload/data_phys"
-        )
-
-        pilot_list = report_helper.pilot_list()
-
-        # Identify all physio sessions
+        # Identify all physio files
         rawdata_pilot = os.path.join(
             proj_dir, "data_pilot/data_scanner_BIDS/rawdata"
         )
@@ -2791,26 +2836,64 @@ class NdarPhysio:
         physio_study = sorted(
             glob.glob(f"{rawdata_study}/sub-ER*/ses-day*/phys/*acq")
         )
-        physio_all = physio_pilot + physio_study
+        self.physio_all = physio_pilot + physio_study
 
-        # Get final demographics
+        # Get final demographics, make report
         final_demo = final_demo.replace("NaN", np.nan)
         final_demo["sex"] = final_demo["sex"].replace(
             ["Male", "Female", "Neither"], ["M", "F", "O"]
         )
-        final_demo = final_demo.dropna(subset=["subjectkey"])
+        self.final_demo = final_demo.dropna(subset=["subjectkey"])
+        self._make_physio()
 
-    def _get_std_info(self):
-        """Title.
+    def _get_subj_demo(self, subj_nda, acq_date):
+        """Gather required participant demographic information.
 
-        Desc.
+        Find participant demographic info and calculate age-in-months
+        at time of scan.
+
+        Parameters
+        ----------
+        subj_nda : str
+            Participant identifier
+        acq_date : datetime
+            Date of physio data acquisition
 
         Returns
         -------
         dict
+            Keys = nda column names
+            Values = demographic info
 
         """
-        std_dict = {
+        # Identify participant date of birth, sex, and GUID
+        final_demo = self.final_demo
+        idx_subj = final_demo.index[
+            final_demo["src_subject_id"] == subj_nda
+        ].tolist()[0]
+        subj_guid = final_demo.iloc[idx_subj]["subjectkey"]
+        subj_id = final_demo.iloc[idx_subj]["src_subject_id"]
+        subj_sex = final_demo.iloc[idx_subj]["sex"]
+        subj_dob = datetime.strptime(
+            final_demo.iloc[idx_subj]["dob"], "%Y-%m-%d"
+        )
+
+        # Calculate age in months
+        interview_age = report_helper.calc_age_mo([subj_dob], [acq_date])[0]
+        interview_date = datetime.strftime(acq_date, "%m/%d/%Y")
+
+        return {
+            "subjectkey": subj_guid,
+            "src_subject_id": subj_id,
+            "interview_date": interview_date,
+            "interview_age": interview_age,
+            "sex": subj_sex,
+        }
+
+    def _get_std_info(self):
+        """Return dict of common dataset values."""
+        # Split long strings
+        return {
             "data_file1_type": "physiological recordings",
             "experiment_description": "emotion induction (see design file in "
             + "linked experiment)",
@@ -2825,35 +2908,64 @@ class NdarPhysio:
             "imaging_present": 1,
             "image_modality": "MRI",
         }
-        return std_dict
 
     def _make_physio(self):
-        """Title.
+        """Generate NDAR report for physio data.
 
-        Desc.
+        Determine acquisition datetime, copy files for hosting,
+        and find all NDAR-required values.
+
+        Attributes
+        ----------
+        df_report : pd.DataFrame
+            Report of physio data that complies with NDAR data definitions
 
         """
+        # Setup for determining experiment id
         exp_dict = {"old": 1683, "new": 2113}
+        pilot_list = report_helper.pilot_list()
 
-        for phys_path in physio_all:
+        # Set local path for upload building
+        local_path = (
+            "/run/user/1001/gvfs/smb-share:server"
+            + "=ccn-keoki.win.duke.edu,share=experiments2/EmoRep/"
+            + "Exp2_Compute_Emotion/ndar_upload/data_phys"
+        )
+
+        # Start empty dataframe, fill with physio data
+        df_report = pd.DataFrame(columns=self.nda_cols)
+        for phys_path in self.physio_all:
+
+            # Determine session info
             phys_file = os.path.basename(phys_path)
             subj, sess, task, run, _, _ = phys_file.split("_")
-
-            # TODO determine datetime
-
-            # TODO get demographic info
-
-            #
             subj_nda = subj.split("-")[1]
-            exp_id = (
-                exp_dict["old"] if subj_nda in pilot_list else exp_dict["new"]
-            )
-            stim_pres = 0 if task == "task-rest" else 1
-            visit = sess[-1]
 
-            # host file
+            # Extract datetime from acq file - I could not suppress
+            # stdout print by air.run() for the life of me.
+            air = acq_info.AcqInfoRunner(phys_path)
+            air.run()
+            acq_date_str = (
+                air.reader.datafile.earliest_marker_created_at.isoformat()
+            ).split("T")[0]
+
+            # bash_cmd = f"""
+            #     line=$(acq_info {phys_path} | grep "Earliest")
+            #     IFS=":" read -ra dt_arr <<< $line
+            #     echo ${{dt_arr[1]%T*}}
+            # """
+            # h_sp = subprocess.Popen(
+            #     bash_cmd, shell=True, stdout=subprocess.PIPE
+            # )
+            # h_out, h_err = h_sp.communicate()
+            # h_sp.wait()
+            # acq_date_str = h_out.decode("utf-8").strip()
+
+            acq_date = datetime.strptime(acq_date_str, "%Y-%m-%d")
+
+            # Copy file for hosting
             host_path = os.path.join(
-                proj_dir, "ndar_upload/data_phys", phys_file
+                self.proj_dir, "ndar_upload/data_phys", phys_file
             )
             if not os.path.exists(host_path):
                 bash_cmd = f"cp {phys_path} {host_path}"
@@ -2863,20 +2975,32 @@ class NdarPhysio:
                 h_out, h_err = h_sp.communicate()
                 h_sp.wait()
 
-            #
+            # Identify participant-specific info
             local_file = os.path.join(local_path, phys_file)
+            exp_id = (
+                exp_dict["old"] if subj_nda in pilot_list else exp_dict["new"]
+            )
+            stim_pres = 0 if task == "task-rest" else 1
+            visit = sess[-1]
             phys_dict = {
                 "experiment_id": exp_id,
                 "data_file1": local_file,
                 "stimulus_present": stim_pres,
+                "visit": visit,
             }
-            phys_dict.update(_get_std_info())
 
-            #
+            # Update with standard, demographic info
+            phys_dict.update(self._get_std_info())
+            phys_dict.update(self._get_subj_demo(subj_nda, acq_date))
+
+            # Write new row with determined info
             new_row = pd.DataFrame(phys_dict, index=[0])
             df_report = pd.concat([df_report.loc[:], new_row]).reset_index(
                 drop=True
             )
+
+        # Set attribute
+        self.df_report = df_report
 
 
 class NdarPswq01:
