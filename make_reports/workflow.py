@@ -206,7 +206,7 @@ def clean_surveys(
             "data_scanner_BIDS",
             "rawdata",
         )
-        rest_list = glob.glob(f"{raw_path}/sub-*/ses-*/beh/*rest-ratings.tsv")
+        rest_list = glob.glob(f"{raw_path}/sub-*/ses-*/beh/*rest-ratings*.tsv")
         if not rest_list:
             raise FileNotFoundError(
                 "Missing rest ratings, try running dcm_conversion."
@@ -389,6 +389,7 @@ def make_nda_reports(nda_reports, proj_dir):
         "panas01": f"{mod_build}.NdarPanas01",
         "psychophys_subj_exp01": f"{mod_build}.NdarPhysio",
         "pswq01": f"{mod_build}.NdarPswq01",
+        "restsurv01": f"{mod_build}.NdarRest01",
         "rrs01": f"{mod_build}.NdarRrs01",
         "stai01": f"{mod_build}.NdarStai01",
         "tas01": f"{mod_build}.NdarTas01",

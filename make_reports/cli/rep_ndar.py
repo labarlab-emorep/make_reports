@@ -95,6 +95,7 @@ def main():
         "panas01",
         "pswq01",
         "psychophys_subj_exp01",
+        "restsurv01",
         "rrs01",
         "stai01",
         "tas01",

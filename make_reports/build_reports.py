@@ -8,14 +8,10 @@ All Ndar* classes contain the following attributes (in addition to others):
 
 """
 import os
-
-# import sys
 import re
 import glob
 import json
 import subprocess
-
-# import contextlib
 import distutils.spawn
 import pandas as pd
 import numpy as np
@@ -3126,7 +3122,244 @@ class NdarPswq01:
 
 
 class NdarRest01:
-    pass
+    """Make restsurv01 report for NDAR submission.
+
+    Parameters
+    ----------
+    proj_dir : path
+        Project's experiment directory
+    final_demo : make_reports.build_reports.DemoAll.final_demo
+        pd.DataFrame, compiled demographic info
+
+    Attributes
+    ----------
+    df_rest_day2 : pd.DataFrame
+        Cleaned visit_day2 rest ratings survey
+    df_rest_day3 : pd.DataFrame
+        Cleaned visit_day3 rest ratings survey
+    df_report : pd.DataFrame
+        Report of rest data that complies with NDAR data definitions
+    final_demo : make_reports.build_reports.DemoAll.final_demo
+        pd.DataFrame, compiled demographic info
+    nda_cols : list
+        NDA report template column names
+    nda_label : list
+        NDA report template label
+    proj_dir : path
+        Project's experiment directory
+
+    """
+
+    def __init__(self, proj_dir, final_demo):
+        """Read in survey data and make report.
+
+        Get cleaned rest rating surveys from visit_day2 and
+        visit_day3, and finalized demographic information.
+        Generate NDAR report.
+
+        Parameters
+        ----------
+        proj_dir : path
+            Project's experiment directory
+        final_demo : make_reports.build_reports.DemoAll.final_demo
+            pd.DataFrame, compiled demographic info
+
+        Attributes
+        ----------
+        df_report : pd.DataFrame
+            Report of rest data that complies with NDAR data definitions
+        final_demo : make_reports.build_reports.DemoAll.final_demo
+            pd.DataFrame, compiled demographic info
+        nda_cols : list
+            NDA report template column names
+        nda_label : list
+            NDA report template label
+        proj_dir : path
+            Project's experiment directory
+
+        """
+        # Get needed column values from report template
+        print("Buiding NDA report : restsurv01 ...")
+        self.proj_dir = proj_dir
+        self.nda_label, self.nda_cols = report_helper.mine_template(
+            "restsurv01_template.csv"
+        )
+
+        # Get pilot, study data for both day2, day3
+        self._get_clean()
+
+        # Get final demographics
+        final_demo = final_demo.replace("NaN", np.nan)
+        final_demo["sex"] = final_demo["sex"].replace(
+            ["Male", "Female", "Neither"], ["M", "F", "O"]
+        )
+        self.final_demo = final_demo.dropna(subset=["subjectkey"])
+
+        # Make nda reports for each session
+        df_nda_day2 = self._make_rest("day2")
+        df_nda_day3 = self._make_rest("day3")
+
+        # Combine into final report
+        df_report = pd.concat([df_nda_day2, df_nda_day3])
+        df_report = df_report.sort_values(by=["src_subject_id"])
+
+        # Add pilot notes for certain subjects
+        pilot_list = report_helper.pilot_list()
+        idx_pilot = df_report[
+            df_report["src_subject_id"].isin(pilot_list)
+        ].index.tolist()
+        df_report.loc[idx_pilot, "comments_misc"] = "PILOT PARTICIPANT"
+        self.df_report = df_report[df_report["interview_date"].notna()]
+
+    def _get_clean(self):
+        """Find and combine cleaned rest rating data.
+
+        Get pilot, study data for day2, day3.
+
+        Attributes
+        ----------
+        df_rest_day2 : pd.DataFrame
+            Cleaned visit_day2 rest rating survey
+        df_rest_day3 : pd.DataFrame
+            Cleaned visit_day3 rest rating survey
+
+        """
+        # Get clean survey data
+        df_pilot2 = pd.read_csv(
+            os.path.join(
+                self.proj_dir,
+                "data_pilot/data_survey",
+                "visit_day2/data_clean",
+                "df_rest-ratings.csv",
+            )
+        )
+        df_study2 = pd.read_csv(
+            os.path.join(
+                self.proj_dir,
+                "data_survey",
+                "visit_day2/data_clean",
+                "df_rest-ratings.csv",
+            )
+        )
+
+        # Combine pilot and study data, drop resp_alpha rows
+        df_rest_day2 = pd.concat([df_pilot2, df_study2], ignore_index=True)
+        idx_alpha = df_rest_day2.index[
+            df_rest_day2["resp_type"] == "resp_alpha"
+        ].tolist()
+        df_rest_day2 = df_rest_day2.drop(
+            df_rest_day2.index[idx_alpha]
+        ).reset_index(drop=True)
+
+        # Update subj id column, set attribute
+        df_rest_day2 = df_rest_day2.rename(
+            columns={"study_id": "src_subject_id"}
+        )
+        self.df_rest_day2 = df_rest_day2
+
+        # Repeat above for day3
+        df_pilot3 = pd.read_csv(
+            os.path.join(
+                self.proj_dir,
+                "data_pilot/data_survey",
+                "visit_day3/data_clean",
+                "df_rest-ratings.csv",
+            )
+        )
+        df_study3 = pd.read_csv(
+            os.path.join(
+                self.proj_dir,
+                "data_survey",
+                "visit_day3/data_clean",
+                "df_rest-ratings.csv",
+            )
+        )
+        df_rest_day3 = pd.concat([df_pilot3, df_study3], ignore_index=True)
+        idx_alpha = df_rest_day3.index[
+            df_rest_day3["resp_type"] == "resp_alpha"
+        ].tolist()
+        df_rest_day3 = df_rest_day3.drop(
+            df_rest_day3.index[idx_alpha]
+        ).reset_index(drop=True)
+        df_rest_day3 = df_rest_day3.rename(
+            columns={"study_id": "src_subject_id"}
+        )
+        df_rest_day3.columns = df_rest_day2.columns.values
+        self.df_rest_day3 = df_rest_day3
+
+    def _make_rest(self, sess):
+        """Make an NDAR compliant report for visit.
+
+        Remap column names, add demographic info, get session
+        age, and generate report.
+
+        Parameters
+        ----------
+        sess : str
+            [day2 | day3]
+            visit/session name
+
+        Returns
+        -------
+        pd.DataFrame
+
+        Raises
+        ------
+        ValueError
+            If sess is not day2 or day3
+
+        """
+        # Check sess value
+        sess_list = ["day2", "day3"]
+        if sess not in sess_list:
+            raise ValueError(f"Incorrect visit day : {sess}")
+
+        # Get session data
+        df_rest = getattr(self, f"df_rest_{sess}")
+
+        # Convert response values to int and remap column names
+        map_item = {
+            "AMUSEMENT": "amusement_01",
+            "ANGER": "anger_02",
+            "ANXIETY": "anxiety_03",
+            "AWE": "awe_04",
+            "CALMNESS": "calmness_05",
+            "CRAVING": "craving_06",
+            "DISGUST": "disgust_07",
+            "EXCITEMENT": "excitement_08",
+            "FEAR": "fear_09",
+            "HORROR": "horror_10",
+            "JOY": "joy_12",
+            "NEUTRAL": "neutral_13",
+            "ROMANCE": "romantic_love_14",
+            "SADNESS": "sadness_15",
+            "SURPRISE": "surprise_16",
+            "INTEREST": "interest_11",
+        }
+        h_cols = [x for x in df_rest.columns if x in map_item.keys()]
+        df_rest[h_cols] = df_rest[h_cols].astype("Int64")
+        df_rest_remap = df_rest.rename(columns=map_item)
+
+        # Drop non-ndar columns
+        df_rest_remap = df_rest_remap.drop(
+            ["resp_type"],
+            axis=1,
+        )
+
+        # Combine demo and bdi dataframes
+        df_nda = self.final_demo[["subjectkey", "src_subject_id", "sex"]]
+        df_rest_demo = pd.merge(df_rest_remap, df_nda, on="src_subject_id")
+
+        # Calculate age in months of visit, update visit
+        df_rest_demo = report_helper.get_survey_age(
+            df_rest_demo, self.final_demo, "src_subject_id"
+        )
+        df_rest_demo["visit"] = sess
+
+        # Build dataframe from nda columns, update with df_bdi_demo data
+        df_nda = pd.DataFrame(columns=self.nda_cols, index=df_rest_demo.index)
+        df_nda.update(df_rest_demo)
+        return df_nda
 
 
 class NdarRrs01:

@@ -793,6 +793,7 @@ class CombineRestRatings:
         col_names = [
             "study_id",
             "visit",
+            "datetime",
             "resp_type",
             "AMUSEMENT",
             "ANGER",
@@ -814,7 +815,7 @@ class CombineRestRatings:
 
         # Find all session files
         beh_path = f"{rawdata_path}/sub-*/ses-{sess}/beh"
-        beh_list = sorted(glob.glob(f"{beh_path}/*rest-ratings.tsv"))
+        beh_list = sorted(glob.glob(f"{beh_path}/*rest-ratings*.tsv"))
         if not beh_list:
             raise FileNotFoundError(
                 f"No rest-ratings files found in {beh_path}."
@@ -822,18 +823,22 @@ class CombineRestRatings:
             )
 
         # Add each participant's responses to df_sess
-        for beh_file in beh_list:
+        for beh_path in beh_list:
 
-            # Read in participant data
-            subj_str = os.path.basename(beh_file).split("_")[0].split("-")[1]
-            df_beh = pd.read_csv(beh_file, sep="\t", index_col="prompt")
+            # Get session info
+            beh_file = os.path.basename(beh_path)
+            subj, sess, task, date_ext = beh_file.split("_")
+            subj_str = subj.split("-")[1]
+            date_str = date_ext.split(".")[0]
 
-            # Organize for concat with df_sess
+            # Get data, organize for concat with df_sess
+            df_beh = pd.read_csv(beh_path, sep="\t", index_col="prompt")
             df_beh_trans = df_beh.T
             df_beh_trans.reset_index(inplace=True)
             df_beh_trans = df_beh_trans.rename(columns={"index": "resp_type"})
             df_beh_trans["study_id"] = subj_str
             df_beh_trans["visit"] = sess
+            df_beh_trans["datetime"] = date_str
 
             # Add info to df_sess
             df_sess = pd.concat([df_sess, df_beh_trans], ignore_index=True)
