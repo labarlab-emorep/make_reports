@@ -1,6 +1,7 @@
 """Clean survey data from RedCap and Qualtrics."""
 import os
 import string
+import glob
 import pandas as pd
 import numpy as np
 from make_reports import report_helper
@@ -724,3 +725,123 @@ class CleanQualtrics:
 
         """
         pass
+
+
+class CombineRestRatings:
+    """Aggregate post resting ratings.
+
+    Find and combine subject rest ratings, output by dcm_conversion.
+
+    Attributes
+    ----------
+    df_sess : pd.DataFrame
+        Aggregated rest ratings for session
+    sess_valid : list
+        Valid session days
+
+    Methods
+    -------
+    get_rest_ratings
+        Aggregate session rest ratings
+
+    """
+
+    def __init__(self, proj_dir):
+        """Setup helper attributes.
+
+        Parameters
+        ----------
+        proj_dir : path
+            Location of parent directory for project
+
+        Attributes
+        ----------
+        sess_valid : list
+            Valid session days
+
+        """
+        self.sess_valid = ["day2", "day3"]
+
+    def get_rest_ratings(self, sess, rawdata_path):
+        """Find and aggregate participant rest ratings for session.
+
+        Parameters
+        ----------
+        sess : str
+            ["day2" | "day3"]
+        rawdata_path : path
+            Location of BIDS rawdata
+
+        Attributes
+        ----------
+        df_sess : pd.DataFrame
+            Aggregated rest ratings for session
+
+        Raises
+        ------
+        ValueError
+            Invalid sess argument supplied
+        FileNotFoundError
+            Participant rest-rating files are not found
+
+        """
+        # Check arg
+        if sess not in self.sess_valid:
+            raise ValueError(f"Improper session argument : sess={sess}")
+
+        # Setup session dataframe
+        col_names = [
+            "study_id",
+            "visit",
+            "datetime",
+            "resp_type",
+            "AMUSEMENT",
+            "ANGER",
+            "ANXIETY",
+            "AWE",
+            "CALMNESS",
+            "CRAVING",
+            "DISGUST",
+            "EXCITEMENT",
+            "FEAR",
+            "HORROR",
+            "JOY",
+            "NEUTRAL",
+            "ROMANCE",
+            "SADNESS",
+            "SURPRISE",
+        ]
+        df_sess = pd.DataFrame(columns=col_names)
+
+        # Find all session files
+        beh_path = f"{rawdata_path}/sub-*/ses-{sess}/beh"
+        beh_list = sorted(glob.glob(f"{beh_path}/*rest-ratings*.tsv"))
+        if not beh_list:
+            raise FileNotFoundError(
+                f"No rest-ratings files found in {beh_path}."
+                + "\n\tTry running dcm_conversion."
+            )
+
+        # Add each participant's responses to df_sess
+        for beh_path in beh_list:
+
+            # Get session info
+            beh_file = os.path.basename(beh_path)
+            subj, sess, task, date_ext = beh_file.split("_")
+            subj_str = subj.split("-")[1]
+            date_str = date_ext.split(".")[0]
+
+            # Get data, organize for concat with df_sess
+            df_beh = pd.read_csv(beh_path, sep="\t", index_col="prompt")
+            df_beh_trans = df_beh.T
+            df_beh_trans.reset_index(inplace=True)
+            df_beh_trans = df_beh_trans.rename(columns={"index": "resp_type"})
+            df_beh_trans["study_id"] = subj_str
+            df_beh_trans["visit"] = sess
+            df_beh_trans["datetime"] = date_str
+
+            # Add info to df_sess
+            df_sess = pd.concat([df_sess, df_beh_trans], ignore_index=True)
+            del df_beh, df_beh_trans
+
+        self.df_sess = df_sess

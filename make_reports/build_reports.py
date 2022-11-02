@@ -17,6 +17,7 @@ import pandas as pd
 import numpy as np
 from datetime import datetime
 import pydicom
+from bioread.runners import acq_info
 from make_reports import report_helper
 
 
@@ -1334,6 +1335,13 @@ class NdarBdi01:
         # Combine into final report
         df_report = pd.concat([df_nda_day2, df_nda_day3])
         df_report = df_report.sort_values(by=["src_subject_id"])
+
+        # Add pilot notes for certain subjects
+        pilot_list = report_helper.pilot_list()
+        idx_pilot = df_report[
+            df_report["src_subject_id"].isin(pilot_list)
+        ].index.tolist()
+        df_report.loc[idx_pilot, "comments_misc"] = "PILOT PARTICIPANT"
         self.df_report = df_report[df_report["interview_date"].notna()]
 
     def _get_clean(self):
@@ -1717,10 +1725,18 @@ class NdarEmrq01:
         )
 
         # Build dataframe from nda columns, update with df_final_emrq data
-        self.df_report = pd.DataFrame(
+        df_report = pd.DataFrame(
             columns=self.nda_cols, index=df_emrq_nda.index
         )
-        self.df_report.update(df_emrq_nda)
+        df_report.update(df_emrq_nda)
+
+        # Add pilot comments
+        pilot_list = report_helper.pilot_list()
+        idx_pilot = df_report[
+            df_report["src_subject_id"].isin(pilot_list)
+        ].index.tolist()
+        df_report.loc[idx_pilot, "comments_misc"] = "PILOT PARTICIPANT"
+        self.df_report = df_report
 
 
 class NdarImage03:
@@ -1744,12 +1760,16 @@ class NdarImage03:
 
     Attributes
     ----------
+    df_report_pilot : pd.DataFrame
+        Image03 for pilot participants
     df_report_study : pd.DataFrame
         Image03 values for experiment/study participants
     final_demo : make_reports.build_reports.DemoAll.final_demo
         pd.DataFrame, compiled demographic info
     local_path : str
         Output location for NDA's report package builder
+    nda_cols : list
+        NDA report template column names
     nda_label : list
         NDA report template label
     proj_dir : path
@@ -1804,6 +1824,8 @@ class NdarImage03:
             pd.DataFrame, compiled demographic info
         local_path : str
             Output location for NDA's report package builder
+        nda_cols : list
+            NDA report template column names
         nda_label : list
             NDA report template label
         proj_dir : path
@@ -1825,10 +1847,10 @@ class NdarImage03:
         print("Buiding NDA report : image03 ...")
 
         # Read in template, start empty dataframe
-        self.nda_label, nda_cols = report_helper.mine_template(
+        self.nda_label, self.nda_cols = report_helper.mine_template(
             "image03_template.csv"
         )
-        self.df_report_study = pd.DataFrame(columns=nda_cols)
+        self.df_report_study = pd.DataFrame(columns=self.nda_cols)
 
         # Set reference and orienting attributes
         self.proj_dir = proj_dir
@@ -1864,25 +1886,44 @@ class NdarImage03:
         )
         self.final_demo = final_demo
 
-        # Make df_report for all study participants
+        # Get pilot df, make df_report for all study participants
+        self._make_pilot()
         self._make_image03()
 
+        # Combine df_report_study and df_report_pilot
+        self.df_report = pd.concat(
+            [self.df_report_pilot, self.df_report_study]
+        )
+
+    def _make_pilot(self):
+        """Read previously-generated NDAR report for pilot participants.
+
+        Attributes
+        ----------
+        df_report_pilot : pd.DataFrame
+            Image03 for pilot participants
+
+        Raises
+        ------
+        FileNotFoundError
+            Expected pilot image dataset not found
+
+        """
         # Read-in dataframe of pilot participants
         pilot_report = os.path.join(
-            proj_dir,
-            "data_pilot/data_scanner_BIDS/ndar_upload",
-            "EMOREP_image03_data_BIAC.csv",
+            self.proj_dir,
+            "data_pilot/ndar_resources",
+            "image03_dataset.csv",
         )
         if not os.path.exists(pilot_report):
             raise FileNotFoundError(
                 f"Expected to find pilot image03 at {pilot_report}"
             )
-        df_report_pilot = pd.read_csv(os.path.join(pilot_report))
+        df_report_pilot = pd.read_csv(pilot_report)
         df_report_pilot = df_report_pilot[1:]
-        df_report_pilot.columns = nda_cols
-
-        # Combine df_report_study and df_report_pilot
-        self.df_report = pd.concat([df_report_pilot, self.df_report_study])
+        df_report_pilot.columns = self.nda_cols
+        df_report_pilot["comments_misc"] = "PILOT PARTICIPANT"
+        self.df_report_pilot = df_report_pilot
 
     def _make_image03(self):
         """Generate image03 report for study participants.
@@ -2363,15 +2404,19 @@ class NdarImage03:
             h_guid = demo_dict["subjectkey"]
             h_task = task.split("-")[1]
             h_run = run[-1]
-            host_nii = f"{h_guid}_{day}_func_{h_task}_run{h_run}.nii.gz"
+            # host_nii = f"{h_guid}_{day}_func_{h_task}_run{h_run}.nii.gz"
+            host_nii = f"{h_guid}_{day}_func_emostim_run{h_run}.nii.gz"
             self._make_host(nii_path, host_nii)
 
             # Setup host events, account for no rest
             # events and missing task files.
             events_exists = False
             if not h_task == "rest":
+                # host_events = (
+                #     f"{h_guid}_{day}_func_{h_task}_run{h_run}_events.tsv"
+                # )
                 host_events = (
-                    f"{h_guid}_{day}_func_{h_task}_run{h_run}_events.tsv"
+                    f"{h_guid}_{day}_func_emostim_run{h_run}_events.tsv"
                 )
                 events_path = re.sub("_bold.nii.gz$", "_events.tsv", nii_path)
                 events_exists = True if os.path.exists(events_path) else False
@@ -2479,6 +2524,7 @@ class NdarPanas01:
         )
 
         # Get pilot, study data for both day2, day3
+        df_pilot = self._get_pilot()
         self._get_clean()
 
         # Get final demographics
@@ -2493,9 +2539,100 @@ class NdarPanas01:
         df_nda_day3 = self._make_panas("day3")
 
         # Combine into final report
-        df_report = pd.concat([df_nda_day2, df_nda_day3])
+        df_report = pd.concat([df_pilot, df_nda_day2, df_nda_day3])
         df_report = df_report.sort_values(by=["src_subject_id"])
         self.df_report = df_report[df_report["interview_date"].notna()]
+
+    def _calc_metrics(self, df):
+        """Calculate positive and negative metrics.
+
+        Parameters
+        ----------
+        df : pd.DataFrame
+            Uses NDAR column names
+
+        Returns
+        -------
+        pd.DataFrame
+
+        """
+        cols_pos = [
+            "interested_q1",
+            "excited_q3",
+            "strong_q5",
+            "enthusiastic_q9",
+            "proud_q10",
+            "alert_q12",
+            "determined_q16",
+            "attentive_q17",
+            "active_q19",
+        ]
+        cols_neg = [
+            "distressed_q2",
+            "upset1_q4",
+            "guilty_q6",
+            "scared_q7",
+            "hostile_q8",
+            "irritable_q11",
+            "ashamed_q13",
+            "nervous_q15",
+            "jittery_q18",
+            "afraid_q20",
+        ]
+
+        # Calculate positive metrics
+        df["sum_pos"] = df[cols_pos].sum(axis=1)
+        df["sum_pos"] = df["sum_pos"].astype("Int64")
+        df["mean_pos_moment"] = df[cols_pos].mean(axis=1, skipna=True).round(3)
+        df["mean_pos_moment_sd"] = (
+            df[cols_pos].std(axis=1, skipna=True).round(3)
+        )
+
+        # Calculate negative metrics
+        df["sum_neg"] = df[cols_neg].sum(axis=1)
+        df["sum_neg"] = df["sum_neg"].astype("Int64")
+        df["mean_neg_moment"] = df[cols_neg].mean(axis=1, skipna=True).round(3)
+        df["mean_neg_moment_sd"] = (
+            df[cols_neg].std(axis=1, skipna=True).round(3)
+        )
+        return df
+
+    def _get_pilot(self):
+        """Get PANAS data of pilot participants.
+
+        Import data from previous NDAR submission.
+
+        Returns
+        -------
+        pd.DataFrame
+
+        Raises
+        ------
+        FileNotFoundError
+            Missing dataframe of pilot data
+
+        """
+        # Read-in dataframe of pilot participants
+        pilot_report = os.path.join(
+            self.proj_dir,
+            "data_pilot/ndar_resources",
+            "panas01_dataset.csv",
+        )
+        if not os.path.exists(pilot_report):
+            raise FileNotFoundError(
+                f"Expected to find pilot panas01 at {pilot_report}"
+            )
+        df_pilot = pd.read_csv(pilot_report)
+        df_pilot = df_pilot[1:]
+        df_pilot.columns = self.nda_cols
+
+        # Add visit, get metrics
+        df_pilot["visit"] = "day1"
+        p_cols = [x for x in df_pilot.columns if "_q" in x]
+        df_pilot[p_cols] = df_pilot[p_cols].astype("Int64")
+        df_pilot = self._calc_metrics(df_pilot)
+        df_pilot["comments_misc"] = "PILOT PARTICIPANT"
+        return df_pilot
 
     def _get_clean(self):
         """Find and combine cleaned PANAS data.
@@ -2510,16 +2647,8 @@ class NdarPanas01:
             Cleaned visit_day3 PANAS Qualtrics survey
 
         """
-        # Get clean survey data
-        df_pilot2 = pd.read_csv(
-            os.path.join(
-                self.proj_dir,
-                "data_pilot/data_survey",
-                "visit_day2/data_clean",
-                "df_PANAS.csv",
-            )
-        )
-        df_study2 = pd.read_csv(
+        # Get visit_day2 data
+        df_panas_day2 = pd.read_csv(
             os.path.join(
                 self.proj_dir,
                 "data_survey",
@@ -2527,24 +2656,13 @@ class NdarPanas01:
                 "df_PANAS.csv",
             )
         )
-
-        # Combine pilot and study data, updated subj id column, set attribute
-        df_panas_day2 = pd.concat([df_pilot2, df_study2], ignore_index=True)
         df_panas_day2 = df_panas_day2.rename(
             columns={"study_id": "src_subject_id"}
         )
         self.df_panas_day2 = df_panas_day2
 
-        # Repeat above for day3
-        df_pilot3 = pd.read_csv(
-            os.path.join(
-                self.proj_dir,
-                "data_pilot/data_survey",
-                "visit_day3/data_clean",
-                "df_PANAS.csv",
-            )
-        )
-        df_study3 = pd.read_csv(
+        # Get visit_day3 data
+        df_panas_day3 = pd.read_csv(
             os.path.join(
                 self.proj_dir,
                 "data_survey",
@@ -2552,7 +2670,6 @@ class NdarPanas01:
                 "df_PANAS.csv",
             )
         )
-        df_panas_day3 = pd.concat([df_pilot3, df_study3], ignore_index=True)
         df_panas_day3 = df_panas_day3.rename(
             columns={"study_id": "src_subject_id"}
         )
@@ -2594,7 +2711,7 @@ class NdarPanas01:
         df_panas[p_cols] = df_panas[p_cols].astype("Int64")
         df_panas["answer_type"] = 1
 
-        # Remap column names
+        # Remap column names, get metrics
         map_item = {
             "PANAS_1": "interested_q1",
             "PANAS_2": "distressed_q2",
@@ -2618,49 +2735,7 @@ class NdarPanas01:
             "PANAS_20": "afraid_q20",
         }
         df_panas_remap = df_panas.rename(columns=map_item)
-
-        # Calculate positive metrics (sum, mean, SD)
-        cols_pos = [
-            "interested_q1",
-            "excited_q3",
-            "strong_q5",
-            "enthusiastic_q9",
-            "proud_q10",
-            "alert_q12",
-            "determined_q16",
-            "attentive_q17",
-            "active_q19",
-        ]
-        df_panas_remap["sum_pos"] = df_panas_remap[cols_pos].sum(axis=1)
-        df_panas_remap["sum_pos"] = df_panas_remap["sum_pos"].astype("Int64")
-        df_panas_remap["mean_pos_moment"] = (
-            df_panas_remap[cols_pos].mean(axis=1, skipna=True).round(3)
-        )
-        df_panas_remap["mean_pos_moment_sd"] = (
-            df_panas_remap[cols_pos].std(axis=1, skipna=True).round(3)
-        )
-
-        # Calculate negative metrics (sum, mean, SD)
-        cols_neg = [
-            "distressed_q2",
-            "upset1_q4",
-            "guilty_q6",
-            "scared_q7",
-            "hostile_q8",
-            "irritable_q11",
-            "ashamed_q13",
-            "nervous_q15",
-            "jittery_q18",
-            "afraid_q20",
-        ]
-        df_panas_remap["sum_neg"] = df_panas_remap[cols_neg].sum(axis=1)
-        df_panas_remap["sum_neg"] = df_panas_remap["sum_neg"].astype("Int64")
-        df_panas_remap["mean_neg_moment"] = (
-            df_panas_remap[cols_neg].mean(axis=1, skipna=True).round(3)
-        )
-        df_panas_remap["mean_neg_moment_sd"] = (
-            df_panas_remap[cols_neg].std(axis=1, skipna=True).round(3)
-        )
+        df_panas_remap = self._calc_metrics(df_panas_remap)
 
         # Add visit
         df_panas_remap["visit"] = sess
@@ -2678,8 +2753,250 @@ class NdarPanas01:
         return df_nda
 
 
-class NdarPhysio01:
-    pass
+class NdarPhysio:
+    """Make psychophys_subj_exp01 report line-by-line.
+
+    Identify all physio data in rawdata and add a line the NDAR report
+    for each file.
+
+    Make copies of physio files in:
+        <proj_dir>/ndar_report/data_phys
+
+    Parameters
+    ----------
+    proj_dir : path
+        Project's experiment directory
+    final_demo : make_reports.build_reports.DemoAll.final_demo
+        pd.DataFrame, compiled demographic info
+
+    Attributes
+    ----------
+    df_report : pd.DataFrame
+        Report of physio data that complies with NDAR data definitions
+    final_demo : make_reports.build_reports.DemoAll.final_demo
+        pd.DataFrame, compiled demographic info
+    nda_cols : list
+        NDA report template column names
+    nda_label : list
+        NDA report template label
+    physio_all : list
+        Locations of all physio files
+    proj_dir : path
+        Project's experiment directory
+
+    """
+
+    def __init__(self, proj_dir, final_demo):
+        """Coordinate report generation for physio data.
+
+        Assumes physio data exists within a BIDS-organized "phys"
+        directory, within each participants' session.
+
+        Parameters
+        ----------
+        proj_dir : path
+            Project's experiment directory
+        final_demo : make_reports.build_reports.DemoAll.final_demo
+            pd.DataFrame, compiled demographic info
+
+        Attributes
+        ----------
+        final_demo : make_reports.build_reports.DemoAll.final_demo
+            pd.DataFrame, compiled demographic info
+        nda_cols : list
+            NDA report template column names
+        nda_label : list
+            NDA report template label
+        physio_all : list
+            Locations of all physio files
+        proj_dir : path
+            Project's experiment directory
+
+        """
+        print("Buiding NDA report : psychophys_subj_exp01 ...")
+        self.proj_dir = proj_dir
+
+        # Read in template
+        self.nda_label, self.nda_cols = report_helper.mine_template(
+            "psychophys_subj_exp01_template.csv"
+        )
+
+        # Identify all physio files
+        rawdata_pilot = os.path.join(
+            proj_dir, "data_pilot/data_scanner_BIDS/rawdata"
+        )
+        rawdata_study = os.path.join(proj_dir, "data_scanner_BIDS/rawdata")
+        physio_pilot = sorted(
+            glob.glob(f"{rawdata_pilot}/sub-ER*/ses-day*/phys/*acq")
+        )
+        physio_study = sorted(
+            glob.glob(f"{rawdata_study}/sub-ER*/ses-day*/phys/*acq")
+        )
+        self.physio_all = physio_pilot + physio_study
+
+        # Get final demographics, make report
+        final_demo = final_demo.replace("NaN", np.nan)
+        final_demo["sex"] = final_demo["sex"].replace(
+            ["Male", "Female", "Neither"], ["M", "F", "O"]
+        )
+        self.final_demo = final_demo.dropna(subset=["subjectkey"])
+        self._make_physio()
+
+    def _get_subj_demo(self, subj_nda, acq_date):
+        """Gather required participant demographic information.
+
+        Find participant demographic info and calculate age-in-months
+        at time of scan.
+
+        Parameters
+        ----------
+        subj_nda : str
+            Participant identifier
+        acq_date : datetime
+            Date of physio data acquisition
+
+        Returns
+        -------
+        dict
+            Keys = nda column names
+            Values = demographic info
+
+        """
+        # Identify participant date of birth, sex, and GUID
+        final_demo = self.final_demo
+        idx_subj = final_demo.index[
+            final_demo["src_subject_id"] == subj_nda
+        ].tolist()[0]
+        subj_guid = final_demo.iloc[idx_subj]["subjectkey"]
+        subj_id = final_demo.iloc[idx_subj]["src_subject_id"]
+        subj_sex = final_demo.iloc[idx_subj]["sex"]
+        subj_dob = datetime.strptime(
+            final_demo.iloc[idx_subj]["dob"], "%Y-%m-%d"
+        )
+
+        # Calculate age in months
+        interview_age = report_helper.calc_age_mo([subj_dob], [acq_date])[0]
+        interview_date = datetime.strftime(acq_date, "%m/%d/%Y")
+
+        return {
+            "subjectkey": subj_guid,
+            "src_subject_id": subj_id,
+            "interview_date": interview_date,
+            "interview_age": interview_age,
+            "sex": subj_sex,
+        }
+
+    def _get_std_info(self):
+        """Return dict of common dataset values."""
+        # Split long strings
+        return {
+            "data_file1_type": "physiological recordings",
+            "experiment_description": "emotion induction (see design file in "
+            + "linked experiment)",
+            "hardware_manufacturer": "BIOPAC",
+            "hardware_model": "MP160",
+            "sampling_rate": 2000,
+            "collection_settings": "Resp: high-pass filter=0.05Hz, Gain=200;"
+            + " Pulse Ox.: high-pass filter=DC, DC=10Hz, Gain=100;"
+            + " GSR: low-pass filter=10Hz, Gain=10",
+            "connections_used": "pneumatic respiration belt, finger pulse"
+            + " oximeter, electrodes on left hand for GSR",
+            "imaging_present": 1,
+            "image_modality": "MRI",
+        }
+
+    def _make_physio(self):
+        """Generate NDAR report for physio data.
+
+        Determine acquisition datetime, copy files for hosting,
+        and find all NDAR-required values.
+
+        Attributes
+        ----------
+        df_report : pd.DataFrame
+            Report of physio data that complies with NDAR data definitions
+
+        """
+        # Setup for determining experiment id
+        exp_dict = {"old": 1683, "new": 2113}
+        pilot_list = report_helper.pilot_list()
+
+        # Set local path for upload building
+        local_path = (
+            "/run/user/1001/gvfs/smb-share:server"
+            + "=ccn-keoki.win.duke.edu,share=experiments2/EmoRep/"
+            + "Exp2_Compute_Emotion/ndar_upload/data_phys"
+        )
+
+        # Start empty dataframe, fill with physio data
+        df_report = pd.DataFrame(columns=self.nda_cols)
+        for phys_path in self.physio_all:
+
+            # Determine session info
+            phys_file = os.path.basename(phys_path)
+            subj, sess, task, run, _, _ = phys_file.split("_")
+            subj_nda = subj.split("-")[1]
+
+            # Extract datetime from acq file - I could not suppress
+            # stdout print by air.run() for the life of me.
+            air = acq_info.AcqInfoRunner(phys_path)
+            air.run()
+            acq_date_str = (
+                air.reader.datafile.earliest_marker_created_at.isoformat()
+            ).split("T")[0]
+
+            # bash_cmd = f"""
+            #     line=$(acq_info {phys_path} | grep "Earliest")
+            #     IFS=":" read -ra dt_arr <<< $line
+            #     echo ${{dt_arr[1]%T*}}
+            # """
+            # h_sp = subprocess.Popen(
+            #     bash_cmd, shell=True, stdout=subprocess.PIPE
+            # )
+            # h_out, h_err = h_sp.communicate()
+            # h_sp.wait()
+            # acq_date_str = h_out.decode("utf-8").strip()
+
+            acq_date = datetime.strptime(acq_date_str, "%Y-%m-%d")
+
+            # Copy file for hosting
+            host_path = os.path.join(
+                self.proj_dir, "ndar_upload/data_phys", phys_file
+            )
+            if not os.path.exists(host_path):
+                bash_cmd = f"cp {phys_path} {host_path}"
+                h_sp = subprocess.Popen(
+                    bash_cmd, shell=True, stdout=subprocess.PIPE
+                )
+                h_out, h_err = h_sp.communicate()
+                h_sp.wait()
+
+            # Identify participant-specific info
+            local_file = os.path.join(local_path, phys_file)
+            exp_id = (
+                exp_dict["old"] if subj_nda in pilot_list else exp_dict["new"]
+            )
+            stim_pres = 0 if task == "task-rest" else 1
+            visit = sess[-1]
+            phys_dict = {
+                "experiment_id": exp_id,
+                "data_file1": local_file,
+                "stimulus_present": stim_pres,
+                "visit": visit,
+            }
+
+            # Update with standard, demographic info
+            phys_dict.update(self._get_std_info())
+            phys_dict.update(self._get_subj_demo(subj_nda, acq_date))
+
+            # Write new row with determined info
+            new_row = pd.DataFrame(phys_dict, index=[0])
+            df_report = pd.concat([df_report.loc[:], new_row]).reset_index(
+                drop=True
+            )
+
+        # Set attribute
+        self.df_report = df_report
 
 
 class NdarPswq01:
@@ -2792,14 +3109,257 @@ class NdarPswq01:
         )
 
         # Build dataframe from nda columns, update with df_final_emrq data
-        self.df_report = pd.DataFrame(
+        df_report = pd.DataFrame(
             columns=self.nda_cols, index=df_pswq_nda.index
         )
-        self.df_report.update(df_pswq_nda)
+        df_report.update(df_pswq_nda)
+        pilot_list = report_helper.pilot_list()
+        idx_pilot = df_report[
+            df_report["src_subject_id"].isin(pilot_list)
+        ].index.tolist()
+        df_report.loc[idx_pilot, "comments_misc"] = "PILOT PARTICIPANT"
+        self.df_report = df_report
 
 
 class NdarRest01:
-    pass
+    """Make restsurv01 report for NDAR submission.
+
+    Parameters
+    ----------
+    proj_dir : path
+        Project's experiment directory
+    final_demo : make_reports.build_reports.DemoAll.final_demo
+        pd.DataFrame, compiled demographic info
+
+    Attributes
+    ----------
+    df_rest_day2 : pd.DataFrame
+        Cleaned visit_day2 rest ratings survey
+    df_rest_day3 : pd.DataFrame
+        Cleaned visit_day3 rest ratings survey
+    df_report : pd.DataFrame
+        Report of rest data that complies with NDAR data definitions
+    final_demo : make_reports.build_reports.DemoAll.final_demo
+        pd.DataFrame, compiled demographic info
+    nda_cols : list
+        NDA report template column names
+    nda_label : list
+        NDA report template label
+    proj_dir : path
+        Project's experiment directory
+
+    """
+
+    def __init__(self, proj_dir, final_demo):
+        """Read in survey data and make report.
+
+        Get cleaned rest rating surveys from visit_day2 and
+        visit_day3, and finalized demographic information.
+        Generate NDAR report.
+
+        Parameters
+        ----------
+        proj_dir : path
+            Project's experiment directory
+        final_demo : make_reports.build_reports.DemoAll.final_demo
+            pd.DataFrame, compiled demographic info
+
+        Attributes
+        ----------
+        df_report : pd.DataFrame
+            Report of rest data that complies with NDAR data definitions
+        final_demo : make_reports.build_reports.DemoAll.final_demo
+            pd.DataFrame, compiled demographic info
+        nda_cols : list
+            NDA report template column names
+        nda_label : list
+            NDA report template label
+        proj_dir : path
+            Project's experiment directory
+
+        """
+        # Get needed column values from report template
+        print("Buiding NDA report : restsurv01 ...")
+        self.proj_dir = proj_dir
+        self.nda_label, self.nda_cols = report_helper.mine_template(
+            "restsurv01_template.csv"
+        )
+
+        # Get pilot, study data for both day2, day3
+        self._get_clean()
+
+        # Get final demographics
+        final_demo = final_demo.replace("NaN", np.nan)
+        final_demo["sex"] = final_demo["sex"].replace(
+            ["Male", "Female", "Neither"], ["M", "F", "O"]
+        )
+        self.final_demo = final_demo.dropna(subset=["subjectkey"])
+
+        # Make nda reports for each session
+        df_nda_day2 = self._make_rest("day2")
+        df_nda_day3 = self._make_rest("day3")
+
+        # Combine into final report
+        df_report = pd.concat([df_nda_day2, df_nda_day3])
+        df_report = df_report.sort_values(by=["src_subject_id"])
+
+        # Add pilot notes for certain subjects
+        pilot_list = report_helper.pilot_list()
+        idx_pilot = df_report[
+            df_report["src_subject_id"].isin(pilot_list)
+        ].index.tolist()
+        df_report.loc[idx_pilot, "comments_misc"] = "PILOT PARTICIPANT"
+        self.df_report = df_report[df_report["interview_date"].notna()]
+
+    def _get_clean(self):
+        """Find and combine cleaned rest rating data.
+
+        Get pilot, study data for day2, day3.
+
+        Attributes
+        ----------
+        df_rest_day2 : pd.DataFrame
+            Cleaned visit_day2 rest rating survey
+        df_rest_day3 : pd.DataFrame
+            Cleaned visit_day3 rest rating survey
+
+        """
+        # Get clean survey data
+        df_pilot2 = pd.read_csv(
+            os.path.join(
+                self.proj_dir,
+                "data_pilot/data_survey",
+                "visit_day2/data_clean",
+                "df_rest-ratings.csv",
+            )
+        )
+        df_study2 = pd.read_csv(
+            os.path.join(
+                self.proj_dir,
+                "data_survey",
+                "visit_day2/data_clean",
+                "df_rest-ratings.csv",
+            )
+        )
+
+        # Combine pilot and study data, drop resp_alpha rows
+        df_rest_day2 = pd.concat([df_pilot2, df_study2], ignore_index=True)
+        idx_alpha = df_rest_day2.index[
+            df_rest_day2["resp_type"] == "resp_alpha"
+        ].tolist()
+        df_rest_day2 = df_rest_day2.drop(
+            df_rest_day2.index[idx_alpha]
+        ).reset_index(drop=True)
+
+        # Update subj id column, set attribute
+        df_rest_day2 = df_rest_day2.rename(
+            columns={"study_id": "src_subject_id"}
+        )
+        self.df_rest_day2 = df_rest_day2
+
+        # Repeat above for day3
+        df_pilot3 = pd.read_csv(
+            os.path.join(
+                self.proj_dir,
+                "data_pilot/data_survey",
+                "visit_day3/data_clean",
+                "df_rest-ratings.csv",
+            )
+        )
+        df_study3 = pd.read_csv(
+            os.path.join(
+                self.proj_dir,
+                "data_survey",
+                "visit_day3/data_clean",
+                "df_rest-ratings.csv",
+            )
+        )
+        df_rest_day3 = pd.concat([df_pilot3, df_study3], ignore_index=True)
+        idx_alpha = df_rest_day3.index[
+            df_rest_day3["resp_type"] == "resp_alpha"
+        ].tolist()
+        df_rest_day3 = df_rest_day3.drop(
+            df_rest_day3.index[idx_alpha]
+        ).reset_index(drop=True)
+        df_rest_day3 = df_rest_day3.rename(
+            columns={"study_id": "src_subject_id"}
+        )
+        df_rest_day3.columns = df_rest_day2.columns.values
+        self.df_rest_day3 = df_rest_day3
+
+    def _make_rest(self, sess):
+        """Make an NDAR compliant report for visit.
+
+        Remap column names, add demographic info, get session
+        age, and generate report.
+
+        Parameters
+        ----------
+        sess : str
+            [day2 | day3]
+            visit/session name
+
+        Returns
+        -------
+        pd.DataFrame
+
+        Raises
+        ------
+        ValueError
+            If sess is not day2 or day3
+
+        """
+        # Check sess value
+        sess_list = ["day2", "day3"]
+        if sess not in sess_list:
+            raise ValueError(f"Incorrect visit day : {sess}")
+
+        # Get session data
+        df_rest = getattr(self, f"df_rest_{sess}")
+
+        # Convert response values to int and remap column names
+        map_item = {
+            "AMUSEMENT": "amusement_01",
+            "ANGER": "anger_02",
+            "ANXIETY": "anxiety_03",
+            "AWE": "awe_04",
+            "CALMNESS": "calmness_05",
+            "CRAVING": "craving_06",
+            "DISGUST": "disgust_07",
+            "EXCITEMENT": "excitement_08",
+            "FEAR": "fear_09",
+            "HORROR": "horror_10",
+            "JOY": "joy_12",
+            "NEUTRAL": "neutral_13",
+            "ROMANCE": "romantic_love_14",
+            "SADNESS": "sadness_15",
+            "SURPRISE": "surprise_16",
+            "INTEREST": "interest_11",
+        }
+        h_cols = [x for x in df_rest.columns if x in map_item.keys()]
+        df_rest[h_cols] = df_rest[h_cols].astype("Int64")
+        df_rest_remap = df_rest.rename(columns=map_item)
+
+        # Drop non-ndar columns
+        df_rest_remap = df_rest_remap.drop(
+            ["resp_type"],
+            axis=1,
+        )
+
+        # Combine demo and bdi dataframes
+        df_nda = self.final_demo[["subjectkey", "src_subject_id", "sex"]]
+        df_rest_demo = pd.merge(df_rest_remap, df_nda, on="src_subject_id")
+
+        # Calculate age in months of visit, update visit
+        df_rest_demo = report_helper.get_survey_age(
+            df_rest_demo, self.final_demo, "src_subject_id"
+        )
+        df_rest_demo["visit"] = sess
+
+        # Build dataframe from nda columns, update with df_bdi_demo data
+        df_nda = pd.DataFrame(columns=self.nda_cols, index=df_rest_demo.index)
+        df_nda.update(df_rest_demo)
+        return df_nda
 
 
 class NdarRrs01:
@@ -2814,8 +3374,6 @@ class NdarRrs01:
 
     Attributes
     ----------
-    df_rrs : pd.DataFrame
-        Cleaned RRS Qualtrics survey
     df_report : pd.DataFrame
         Report of RRS data that complies with NDAR data definitions
     final_demo : make_reports.build_reports.DemoAll.final_demo
@@ -2842,14 +3400,16 @@ class NdarRrs01:
 
         Attributes
         ----------
-        df_rrs : pd.DataFrame
-            Cleaned RRS Qualtrics survey
+        df_report : pd.DataFrame
+            Report of RRS data that complies with NDAR data definitions
         final_demo : make_reports.build_reports.DemoAll.final_demo
             pd.DataFrame, compiled demographic info
         nda_cols : list
             NDA report template column names
         nda_label : list
             NDA report template label
+        proj_dir : path
+            Project's experiment directory
 
         """
         print("Buiding NDA report : rrs01 ...")
@@ -2857,53 +3417,88 @@ class NdarRrs01:
         self.nda_label, self.nda_cols = report_helper.mine_template(
             "rrs01_template.csv"
         )
+        self.proj_dir = proj_dir
 
-        # Get clean survey data
-        df_pilot = pd.read_csv(
-            os.path.join(
-                proj_dir,
-                "data_pilot/data_survey",
-                "visit_day1/data_clean",
-                "df_RRS.csv",
-            )
-        )
-        df_study = pd.read_csv(
-            os.path.join(
-                proj_dir,
-                "data_survey",
-                "visit_day1/data_clean",
-                "df_RRS.csv",
-            )
-        )
-        df_rrs = pd.concat([df_pilot, df_study], ignore_index=True)
-        del df_pilot, df_study
-
-        # Rename columns, drop NaN rows
-        df_rrs = df_rrs.rename(columns={"study_id": "src_subject_id"})
-        df_rrs = df_rrs.replace("NaN", np.nan)
-        self.df_rrs = df_rrs[df_rrs["RRS_1"].notna()]
-
-        # Get final demographics, make report
+        # Get final demographics
         final_demo = final_demo.replace("NaN", np.nan)
         final_demo["sex"] = final_demo["sex"].replace(
             ["Male", "Female", "Neither"], ["M", "F", "O"]
         )
         self.final_demo = final_demo.dropna(subset=["subjectkey"])
-        self._make_rrs()
+
+        # Make pilot, study dataframes
+        df_pilot = self._get_pilot()
+        df_study = self._make_rrs()
+
+        # Combine into final report
+        df_report = pd.concat([df_pilot, df_study], ignore_index=True)
+        self.df_report = df_report[df_report["interview_date"].notna()]
+
+    def _get_pilot(self):
+        """Get RRS data of pilot participants.
+
+        Import data from previous NDAR submission.
+
+        Returns
+        -------
+        pd.DataFrame
+
+        Raises
+        ------
+        FileNotFoundError
+            Missing dataframe of pilot data
+
+        """
+        # Read in pilot report
+        pilot_report = os.path.join(
+            self.proj_dir,
+            "data_pilot/ndar_resources",
+            "rrs01_dataset.csv",
+        )
+        if not os.path.exists(pilot_report):
+            raise FileNotFoundError(
+                f"Expected to find pilot rrs01 at {pilot_report}"
+            )
+        df_pilot = pd.read_csv(pilot_report)
+        df_pilot = df_pilot[1:]
+        df_pilot.columns = self.nda_cols
+        df_pilot["comments_misc"] = "PILOT PARTICIPANT"
+
+        # Calculate sum
+        p_cols = [x for x in df_pilot.columns if "rrs" in x]
+        df_pilot[p_cols] = df_pilot[p_cols].astype("Int64")
+        df_pilot["rrs_total"] = df_pilot[p_cols].sum(axis=1)
+        df_pilot["rrs_total"] = df_pilot["rrs_total"].astype("Int64")
+        return df_pilot
 
     def _make_rrs(self):
         """Combine dataframes to generate requested report.
 
         Calculate totals and determine survey age.
 
-        Attributes
-        ----------
-        df_report : pd.DataFrame
-            Report of RRS data that complies with NDAR data definitions
+        Returns
+        -------
+        pd.DataFrame
+            Report of study RRS data that complies with NDAR data definitions
 
         """
+        # Get clean survey data
+        df_rrs = pd.read_csv(
+            os.path.join(
+                self.proj_dir,
+                "data_survey",
+                "visit_day1/data_clean",
+                "df_RRS.csv",
+            )
+        )
+
+        # Rename columns, drop NaN rows
+        df_rrs = df_rrs.rename(columns={"study_id": "src_subject_id"})
+        df_rrs = df_rrs.replace("NaN", np.nan)
+        df_rrs = df_rrs[df_rrs["RRS_1"].notna()]
+
         # Update column names, make data integer
-        df_rrs = self.df_rrs.rename(columns=str.lower)
+        df_rrs = df_rrs.rename(columns=str.lower)
         rrs_cols = [x for x in df_rrs.columns if "rrs" in x]
         df_rrs[rrs_cols] = df_rrs[rrs_cols].astype("Int64")
 
@@ -2919,10 +3514,11 @@ class NdarRrs01:
         )
 
         # Build dataframe from nda columns, update with demo and rrs data
-        self.df_report = pd.DataFrame(
+        df_study_report = pd.DataFrame(
             columns=self.nda_cols, index=df_rrs_nda.index
         )
-        self.df_report.update(df_rrs_nda)
+        df_study_report.update(df_rrs_nda)
+        return df_study_report
 
 
 class NdarStai01:

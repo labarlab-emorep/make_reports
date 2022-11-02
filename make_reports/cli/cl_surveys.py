@@ -1,6 +1,8 @@
 r"""Clean EmoRep survey data.
 
-Clean RedCap and Qualtrics survey data downloaded by rep_dl.
+Clean RedCap and Qualtrics survey data downloaded by rep_dl. Also
+aggregate cleaned post-resting-state ratings (which were generated
+by dcm_conversion).
 
 Study data written to:
     <proj_dir>/data_survey/<visit>/data_clean
@@ -12,7 +14,8 @@ Example
 -------
 rep_cl \
     --clean-redcap \
-    --clean-qualtrics
+    --clean-qualtrics \
+    --clean-rest
 
 """
 import sys
@@ -33,6 +36,16 @@ def _get_args():
             """\
             Whether to clean RedCap surveys,
             True if "--clean-redcap" else False.
+            """
+        ),
+    )
+    parser.add_argument(
+        "--clean-rest",
+        action="store_true",
+        help=textwrap.dedent(
+            """\
+            Whether to clean/aggregate resting state ratings,
+            True if "--clean-rest" else False.
             """
         ),
     )
@@ -71,12 +84,14 @@ def main():
     args = _get_args().parse_args()
     proj_dir = args.proj_dir
     clean_redcap = args.clean_redcap
+    clean_rest = args.clean_rest
     clean_qualtrics = args.clean_qualtrics
 
     workflow.clean_surveys(
         proj_dir,
         clean_redcap=clean_redcap,
         clean_qualtrics=clean_qualtrics,
+        clean_rest=clean_rest,
     )
 
 
