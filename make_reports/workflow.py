@@ -177,12 +177,10 @@ def clean_surveys(
 
         # Clean each planned survey and write out
         for sur_name, dir_name in qualtrics_dict.items():
-            if dir_name == "post_scan_ratings":
-                continue
             clean_qualtrics.clean_surveys(sur_name)
 
             # Account for visit type, survey name/report organization
-            if dir_name == "visit_day1":
+            if dir_name == "visit_day1" or dir_name == "post_scan_ratings":
                 _write_clean_qualtrics(
                     clean_qualtrics.data_clean,
                     clean_qualtrics.data_pilot,

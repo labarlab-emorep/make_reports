@@ -758,7 +758,7 @@ class CleanQualtrics:
         Desc.
 
         """
-        print(f"Getting data for : {sub} {sess} ...")
+        print(f"\t\tGetting data for : {sub} {sess} ...")
 
         # Subset df_raw for subject, session data. Remove empty columns.
         df_sub = self.df_raw.loc[
@@ -797,16 +797,16 @@ class CleanQualtrics:
 
                 # Get response value from proper column, manage multiple,
                 # single, or non responses.
-                h_resp = df_sub.iloc[
-                    0,
+                df_resp = df_sub.loc[
+                    :,
                     df_sub.columns.str.startswith(f"{cnt}_{prompt}"),
                 ]
-                if len(h_resp) == 0:
+                if df_resp.empty:
                     resp = np.nan
-                elif len(h_resp) > 1:
-                    resp = ";".join(h_resp)
+                elif df_resp.shape == (1, 1):
+                    resp = df_resp.values[0][0]
                 else:
-                    resp = h_resp
+                    resp = ";".join(df_resp.values[0])
 
                 # Add stimulus prompt values to df_study
                 update_dict = {
