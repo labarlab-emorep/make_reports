@@ -42,101 +42,52 @@ def download_surveys(
     print("\nDone with survey download!")
 
 
-def clean_surveys(
-    proj_dir, clean_redcap=False, clean_qualtrics=False, clean_rest=False
-):
-    """Coordinate survey cleaning and writing resources.
+class CleanSurveys:
+    """Coordinate cleaning of survey data.
 
-    Parameters
-    ----------
-    proj_dir : path
-        Location of parent directory for project
-    clean_redcap : bool
-        Whether to clean RedCap surveys
-    clean_qualtrics : bool
-        Whether to clean Qualtrics surveys
-    clean_rest : bool
-        Whether to clean resting state ratings
-
-    Returns
+    Methods
     -------
-    None
-
-    Notes
-    -----
-    Study data written to:
-        <proj_dir>/data_survey/<visit>/data_clean
-    Pilot data written to:
-        <proj_dir>/data_pilot/data_survey/<visit>/data_clean
+    clean_redcap
+        Clean all RedCap surveys
+    clean_rest
+        Clean ratings of resting state experiences
+    clean_qualtrics
+        Clean all Qualtrics surveys
 
     """
-    # Set inner functions for unpacking, writing clean data
-    def _write_clean_redcap(data_clean, data_pilot, dir_name, sur_name):
-        """Write cleaned dataframes for RedCap surveys."""
-        # Study data
-        clean_file = os.path.join(
-            proj_dir,
-            "data_survey",
-            dir_name,
-            "data_clean",
-            f"df_{sur_name}.csv",
-        )
-        out_dir = os.path.dirname(clean_file)
-        if not os.path.exists(out_dir):
-            os.makedirs(out_dir)
-        data_clean.to_csv(clean_file, index=False, na_rep="")
 
-        # Pilot data
-        pilot_file = os.path.join(
-            proj_dir,
-            "data_pilot/data_survey",
-            dir_name,
-            "data_clean",
-            f"df_{sur_name}.csv",
-        )
-        out_dir = os.path.dirname(pilot_file)
-        if not os.path.exists(out_dir):
-            os.makedirs(out_dir)
-        data_pilot.to_csv(pilot_file, index=False, na_rep="")
+    def __init__(self, proj_dir):
+        """Set helping attributes.
 
-    def _write_clean_qualtrics(clean_dict, pilot_dict, dir_name):
-        """Write cleaned dataframes for RedCap surveys."""
-        # Unpack study clean data
-        for h_name, h_df in clean_dict.items():
-            out_file = os.path.join(
-                proj_dir,
-                "data_survey",
-                dir_name,
-                "data_clean",
-                f"df_{h_name}.csv",
-            )
-            out_dir = os.path.dirname(out_file)
-            if not os.path.exists(out_dir):
-                os.makedirs(out_dir)
-            print(f"\tWriting : {out_file}")
-            h_df.to_csv(out_file, index=False, na_rep="")
+        Parameters
+        ----------
+        proj_dir : path
+            Project's experiment directory
 
-        # Unpack pilot clean data
-        for h_name, h_df in pilot_dict.items():
-            out_file = os.path.join(
-                proj_dir,
-                "data_pilot/data_survey",
-                dir_name,
-                "data_clean",
-                f"df_{h_name}.csv",
-            )
-            out_dir = os.path.dirname(out_file)
-            if not os.path.exists(out_dir):
-                os.makedirs(out_dir)
-            print(f"\tWriting : {out_file}")
-            h_df.to_csv(out_file, index=False, na_rep="")
+        Attributes
+        ----------
+        proj_dir : path
+            Project's experiment directory
 
-    # Trigger redcap cleaning methods
-    if clean_redcap:
+        """
+        self.proj_dir = proj_dir
 
+    def clean_redcap(self):
+        """Coordinate cleaning of RedCap surveys.
+
+        Clean each survey specified in report_helper.redcap_dict and
+        write out the cleaned dataframe.
+
+        Raises
+        ------
+        FileNotFoundError
+            Unexpected number of files in:
+                <proj_dir>/data_survey/redcap_demographics/data_raw
+
+        """
         # Check for data
         redcap_raw = glob.glob(
-            f"{proj_dir}/data_survey/redcap*/data_raw/*latest.csv"
+            f"{self.proj_dir}/data_survey/redcap*/data_raw/*latest.csv"
         )
         if len(redcap_raw) != 4:
             raise FileNotFoundError(
@@ -146,26 +97,89 @@ def clean_surveys(
 
         # Get cleaning obj
         redcap_dict = report_helper.redcap_dict()
-        clean_redcap = survey_clean.CleanRedcap(proj_dir)
+        clean_redcap = survey_clean.CleanRedcap(self.proj_dir)
 
         # Clean each planned survey, write out
         for sur_name, dir_name in redcap_dict.items():
             clean_redcap.clean_surveys(sur_name)
-            _write_clean_redcap(
-                clean_redcap.df_clean,
-                clean_redcap.df_pilot,
-                dir_name,
-                sur_name,
-            )
 
-    # Trigger qualtrics cleaning methods
-    if clean_qualtrics:
+            # Write study data
+            clean_file = os.path.join(
+                self.proj_dir,
+                "data_survey",
+                dir_name,
+                "data_clean",
+                f"df_{sur_name}.csv",
+            )
+            out_dir = os.path.dirname(clean_file)
+            if not os.path.exists(out_dir):
+                os.makedirs(out_dir)
+            clean_redcap.df_clean.to_csv(clean_file, index=False, na_rep="")
+
+            # Write pilot data
+            pilot_file = os.path.join(
+                self.proj_dir,
+                "data_pilot/data_survey",
+                dir_name,
+                "data_clean",
+                f"df_{sur_name}.csv",
+            )
+            out_dir = os.path.dirname(pilot_file)
+            if not os.path.exists(out_dir):
+                os.makedirs(out_dir)
+            clean_redcap.df_pilot.to_csv(pilot_file, index=False, na_rep="")
+
+    def clean_qualtrics(self):
+        """Coordinate cleaning of Qualtrics surveys.
+
+        Clean each survey specified in report_helper.qualtrics_dict and
+        write out the cleaned dataframe.
+
+        Raises
+        ------
+        FileNotFoundError
+            Unexpected number of files in:
+                <proj_dir>/data_survey/visit_day*/data_raw
+
+        """
+
+        def _write_clean_qualtrics(clean_dict, pilot_dict, dir_name):
+            """Write cleaned dataframes for RedCap surveys."""
+            # Unpack study clean data
+            for h_name, h_df in clean_dict.items():
+                out_file = os.path.join(
+                    self.proj_dir,
+                    "data_survey",
+                    dir_name,
+                    "data_clean",
+                    f"df_{h_name}.csv",
+                )
+                out_dir = os.path.dirname(out_file)
+                if not os.path.exists(out_dir):
+                    os.makedirs(out_dir)
+                print(f"\tWriting : {out_file}")
+                h_df.to_csv(out_file, index=False, na_rep="")
+
+            # Unpack pilot clean data
+            for h_name, h_df in pilot_dict.items():
+                out_file = os.path.join(
+                    self.proj_dir,
+                    "data_pilot/data_survey",
+                    dir_name,
+                    "data_clean",
+                    f"df_{h_name}.csv",
+                )
+                out_dir = os.path.dirname(out_file)
+                if not os.path.exists(out_dir):
+                    os.makedirs(out_dir)
+                print(f"\tWriting : {out_file}")
+                h_df.to_csv(out_file, index=False, na_rep="")
 
         # Check for data
         visit_raw = glob.glob(
-            f"{proj_dir}/data_survey/visit*/data_raw/*latest.csv"
+            f"{self.proj_dir}/data_survey/visit*/data_raw/*latest.csv"
         )
-        if len(visit_raw) != 5:
+        if len(visit_raw) != 7:
             raise FileNotFoundError(
                 "Missing raw survey data in visit directories,"
                 + " please download raw data via rep_dl."
@@ -173,36 +187,41 @@ def clean_surveys(
 
         # Get cleaning obj
         qualtrics_dict = report_helper.qualtrics_dict()
-        clean_qualtrics = survey_clean.CleanQualtrics(proj_dir)
+        clean_qualtrics = survey_clean.CleanQualtrics(self.proj_dir)
 
         # Clean each planned survey and write out
         for sur_name, dir_name in qualtrics_dict.items():
-            if dir_name == "post_scan_ratings":
-                continue
             clean_qualtrics.clean_surveys(sur_name)
 
             # Account for visit type, survey name/report organization
-            if dir_name == "visit_day1":
-                _write_clean_qualtrics(
-                    clean_qualtrics.data_clean,
-                    clean_qualtrics.data_pilot,
-                    dir_name,
-                )
-            elif dir_name == "visit_day23":
-                for vis_name in ["visit_day2", "visit_day3"]:
+            if type(dir_name) == list:
+                for vis_name in dir_name:
                     _write_clean_qualtrics(
                         clean_qualtrics.data_clean[vis_name],
                         clean_qualtrics.data_pilot[vis_name],
                         vis_name,
                     )
+            elif dir_name == "visit_day1":
+                _write_clean_qualtrics(
+                    clean_qualtrics.data_clean,
+                    clean_qualtrics.data_pilot,
+                    dir_name,
+                )
 
-    # Aggregate rest rating responses
-    if clean_rest:
+    def clean_rest(self):
+        """Coordinate cleaning of rest ratings survey.
+
+        Raises
+        ------
+        FileNotFoundError
+            *rest-ratings*.tsv are not found in BIDS location
+
+        """
         print("Cleaning survey : rest ratings")
 
         # Check for data
         raw_path = os.path.join(
-            proj_dir,
+            self.proj_dir,
             "data_scanner_BIDS",
             "rawdata",
         )
@@ -213,13 +232,13 @@ def clean_surveys(
             )
 
         # Aggregate rest ratings, for each session day
-        agg_rest = survey_clean.CombineRestRatings(proj_dir)
+        agg_rest = survey_clean.CombineRestRatings(self.proj_dir)
         for day in ["day2", "day3"]:
 
             # Get, write out study data
             agg_rest.get_rest_ratings(day, raw_path)
             out_file = os.path.join(
-                proj_dir,
+                self.proj_dir,
                 "data_survey",
                 f"visit_{day}",
                 "data_clean",
@@ -233,11 +252,11 @@ def clean_surveys(
 
             # Get, write out pilot data
             rawdata_pilot = os.path.join(
-                proj_dir, "data_pilot/data_scanner_BIDS", "rawdata"
+                self.proj_dir, "data_pilot/data_scanner_BIDS", "rawdata"
             )
             agg_rest.get_rest_ratings(day, rawdata_pilot)
             out_file = os.path.join(
-                proj_dir,
+                self.proj_dir,
                 "data_pilot/data_survey",
                 f"visit_{day}",
                 "data_clean",
@@ -288,7 +307,8 @@ def make_manager_reports(manager_reports, query_date, proj_dir):
     )
     if len(redcap_clean) != 4:
         print("No clean data found in RedCap, cleaning ...")
-        clean_surveys(proj_dir, clean_redcap=True)
+        cl_data = CleanSurveys(proj_dir)
+        cl_data.clean_redcap()
         print("\tDone.")
 
     # Validate manager_reports arguments
@@ -371,9 +391,11 @@ def make_nda_reports(nda_reports, proj_dir):
         f"{proj_dir}/data_survey/redcap_demographics/data_clean/*.csv"
     )
     visit_clean = glob.glob(f"{proj_dir}/data_survey/visit*/data_clean/*.csv")
-    if len(redcap_clean) != 4 and len(visit_clean) != 13:
+    if len(redcap_clean) != 4 or len(visit_clean) != 17:
         print("Missing RedCap, Qualtrics clean data. Cleaning ...")
-        clean_surveys(proj_dir, clean_redcap=True, clean_qualtrics=True)
+        cl_data = CleanSurveys(proj_dir)
+        cl_data.clean_redcap()
+        cl_data.clean_qualtrics()
         print("\tDone.")
 
     # Set switch to find appropriate class: key = user-specified
@@ -384,6 +406,7 @@ def make_nda_reports(nda_reports, proj_dir):
         "affim01": f"{mod_build}.NdarAffim01",
         "als01": f"{mod_build}.NdarAls01",
         "bdi01": f"{mod_build}.NdarBdi01",
+        "brd01": f"{mod_build}.NdarBrd01",
         "emrq01": f"{mod_build}.NdarEmrq01",
         "image03": f"{mod_build}.NdarImage03",
         "panas01": f"{mod_build}.NdarPanas01",
@@ -472,7 +495,8 @@ def generate_guids(proj_dir, user_name, user_pass, find_mismatch):
     )
     if not os.path.exists(chk_demo):
         print("Missing clean RedCap demographics, cleaning ...")
-        clean_surveys(proj_dir, clean_redcap=True)
+        cl_data = CleanSurveys(proj_dir)
+        cl_data.clean_redcap()
         print("\tDone.")
 
     # Trigger build reports class and method, clean intermediate

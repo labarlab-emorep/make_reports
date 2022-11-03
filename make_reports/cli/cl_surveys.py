@@ -87,12 +87,19 @@ def main():
     clean_rest = args.clean_rest
     clean_qualtrics = args.clean_qualtrics
 
-    workflow.clean_surveys(
-        proj_dir,
-        clean_redcap=clean_redcap,
-        clean_qualtrics=clean_qualtrics,
-        clean_rest=clean_rest,
-    )
+    # Get cleaning object
+    cl_data = workflow.CleanSurveys(proj_dir)
+
+    # Trigger desired cleaning methods
+    cl_dict = {
+        "clean_redcap": clean_redcap,
+        "clean_rest": clean_rest,
+        "clean_qualtrics": clean_qualtrics,
+    }
+    for cl_name, cl_bool in cl_dict.items():
+        if cl_bool:
+            cl_meth = getattr(cl_data, cl_name)
+            cl_meth()
 
 
 if __name__ == "__main__":

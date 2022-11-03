@@ -2,9 +2,13 @@
 import os
 import string
 import glob
+import re
 import pandas as pd
 import numpy as np
+from string import punctuation
 from make_reports import report_helper
+import importlib.resources as pkg_resources
+from make_reports import reference_files
 
 
 class CleanRedcap:
@@ -311,7 +315,7 @@ class CleanRedcap:
         )
         df_raw.loc[na_mask, ["middle_name"]] = np.nan
 
-        special_list = [x for x in string.punctuation]
+        special_list = [x for x in punctuation]
         sp_mask = (df_raw["middle_name"].str.len() == 1) & df_raw[
             "middle_name"
         ].astype("str").isin(special_list)
@@ -518,10 +522,9 @@ class CleanQualtrics:
         """
         # Find data_raw path, visit_day2 has raw qualtrics for both
         # visit_day2 and visit_day3
-        visit_name = self.qualtrics_dict[survey_name]
         visit_raw = (
             "visit_day2"
-            if survey_name == "Session 2 & 3 Survey"
+            if survey_name != "EmoRep_Session_1"
             else self.qualtrics_dict[survey_name]
         )
         raw_file = os.path.join(
@@ -537,10 +540,16 @@ class CleanQualtrics:
 
         # Get and run cleaning method
         print(f"Cleaning survey : {survey_name}")
-        clean_method = getattr(self, f"_clean_{visit_name}")
+        meth_switch = {
+            "EmoRep_Session_1": "session_1",
+            "Session 2 & 3 Survey": "session_23",
+            "FINAL - EmoRep Stimulus Ratings "
+            + "- fMRI Study": "post_scan_ratings",
+        }
+        clean_method = getattr(self, f"_clean_{meth_switch[survey_name]}")
         clean_method()
 
-    def _clean_visit_day1(self):
+    def _clean_session_1(self):
         """Cleaning method for visit 1 surveys.
 
         Split session into individual surveys, convert participant
@@ -621,7 +630,7 @@ class CleanQualtrics:
         self.data_clean = data_clean
         self.data_pilot = data_pilot
 
-    def _clean_visit_day23(self):
+    def _clean_session_23(self):
         """Cleaning method for visit 2 & 3 surveys.
 
         Split session into individual surveys, convert participant
@@ -709,22 +718,202 @@ class CleanQualtrics:
         self.data_clean = data_clean
         self.data_pilot = data_pilot
 
-    def _clean_post_scan_ratings():
-        """Title.
+    def _clean_post_scan_ratings(self):
+        """Cleaning method for stimuli ratings.
 
-        Desc.
+        Mine "FINAL - EmoRep Stimulus Ratings - fMRI Study" and generate
+        a long-formatted dataframe of participant responses. Stimuli order
+        and name are stored in "txtFile" column values, and mappings of
+        Qualtrics stimulus names with LabrLab's are found in
+        make_reports.reference_files.EmoRep_PostScan_Task_<*>_2022.csv.
+        Participants give valence and arousal ratings for each stimulus, and
+        supply 1+ emotion endorsements.
 
         Attributes
         ----------
         data_clean : dict
             Cleaned survey data of study participant responses
-            {survey_name: pd.DataFrame}
+            {visit: {survey_name: pd.DataFrame}}
         data_pilot : dict
             Cleaned survey data of pilot participant responses
-            {survey_name: pd.DataFrame}
+            {visit: {survey_name: pd.DataFrame}}
 
         """
-        pass
+        print("\tCleaning survey data : post_scan_ratings")
+
+        # Get scenario reference file for mapping prompt to stimulus
+        with pkg_resources.open_text(
+            reference_files, "EmoRep_PostScan_Task_ScenarioIDs_2022.csv"
+        ) as rf:
+            _df_keys_scenario = pd.read_csv(rf, index_col="Qualtrics_ID")
+        _keys_scenarios = _df_keys_scenario.to_dict()["Stimulus_ID"]
+
+        # Remove punctuation, setup reference dictionary:
+        #   key = qualtrics id, value = stimulus id.
+        keys_scenarios = {}
+        for h_key, h_val in _keys_scenarios.items():
+            new_key = h_key.translate(
+                str.maketrans("", "", string.punctuation)
+            )
+            keys_scenarios[new_key] = h_val
+
+        # Get video reference file, setup reference dict
+        with pkg_resources.open_text(
+            reference_files, "EmoRep_PostScan_Task_VideoIDs_2022.csv"
+        ) as rf:
+            _df_keys_video = pd.read_csv(rf, index_col="Qualtrics_ID")
+        keys_videos = _df_keys_video.to_dict()["Stimulus_ID"]
+
+        # Remove header rows, test IDs, txtFile NaNs, and restarted
+        # sessions (Finished=False).
+        df_clean = self.df_raw
+        df_clean = df_clean.drop([0, 1])
+        df_clean = df_clean[~df_clean["SubID"].str.contains("ER9")]
+        df_clean = df_clean[df_clean["txtFile"].notna()]
+        df_clean = df_clean[~df_clean["Finished"].str.contains("False")]
+        df_clean = df_clean.reset_index(drop=True)
+
+        # Remove some unneeded columns
+        drop_list = [
+            "Status",
+            "IPAddress",
+            "Recipient",
+            "ExternalReference",
+            "Location",
+            "Click",
+            "Categories",
+            "Submit",
+            "Duration",
+            "EndDate",
+            "ResponseID",
+            "DistributionChannel",
+            "StimulusFile_Size",
+            "ScenInstruct",
+        ]
+        for drop_name in drop_list:
+            drop_cols = [x for x in df_clean.columns if drop_name in x]
+            df_clean = df_clean.drop(drop_cols, axis=1)
+
+        # Extract subject, session, and stimulus type columns
+        sub_list = df_clean["SubID"].tolist()
+        sess_list = df_clean["SessionID"].tolist()
+
+        # Unpack txtFile column to get list and order of stimuli that
+        # were presented to participant.
+        stim_all = df_clean["txtFile"].tolist()
+        stim_all = [x.replace("<br>", " ") for x in stim_all]
+        stim_unpack = [re.split(r"\t+", x.rstrip("\t")) for x in stim_all]
+
+        # Setup output dataframe
+        out_names = [
+            "study_id",
+            "datetime",
+            "session",
+            "type",
+            "emotion",
+            "stimulus",
+            "prompt",
+            "response",
+        ]
+        df_study = pd.DataFrame(columns=out_names)
+        df_pilot = pd.DataFrame(columns=out_names)
+
+        # Setup inner function for mining df_clean
+        def _fill_psr(sub, sess, stim_list):
+            """Find participant responses and fill dataframe."""
+            print(f"\t\tGetting data for : {sub} {sess} ...")
+
+            # Subset df_raw for subject, session data. Remove empty columns.
+            df_sub = df_clean.loc[
+                (df_clean["SubID"] == sub) & (df_clean["SessionID"] == sess)
+            ]
+            df_sub = df_sub.dropna(axis=1)
+
+            # Identify session, datetime, and type values
+            day = f"day{int(sess) + 1}"
+            sur_date = df_sub.iloc[0]["RecordedDate"].split(" ")[0]
+            stim_type = df_sub.iloc[0]["StimulusType"]
+
+            # Get relevant reference dictionary for stimulus type, remove
+            # punctuation from scenario prompts and deal with \u2019.
+            if stim_type == "Scenarios":
+                ref_dict = keys_scenarios
+                stim_list = [
+                    x.translate(
+                        str.maketrans("", "", string.punctuation)
+                    ).replace("can’t", "cant")
+                    for x in stim_list
+                ]
+            else:
+                ref_dict = keys_videos
+
+            # Add a number lines to df_study for each stimulus
+            nonlocal df_study
+            for h_cnt, stim in enumerate(stim_list):
+
+                # Determine stimulus number in qualtrics, extract
+                # emotion and trial stimulus from reference dict.
+                cnt = h_cnt + 1
+                emotion, trial_stim = ref_dict[stim].split("_")
+
+                # Add a line to df_study for each prompt type
+                for prompt in ["Arousal", "Valence", "Endorsement"]:
+
+                    # Get response value from proper column, manage multiple,
+                    # single, or non responses.
+                    df_resp = df_sub.loc[
+                        :,
+                        df_sub.columns.str.startswith(f"{cnt}_{prompt}"),
+                    ]
+                    if df_resp.empty:
+                        resp = np.nan
+                    elif df_resp.shape == (1, 1):
+                        resp = df_resp.values[0][0]
+                    else:
+                        resp = ";".join(df_resp.values[0])
+
+                    # Add stimulus prompt values to df_study
+                    update_dict = {
+                        "study_id": sub,
+                        "datetime": sur_date,
+                        "session": day,
+                        "type": stim_type,
+                        "emotion": emotion,
+                        "stimulus": trial_stim,
+                        "prompt": prompt,
+                        "response": resp,
+                    }
+                    df_study = pd.concat(
+                        [
+                            df_study,
+                            pd.DataFrame.from_records([update_dict]),
+                        ]
+                    )
+            del df_sub
+
+        # Update df_study with each participant's responses
+        for sub, sess, stim_list in zip(sub_list, sess_list, stim_unpack):
+            if sub in self.withdrew_list:
+                continue
+            _fill_psr(sub, sess, stim_list)
+        df_study = df_study.sort_values(
+            by=["study_id", "session", "emotion", "stimulus", "prompt"]
+        )
+
+        # Split dataframe by session
+        sess_mask = df_study["session"] == "day2"
+        df_study_day2 = df_study[sess_mask]
+        df_study_day3 = df_study[~sess_mask]
+
+        # Make ouput attributes, just use df_pilot as filler
+        self.data_clean = {
+            "visit_day2": {"post_scan_ratings": df_study_day2},
+            "visit_day3": {"post_scan_ratings": df_study_day3},
+        }
+        self.data_pilot = {
+            "visit_day2": {"post_scan_ratings": df_pilot},
+            "visit_day3": {"post_scan_ratings": df_pilot},
+        }
 
 
 class CombineRestRatings:

@@ -17,8 +17,9 @@ import pandas as pd
 import numpy as np
 from datetime import datetime
 import pydicom
-from bioread.runners import acq_info
 from make_reports import report_helper
+
+# from bioread.runners import acq_info
 
 
 class DemoAll:
@@ -1333,7 +1334,7 @@ class NdarBdi01:
         df_nda_day3 = self._make_bdi("day3")
 
         # Combine into final report
-        df_report = pd.concat([df_nda_day2, df_nda_day3])
+        df_report = pd.concat([df_nda_day2, df_nda_day3], ignore_index=True)
         df_report = df_report.sort_values(by=["src_subject_id"])
 
         # Add pilot notes for certain subjects
@@ -1498,7 +1499,205 @@ class NdarBdi01:
 
 
 class NdarBrd01:
-    pass
+    """Make brd01 report for NDAR submission.
+
+    Parameters
+    ----------
+    proj_dir : path
+        Project's experiment directory
+    final_demo : make_reports.build_reports.DemoAll.final_demo
+        pd.DataFrame, compiled demographic info
+
+    Attributes
+    ----------
+    df_report : pd.DataFrame
+        Report of rest rating data that complies with NDAR data definitions
+    final_demo : make_reports.build_reports.DemoAll.final_demo
+        pd.DataFrame, compiled demographic info
+    local_path : path
+        Local location of files to host
+    nda_label : list
+        NDA report template label
+    proj_dir : path
+        Project's experiment directory
+
+    """
+
+    def __init__(self, proj_dir, final_demo):
+        """Read in survey data and make report.
+
+        Get finalized demographic information, set orienting
+        attributes, and trigger report generation method for
+        each session.
+
+        Parameters
+        ----------
+        proj_dir : path
+            Project's experiment directory
+        final_demo : make_reports.build_reports.DemoAll.final_demo
+            pd.DataFrame, compiled demographic info
+
+        Attributes
+        ----------
+        df_report : pd.DataFrame
+            Report of rest rating data that complies with NDAR data definitions
+        final_demo : make_reports.build_reports.DemoAll.final_demo
+            pd.DataFrame, compiled demographic info
+        local_path : path
+            Local location of files to host
+        nda_label : list
+            NDA report template label
+        proj_dir : path
+            Project's experiment directory
+
+        """
+        # Get needed column values from report template
+        print("Buiding NDA report : brd01 ...")
+        self.nda_label, nda_cols = report_helper.mine_template(
+            "brd01_template.csv"
+        )
+
+        # Start empty report for filling
+        self.df_report = pd.DataFrame(columns=nda_cols)
+
+        # Set helper paths
+        self.proj_dir = proj_dir
+        self.local_path = (
+            "/run/user/1001/gvfs/smb-share:server"
+            + "=ccn-keoki.win.duke.edu,share=experiments2/EmoRep/"
+            + "Exp2_Compute_Emotion/ndar_upload/data_beh"
+        )
+
+        # Get final demographics
+        final_demo = final_demo.replace("NaN", np.nan)
+        final_demo["sex"] = final_demo["sex"].replace(
+            ["Male", "Female", "Neither"], ["M", "F", "O"]
+        )
+        self.final_demo = final_demo.dropna(subset=["subjectkey"])
+
+        # Fill df_report for each session
+        self._make_brd("day2")
+        self._make_brd("day3")
+        self.df_report = self.df_report.sort_values(by=["src_subject_id"])
+
+    def _get_subj_demo(self, survey_date, sub):
+        """Gather required participant demographic information.
+
+        Find participant demographic info and calculate age-in-months
+        at time of scan.
+
+        Parameters
+        ----------
+        survey_date : datetime
+            Time survey took place
+        sub : str
+            Subject identifier
+
+        Returns
+        -------
+        dict
+            Keys = brd01 column names
+            Values = demographic info
+
+        """
+        # Identify participant date of birth, sex, and GUID
+        # TODO deal with participants not found in final_demo (withdrawn)
+        final_demo = self.final_demo
+        idx_subj = final_demo.index[
+            final_demo["src_subject_id"] == sub
+        ].tolist()[0]
+        subj_guid = final_demo.iloc[idx_subj]["subjectkey"]
+        subj_id = final_demo.iloc[idx_subj]["src_subject_id"]
+        subj_sex = final_demo.iloc[idx_subj]["sex"]
+        subj_dob = datetime.strptime(
+            final_demo.iloc[idx_subj]["dob"], "%Y-%m-%d"
+        )
+
+        # Calculate age in months
+        interview_age = report_helper.calc_age_mo([subj_dob], [survey_date])[0]
+        interview_date = datetime.strftime(survey_date, "%m/%d/%Y")
+
+        return {
+            "subjectkey": subj_guid,
+            "src_subject_id": subj_id,
+            "interview_date": interview_date,
+            "interview_age": interview_age,
+            "sex": subj_sex,
+        }
+
+    def _make_brd(self, sess):
+        """Make brd01 report for session.
+
+        Get Qualtrics survey data for post scan ratings,
+        make a host file, and generate NDAR dataframe.
+
+        """
+        # Check sess value
+        sess_list = ["day2", "day3"]
+        if sess not in sess_list:
+            raise ValueError(f"Incorrect visit day : {sess}")
+
+        # Get clean survey data
+        df_pilot = pd.read_csv(
+            os.path.join(
+                self.proj_dir,
+                "data_pilot/data_survey",
+                f"visit_{sess}/data_clean",
+                "df_post_scan_ratings.csv",
+            )
+        )
+        df_study = pd.read_csv(
+            os.path.join(
+                self.proj_dir,
+                "data_survey",
+                f"visit_{sess}/data_clean",
+                "df_post_scan_ratings.csv",
+            )
+        )
+
+        # Combine pilot and study data, updated subj id column, set attribute
+        df_brd = pd.concat([df_pilot, df_study], ignore_index=True)
+        df_brd = df_brd.rename(columns={"study_id": "src_subject_id"})
+
+        # Setup hosting directory
+        host_dir = os.path.join(self.proj_dir, "ndar_upload/data_beh")
+        if not os.path.exists(host_dir):
+            os.makedirs(host_dir)
+
+        # Mine each participant's data
+        sub_list = df_brd["src_subject_id"].unique().tolist()
+        for sub in sub_list:
+
+            # Extract participant info
+            df_sub = df_brd[df_brd["src_subject_id"] == sub]
+            df_sub = df_sub.reset_index(drop=True)
+
+            # Make host file
+            task = df_sub.loc[0, "type"].lower()
+            out_file = f"sub-{sub}_ses-{sess}_task-{task}_ratings.csv"
+            out_path = os.path.join(host_dir, out_file)
+            if not os.path.exists(out_path):
+                print(f"\tMaking host file : {out_path}")
+                df_sub.to_csv(out_path, index=False, na_rep="")
+
+            # Determine date survey was taken, get demographic info
+            h_date = df_sub.loc[0, "datetime"]
+            survey_date = datetime.strptime(h_date, "%Y-%m-%d")
+            demo_info = self._get_subj_demo(survey_date, sub)
+
+            # Set values required by brd01
+            brd01_info = {
+                "visit": sess[-1],
+                "data_file1": os.path.join(self.local_path, out_file),
+            }
+            brd01_info.update(demo_info)
+
+            # Add brd info to report
+            new_row = pd.DataFrame(brd01_info, index=[0])
+            self.df_report = pd.concat(
+                [self.df_report.loc[:], new_row]
+            ).reset_index(drop=True)
+            del new_row
 
 
 class NdarDemoInfo01:
@@ -1892,7 +2091,7 @@ class NdarImage03:
 
         # Combine df_report_study and df_report_pilot
         self.df_report = pd.concat(
-            [self.df_report_pilot, self.df_report_study]
+            [self.df_report_pilot, self.df_report_study], ignore_index=True
         )
 
     def _make_pilot(self):
@@ -2539,7 +2738,9 @@ class NdarPanas01:
         df_nda_day3 = self._make_panas("day3")
 
         # Combine into final report
-        df_report = pd.concat([df_pilot, df_nda_day2, df_nda_day3])
+        df_report = pd.concat(
+            [df_pilot, df_nda_day2, df_nda_day3], ignore_index=True
+        )
         df_report = df_report.sort_values(by=["src_subject_id"])
         self.df_report = df_report[df_report["interview_date"].notna()]
 
@@ -2934,29 +3135,32 @@ class NdarPhysio:
 
             # Determine session info
             phys_file = os.path.basename(phys_path)
+            print(f"\tMining data for {phys_file}")
             subj, sess, task, run, _, _ = phys_file.split("_")
             subj_nda = subj.split("-")[1]
 
-            # Extract datetime from acq file - I could not suppress
-            # stdout print by air.run() for the life of me.
-            air = acq_info.AcqInfoRunner(phys_path)
-            air.run()
-            acq_date_str = (
-                air.reader.datafile.earliest_marker_created_at.isoformat()
-            ).split("T")[0]
+            # # Extract datetime from acq file - I could not suppress
+            # # stdout print by air.run() for the life of me.
+            # air = acq_info.AcqInfoRunner(phys_path)
+            # air.run()
+            # acq_date_str = (
+            #     air.reader.datafile.earliest_marker_created_at.isoformat()
+            # ).split("T")[0]
 
-            # bash_cmd = f"""
-            #     line=$(acq_info {phys_path} | grep "Earliest")
-            #     IFS=":" read -ra dt_arr <<< $line
-            #     echo ${{dt_arr[1]%T*}}
-            # """
-            # h_sp = subprocess.Popen(
-            #     bash_cmd, shell=True, stdout=subprocess.PIPE
-            # )
-            # h_out, h_err = h_sp.communicate()
-            # h_sp.wait()
-            # acq_date_str = h_out.decode("utf-8").strip()
-
+            bash_cmd = f"""
+                line=$(acq_info {phys_path} | grep "Earliest")
+                IFS=":" read -ra dt_arr <<< $line
+                echo ${{dt_arr[1]%T*}}
+            """
+            h_sp = subprocess.Popen(
+                bash_cmd,
+                shell=True,
+                executable="/bin/bash",
+                stdout=subprocess.PIPE,
+            )
+            h_out = h_sp.stdout.read()
+            h_acq_date_str = h_out.decode("utf-8").strip()
+            acq_date_str = h_acq_date_str.split("T")[0]
             acq_date = datetime.strptime(acq_date_str, "%Y-%m-%d")
 
             # Copy file for hosting
@@ -3200,7 +3404,7 @@ class NdarRest01:
         df_nda_day3 = self._make_rest("day3")
 
         # Combine into final report
-        df_report = pd.concat([df_nda_day2, df_nda_day3])
+        df_report = pd.concat([df_nda_day2, df_nda_day3], ignore_index=True)
         df_report = df_report.sort_values(by=["src_subject_id"])
 
         # Add pilot notes for certain subjects
