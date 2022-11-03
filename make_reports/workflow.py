@@ -165,7 +165,7 @@ def clean_surveys(
         visit_raw = glob.glob(
             f"{proj_dir}/data_survey/visit*/data_raw/*latest.csv"
         )
-        if len(visit_raw) != 5:
+        if len(visit_raw) != 7:
             raise FileNotFoundError(
                 "Missing raw survey data in visit directories,"
                 + " please download raw data via rep_dl."
@@ -180,19 +180,19 @@ def clean_surveys(
             clean_qualtrics.clean_surveys(sur_name)
 
             # Account for visit type, survey name/report organization
-            if dir_name == "visit_day1" or dir_name == "post_scan_ratings":
-                _write_clean_qualtrics(
-                    clean_qualtrics.data_clean,
-                    clean_qualtrics.data_pilot,
-                    dir_name,
-                )
-            elif dir_name == "visit_day23":
-                for vis_name in ["visit_day2", "visit_day3"]:
+            if type(dir_name) == list:
+                for vis_name in dir_name:
                     _write_clean_qualtrics(
                         clean_qualtrics.data_clean[vis_name],
                         clean_qualtrics.data_pilot[vis_name],
                         vis_name,
                     )
+            elif dir_name == "visit_day1":
+                _write_clean_qualtrics(
+                    clean_qualtrics.data_clean,
+                    clean_qualtrics.data_pilot,
+                    dir_name,
+                )
 
     # Aggregate rest rating responses
     if clean_rest:

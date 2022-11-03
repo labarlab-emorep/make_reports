@@ -146,7 +146,11 @@ def download_qualtrics(proj_dir, qualtrics_token, survey_name=None):
     # Download and write desired Qualtrics surveys
     out_dict = {}
     for sur_name, dir_name in report_org.items():
-        post_labels = True if dir_name == "post_scan_ratings" else False
+        post_labels = (
+            True
+            if sur_name == "FINAL - EmoRep Stimulus Ratings - fMRI Study"
+            else False
+        )
         survey_id = report_keys[sur_name]
         df = report_helper.pull_qualtrics_data(
             sur_name,
@@ -157,8 +161,11 @@ def download_qualtrics(proj_dir, qualtrics_token, survey_name=None):
         )
 
         # Account for visit/directory identifier
-        if dir_name == "visit_day23":
-            for day in ["visit_day2", "visit_day3"]:
+        if type(dir_name) == list:
+
+            # Write same file to visit_day2 and visit_day3 since
+            # the survey has info for both sessions.
+            for day in dir_name:
 
                 # Setup output location, file
                 out_file = os.path.join(

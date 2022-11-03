@@ -522,10 +522,9 @@ class CleanQualtrics:
         """
         # Find data_raw path, visit_day2 has raw qualtrics for both
         # visit_day2 and visit_day3
-        visit_name = self.qualtrics_dict[survey_name]
         visit_raw = (
             "visit_day2"
-            if survey_name == "Session 2 & 3 Survey"
+            if survey_name != "EmoRep_Session_1"
             else self.qualtrics_dict[survey_name]
         )
         raw_file = os.path.join(
@@ -541,10 +540,16 @@ class CleanQualtrics:
 
         # Get and run cleaning method
         print(f"Cleaning survey : {survey_name}")
-        clean_method = getattr(self, f"_clean_{visit_name}")
+        meth_switch = {
+            "EmoRep_Session_1": "session_1",
+            "Session 2 & 3 Survey": "session_23",
+            "FINAL - EmoRep Stimulus Ratings "
+            + "- fMRI Study": "post_scan_ratings",
+        }
+        clean_method = getattr(self, f"_clean_{meth_switch[survey_name]}")
         clean_method()
 
-    def _clean_visit_day1(self):
+    def _clean_session_1(self):
         """Cleaning method for visit 1 surveys.
 
         Split session into individual surveys, convert participant
@@ -625,7 +630,7 @@ class CleanQualtrics:
         self.data_clean = data_clean
         self.data_pilot = data_pilot
 
-    def _clean_visit_day23(self):
+    def _clean_session_23(self):
         """Cleaning method for visit 2 & 3 surveys.
 
         Split session into individual surveys, convert participant
@@ -728,10 +733,10 @@ class CleanQualtrics:
         ----------
         data_clean : dict
             Cleaned survey data of study participant responses
-            {survey_name: pd.DataFrame}
+            {visit: {survey_name: pd.DataFrame}}
         data_pilot : dict
             Cleaned survey data of pilot participant responses
-            {survey_name: pd.DataFrame}
+            {visit: {survey_name: pd.DataFrame}}
 
         """
         print("\tCleaning survey data : post_scan_ratings")
@@ -895,9 +900,20 @@ class CleanQualtrics:
             by=["study_id", "session", "emotion", "stimulus", "prompt"]
         )
 
-        # Make ouput attributes
-        self.data_clean = {"post_scan_ratings": df_study}
-        self.data_pilot = {"post_scan_ratings": df_pilot}
+        # Split dataframe by session
+        sess_mask = df_study["session"] == "day2"
+        df_study_day2 = df_study[sess_mask]
+        df_study_day3 = df_study[~sess_mask]
+
+        # Make ouput attributes, just use df_pilot as filler
+        self.data_clean = {
+            "visit_day2": {"post_scan_ratings": df_study_day2},
+            "visit_day3": {"post_scan_ratings": df_study_day3},
+        }
+        self.data_pilot = {
+            "visit_day2": {"post_scan_ratings": df_pilot},
+            "visit_day3": {"post_scan_ratings": df_pilot},
+        }
 
 
 class CombineRestRatings:
