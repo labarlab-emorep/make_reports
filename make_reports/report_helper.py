@@ -289,7 +289,6 @@ def qualtrics_dict():
     """Return a dict of Qualtrics surveys."""
     # Key : Qualtrics dataframe
     # Value : output parent directory identifier
-    # TODO convert visit_day23 to list
     return {
         "EmoRep_Session_1": "visit_day1",
         "FINAL - EmoRep Stimulus Ratings - fMRI Study": [
