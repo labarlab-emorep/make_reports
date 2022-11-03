@@ -406,6 +406,7 @@ def make_nda_reports(nda_reports, proj_dir):
         "affim01": f"{mod_build}.NdarAffim01",
         "als01": f"{mod_build}.NdarAls01",
         "bdi01": f"{mod_build}.NdarBdi01",
+        "brd01": f"{mod_build}.NdarBrd01",
         "emrq01": f"{mod_build}.NdarEmrq01",
         "image03": f"{mod_build}.NdarImage03",
         "panas01": f"{mod_build}.NdarPanas01",

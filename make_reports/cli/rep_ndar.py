@@ -89,6 +89,7 @@ def main():
         "affim01",
         "als01",
         "bdi01",
+        "brd01",
         "demo_info01",
         "emrq01",
         "image03",
