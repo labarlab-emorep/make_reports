@@ -1,8 +1,14 @@
 """Clean survey data from RedCap and Qualtrics."""
 import os
+import string
+import glob
+import re
 import pandas as pd
 import numpy as np
+from string import punctuation
 from make_reports import report_helper
+import importlib.resources as pkg_resources
+from make_reports import reference_files
 
 
 class CleanRedcap:
@@ -202,6 +208,71 @@ class CleanRedcap:
                     subj_educate.append(educate_switch[h_level])
         return subj_educate
 
+    def _clean_city_state(self):
+        """Fix city-of-birth free response.
+
+        Account for formats:
+            1. San Jose
+            2. San Jose, California
+            4. San Jose CA
+
+        """
+        self.df_raw = self.df_raw.rename(columns={"city": "city-state"})
+        city_state = self.df_raw["city-state"].tolist()
+        city_list = []
+        state_list = []
+        for cs in city_state:
+            cs = cs.strip()
+            if "," in cs:
+                h_city, h_st = cs.split(",")
+                h_state = h_st.lstrip()
+            elif " " in cs:
+                h_split = cs.rsplit(" ", 1)[-1]
+                if h_split.isupper():
+                    h_state = h_split
+                    h_city = cs.rsplit(" ", 1)[0]
+                else:
+                    h_city = cs
+                    h_state = np.nan
+            else:
+                h_city = cs
+                h_state = np.nan
+            city_list.append(h_city)
+            state_list.append(h_state)
+
+        self.df_raw["city"] = city_list
+        self.df_raw["state"] = state_list
+
+        self.df_raw = self.df_raw.drop("city-state", axis=1)
+        col_reorder = [
+            "record_id",
+            "demographics_complete",
+            "firstname",
+            "middle_name",
+            "lastname",
+            "dob",
+            "city",
+            "state",
+            "country_birth",
+            "age",
+            "gender",
+            "gender_other",
+            "race___1",
+            "race___2",
+            "race___3",
+            "race___4",
+            "race___5",
+            "race___6",
+            "race___7",
+            "race___8",
+            "race_other",
+            "ethnicity",
+            "years_education",
+            "level_education",
+            "handedness",
+        ]
+        self.df_raw = self.df_raw[col_reorder]
+
     def _clean_demographics(self):
         """Cleaning method for RedCap demographics survey.
 
@@ -231,16 +302,33 @@ class CleanRedcap:
         yrs_edu = self._get_educ_years()
         self.df_raw["years_education"] = yrs_edu
 
+        # Fix City, State of birth
+        self._clean_city_state()
+
+        # Clean middle name responses for NA and special characters
+        df_raw = self.df_raw
+        na_mask = (
+            df_raw.middle_name.eq("na")
+            | df_raw.middle_name.eq("NA")
+            | df_raw.middle_name.eq("N/A")
+            | df_raw.middle_name.eq(" ")
+        )
+        df_raw.loc[na_mask, ["middle_name"]] = np.nan
+
+        special_list = [x for x in punctuation]
+        sp_mask = (df_raw["middle_name"].str.len() == 1) & df_raw[
+            "middle_name"
+        ].astype("str").isin(special_list)
+        df_raw.loc[sp_mask, ["middle_name"]] = np.nan
+
         # Separate pilot from study data
         pilot_list = [int(x[-1]) for x in self.pilot_list]
-        idx_pilot = self.df_raw[
-            self.df_raw["record_id"].isin(pilot_list)
+        idx_pilot = df_raw[df_raw["record_id"].isin(pilot_list)].index.tolist()
+        idx_study = df_raw[
+            ~df_raw["record_id"].isin(pilot_list)
         ].index.tolist()
-        idx_study = self.df_raw[
-            ~self.df_raw["record_id"].isin(pilot_list)
-        ].index.tolist()
-        self.df_pilot = self.df_raw.loc[idx_pilot]
-        self.df_clean = self.df_raw.loc[idx_study]
+        self.df_pilot = df_raw.loc[idx_pilot]
+        self.df_clean = df_raw.loc[idx_study]
 
     def _clean_consent(self):
         """Cleaning method for RedCap consent survey.
@@ -434,10 +522,9 @@ class CleanQualtrics:
         """
         # Find data_raw path, visit_day2 has raw qualtrics for both
         # visit_day2 and visit_day3
-        visit_name = self.qualtrics_dict[survey_name]
         visit_raw = (
             "visit_day2"
-            if survey_name == "Session 2 & 3 Survey"
+            if survey_name != "EmoRep_Session_1"
             else self.qualtrics_dict[survey_name]
         )
         raw_file = os.path.join(
@@ -453,10 +540,16 @@ class CleanQualtrics:
 
         # Get and run cleaning method
         print(f"Cleaning survey : {survey_name}")
-        clean_method = getattr(self, f"_clean_{visit_name}")
+        meth_switch = {
+            "EmoRep_Session_1": "session_1",
+            "Session 2 & 3 Survey": "session_23",
+            "FINAL - EmoRep Stimulus Ratings "
+            + "- fMRI Study": "post_scan_ratings",
+        }
+        clean_method = getattr(self, f"_clean_{meth_switch[survey_name]}")
         clean_method()
 
-    def _clean_visit_day1(self):
+    def _clean_session_1(self):
         """Cleaning method for visit 1 surveys.
 
         Split session into individual surveys, convert participant
@@ -537,7 +630,7 @@ class CleanQualtrics:
         self.data_clean = data_clean
         self.data_pilot = data_pilot
 
-    def _clean_visit_day23(self):
+    def _clean_session_23(self):
         """Cleaning method for visit 2 & 3 surveys.
 
         Split session into individual surveys, convert participant
@@ -625,19 +718,319 @@ class CleanQualtrics:
         self.data_clean = data_clean
         self.data_pilot = data_pilot
 
-    def _clean_post_scan_ratings():
-        """Title.
+    def _clean_post_scan_ratings(self):
+        """Cleaning method for stimuli ratings.
 
-        Desc.
+        Mine "FINAL - EmoRep Stimulus Ratings - fMRI Study" and generate
+        a long-formatted dataframe of participant responses. Stimuli order
+        and name are stored in "txtFile" column values, and mappings of
+        Qualtrics stimulus names with LabrLab's are found in
+        make_reports.reference_files.EmoRep_PostScan_Task_<*>_2022.csv.
+        Participants give valence and arousal ratings for each stimulus, and
+        supply 1+ emotion endorsements.
 
         Attributes
         ----------
         data_clean : dict
             Cleaned survey data of study participant responses
-            {survey_name: pd.DataFrame}
+            {visit: {survey_name: pd.DataFrame}}
         data_pilot : dict
             Cleaned survey data of pilot participant responses
-            {survey_name: pd.DataFrame}
+            {visit: {survey_name: pd.DataFrame}}
 
         """
-        pass
+        print("\tCleaning survey data : post_scan_ratings")
+
+        # Get scenario reference file for mapping prompt to stimulus
+        with pkg_resources.open_text(
+            reference_files, "EmoRep_PostScan_Task_ScenarioIDs_2022.csv"
+        ) as rf:
+            _df_keys_scenario = pd.read_csv(rf, index_col="Qualtrics_ID")
+        _keys_scenarios = _df_keys_scenario.to_dict()["Stimulus_ID"]
+
+        # Remove punctuation, setup reference dictionary:
+        #   key = qualtrics id, value = stimulus id.
+        keys_scenarios = {}
+        for h_key, h_val in _keys_scenarios.items():
+            new_key = h_key.translate(
+                str.maketrans("", "", string.punctuation)
+            )
+            keys_scenarios[new_key] = h_val
+
+        # Get video reference file, setup reference dict
+        with pkg_resources.open_text(
+            reference_files, "EmoRep_PostScan_Task_VideoIDs_2022.csv"
+        ) as rf:
+            _df_keys_video = pd.read_csv(rf, index_col="Qualtrics_ID")
+        keys_videos = _df_keys_video.to_dict()["Stimulus_ID"]
+
+        # Remove header rows, test IDs, txtFile NaNs, and restarted
+        # sessions (Finished=False).
+        df_clean = self.df_raw
+        df_clean = df_clean.drop([0, 1])
+        df_clean = df_clean[~df_clean["SubID"].str.contains("ER9")]
+        df_clean = df_clean[df_clean["txtFile"].notna()]
+        df_clean = df_clean[~df_clean["Finished"].str.contains("False")]
+        df_clean = df_clean.reset_index(drop=True)
+
+        # Remove some unneeded columns
+        drop_list = [
+            "Status",
+            "IPAddress",
+            "Recipient",
+            "ExternalReference",
+            "Location",
+            "Click",
+            "Categories",
+            "Submit",
+            "Duration",
+            "EndDate",
+            "ResponseID",
+            "DistributionChannel",
+            "StimulusFile_Size",
+            "ScenInstruct",
+        ]
+        for drop_name in drop_list:
+            drop_cols = [x for x in df_clean.columns if drop_name in x]
+            df_clean = df_clean.drop(drop_cols, axis=1)
+
+        # Extract subject, session, and stimulus type columns
+        sub_list = df_clean["SubID"].tolist()
+        sess_list = df_clean["SessionID"].tolist()
+
+        # Unpack txtFile column to get list and order of stimuli that
+        # were presented to participant.
+        stim_all = df_clean["txtFile"].tolist()
+        stim_all = [x.replace("<br>", " ") for x in stim_all]
+        stim_unpack = [re.split(r"\t+", x.rstrip("\t")) for x in stim_all]
+
+        # Setup output dataframe
+        out_names = [
+            "study_id",
+            "datetime",
+            "session",
+            "type",
+            "emotion",
+            "stimulus",
+            "prompt",
+            "response",
+        ]
+        df_study = pd.DataFrame(columns=out_names)
+        df_pilot = pd.DataFrame(columns=out_names)
+
+        # Setup inner function for mining df_clean
+        def _fill_psr(sub, sess, stim_list):
+            """Find participant responses and fill dataframe."""
+            print(f"\t\tGetting data for : {sub} {sess} ...")
+
+            # Subset df_raw for subject, session data. Remove empty columns.
+            df_sub = df_clean.loc[
+                (df_clean["SubID"] == sub) & (df_clean["SessionID"] == sess)
+            ]
+            df_sub = df_sub.dropna(axis=1)
+
+            # Identify session, datetime, and type values
+            day = f"day{int(sess) + 1}"
+            sur_date = df_sub.iloc[0]["RecordedDate"].split(" ")[0]
+            stim_type = df_sub.iloc[0]["StimulusType"]
+
+            # Get relevant reference dictionary for stimulus type, remove
+            # punctuation from scenario prompts and deal with \u2019.
+            if stim_type == "Scenarios":
+                ref_dict = keys_scenarios
+                stim_list = [
+                    x.translate(
+                        str.maketrans("", "", string.punctuation)
+                    ).replace("can’t", "cant")
+                    for x in stim_list
+                ]
+            else:
+                ref_dict = keys_videos
+
+            # Add a number lines to df_study for each stimulus
+            nonlocal df_study
+            for h_cnt, stim in enumerate(stim_list):
+
+                # Determine stimulus number in qualtrics, extract
+                # emotion and trial stimulus from reference dict.
+                cnt = h_cnt + 1
+                emotion, trial_stim = ref_dict[stim].split("_")
+
+                # Add a line to df_study for each prompt type
+                for prompt in ["Arousal", "Valence", "Endorsement"]:
+
+                    # Get response value from proper column, manage multiple,
+                    # single, or non responses.
+                    df_resp = df_sub.loc[
+                        :,
+                        df_sub.columns.str.startswith(f"{cnt}_{prompt}"),
+                    ]
+                    if df_resp.empty:
+                        resp = np.nan
+                    elif df_resp.shape == (1, 1):
+                        resp = df_resp.values[0][0]
+                    else:
+                        resp = ";".join(df_resp.values[0])
+
+                    # Add stimulus prompt values to df_study
+                    update_dict = {
+                        "study_id": sub,
+                        "datetime": sur_date,
+                        "session": day,
+                        "type": stim_type,
+                        "emotion": emotion,
+                        "stimulus": trial_stim,
+                        "prompt": prompt,
+                        "response": resp,
+                    }
+                    df_study = pd.concat(
+                        [
+                            df_study,
+                            pd.DataFrame.from_records([update_dict]),
+                        ]
+                    )
+            del df_sub
+
+        # Update df_study with each participant's responses
+        for sub, sess, stim_list in zip(sub_list, sess_list, stim_unpack):
+            if sub in self.withdrew_list:
+                continue
+            _fill_psr(sub, sess, stim_list)
+        df_study = df_study.sort_values(
+            by=["study_id", "session", "emotion", "stimulus", "prompt"]
+        )
+
+        # Split dataframe by session
+        sess_mask = df_study["session"] == "day2"
+        df_study_day2 = df_study[sess_mask]
+        df_study_day3 = df_study[~sess_mask]
+
+        # Make ouput attributes, just use df_pilot as filler
+        self.data_clean = {
+            "visit_day2": {"post_scan_ratings": df_study_day2},
+            "visit_day3": {"post_scan_ratings": df_study_day3},
+        }
+        self.data_pilot = {
+            "visit_day2": {"post_scan_ratings": df_pilot},
+            "visit_day3": {"post_scan_ratings": df_pilot},
+        }
+
+
+class CombineRestRatings:
+    """Aggregate post resting ratings.
+
+    Find and combine subject rest ratings, output by dcm_conversion.
+
+    Attributes
+    ----------
+    df_sess : pd.DataFrame
+        Aggregated rest ratings for session
+    sess_valid : list
+        Valid session days
+
+    Methods
+    -------
+    get_rest_ratings
+        Aggregate session rest ratings
+
+    """
+
+    def __init__(self, proj_dir):
+        """Setup helper attributes.
+
+        Parameters
+        ----------
+        proj_dir : path
+            Location of parent directory for project
+
+        Attributes
+        ----------
+        sess_valid : list
+            Valid session days
+
+        """
+        self.sess_valid = ["day2", "day3"]
+
+    def get_rest_ratings(self, sess, rawdata_path):
+        """Find and aggregate participant rest ratings for session.
+
+        Parameters
+        ----------
+        sess : str
+            ["day2" | "day3"]
+        rawdata_path : path
+            Location of BIDS rawdata
+
+        Attributes
+        ----------
+        df_sess : pd.DataFrame
+            Aggregated rest ratings for session
+
+        Raises
+        ------
+        ValueError
+            Invalid sess argument supplied
+        FileNotFoundError
+            Participant rest-rating files are not found
+
+        """
+        # Check arg
+        if sess not in self.sess_valid:
+            raise ValueError(f"Improper session argument : sess={sess}")
+
+        # Setup session dataframe
+        col_names = [
+            "study_id",
+            "visit",
+            "datetime",
+            "resp_type",
+            "AMUSEMENT",
+            "ANGER",
+            "ANXIETY",
+            "AWE",
+            "CALMNESS",
+            "CRAVING",
+            "DISGUST",
+            "EXCITEMENT",
+            "FEAR",
+            "HORROR",
+            "JOY",
+            "NEUTRAL",
+            "ROMANCE",
+            "SADNESS",
+            "SURPRISE",
+        ]
+        df_sess = pd.DataFrame(columns=col_names)
+
+        # Find all session files
+        beh_path = f"{rawdata_path}/sub-*/ses-{sess}/beh"
+        beh_list = sorted(glob.glob(f"{beh_path}/*rest-ratings*.tsv"))
+        if not beh_list:
+            raise FileNotFoundError(
+                f"No rest-ratings files found in {beh_path}."
+                + "\n\tTry running dcm_conversion."
+            )
+
+        # Add each participant's responses to df_sess
+        for beh_path in beh_list:
+
+            # Get session info
+            beh_file = os.path.basename(beh_path)
+            subj, sess, task, date_ext = beh_file.split("_")
+            subj_str = subj.split("-")[1]
+            date_str = date_ext.split(".")[0]
+
+            # Get data, organize for concat with df_sess
+            df_beh = pd.read_csv(beh_path, sep="\t", index_col="prompt")
+            df_beh_trans = df_beh.T
+            df_beh_trans.reset_index(inplace=True)
+            df_beh_trans = df_beh_trans.rename(columns={"index": "resp_type"})
+            df_beh_trans["study_id"] = subj_str
+            df_beh_trans["visit"] = sess
+            df_beh_trans["datetime"] = date_str
+
+            # Add info to df_sess
+            df_sess = pd.concat([df_sess, df_beh_trans], ignore_index=True)
+            del df_beh, df_beh_trans
+
+        self.df_sess = df_sess

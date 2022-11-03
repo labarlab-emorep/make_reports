@@ -1,7 +1,8 @@
 r"""Generate NDAR reports for EmoRep project.
 
 Organize project data and generate reports for regular
-NDAR submissions.
+NDAR submissions. List all reports available for generation
+via "--report-avail" option.
 
 Reports are written to:
     <proj_dir>/ndar_upload/reports
@@ -9,10 +10,10 @@ Reports are written to:
 Examples
 --------
 rep_ndar \
-    --nda-reports demo_info01 affim01
+    --report-names demo_info01 affim01
 
 rep_ndar \
-    --nda-reports-all
+    --report-all
 
 """
 import sys
@@ -27,28 +28,6 @@ def _get_args():
         description=__doc__, formatter_class=RawTextHelpFormatter
     )
     parser.add_argument(
-        "--nda-reports",
-        type=str,
-        nargs="+",
-        help=textwrap.dedent(
-            """\
-            [affim01 | als01 | bdi01 | demo_info01 | emrq01]
-            Make specific NDA reports by name.
-            e.g. --nda-reports affim01 als01
-            """
-        ),
-    )
-    parser.add_argument(
-        "--nda-reports-all",
-        action="store_true",
-        help=textwrap.dedent(
-            """\
-            Make all planned NDA reports.
-            True if "--nda-reports-all" else False.
-            """
-        ),
-    )
-    parser.add_argument(
         "--proj-dir",
         type=str,
         default="/mnt/keoki/experiments2/EmoRep/Exp2_Compute_Emotion",
@@ -56,6 +35,37 @@ def _get_args():
             """\
             Path to project's experiment directory
             (default : %(default)s)
+            """
+        ),
+    )
+    parser.add_argument(
+        "--report-all",
+        action="store_true",
+        help=textwrap.dedent(
+            """\
+            Make all planned NDA reports.
+            True if "--report-all" else False.
+            """
+        ),
+    )
+    parser.add_argument(
+        "--report-avail",
+        action="store_true",
+        help=textwrap.dedent(
+            """\
+            Print list of NDAR reports available for generating.
+            True if "--available-reports" else False.
+            """
+        ),
+    )
+    parser.add_argument(
+        "--report-names",
+        type=str,
+        nargs="+",
+        help=textwrap.dedent(
+            """\
+            Make specific NDA reports by name.
+            e.g. --report-names affim01 als01
             """
         ),
     )
@@ -70,12 +80,33 @@ def _get_args():
 def main():
     """Capture arguments and trigger workflow."""
     args = _get_args().parse_args()
-    nda_reports = args.nda_reports
-    nda_reports_all = args.nda_reports_all
+    print_avail = args.report_avail
+    nda_reports = args.report_names
+    nda_reports_all = args.report_all
     proj_dir = args.proj_dir
 
+    rep_avail = [
+        "affim01",
+        "als01",
+        "bdi01",
+        "brd01",
+        "demo_info01",
+        "emrq01",
+        "image03",
+        "panas01",
+        "pswq01",
+        "psychophys_subj_exp01",
+        "restsurv01",
+        "rrs01",
+        "stai01",
+        "tas01",
+    ]
+    if print_avail:
+        print(f"Available reports for generation : \n\t{rep_avail}")
+        sys.exit(0)
+
     if nda_reports_all:
-        nda_reports = ["affim01", "als01", "bdi01", "demo_info01", "emrq01"]
+        nda_reports = rep_avail
     workflow.make_nda_reports(nda_reports, proj_dir)
 
 

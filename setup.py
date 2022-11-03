@@ -12,6 +12,7 @@ setup(
             "rep_manager=make_reports.cli.rep_manager:main",
             "rep_metrics=make_reports.cli.rep_metrics:main",
             "rep_ndar=make_reports.cli.rep_ndar:main",
+            "gen_guids=make_reports.cli.gen_guids:main",
         ]
     },
     include_package_data=True,

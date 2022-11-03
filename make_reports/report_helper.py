@@ -291,8 +291,11 @@ def qualtrics_dict():
     # Value : output parent directory identifier
     return {
         "EmoRep_Session_1": "visit_day1",
-        "FINAL - EmoRep Stimulus Ratings - fMRI Study": "post_scan_ratings",
-        "Session 2 & 3 Survey": "visit_day23",
+        "FINAL - EmoRep Stimulus Ratings - fMRI Study": [
+            "visit_day2",
+            "visit_day3",
+        ],
+        "Session 2 & 3 Survey": ["visit_day2", "visit_day3"],
     }
 
 
