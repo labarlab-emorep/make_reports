@@ -2934,29 +2934,32 @@ class NdarPhysio:
 
             # Determine session info
             phys_file = os.path.basename(phys_path)
+            print(f"\tMining data for {phys_file}")
             subj, sess, task, run, _, _ = phys_file.split("_")
             subj_nda = subj.split("-")[1]
 
-            # Extract datetime from acq file - I could not suppress
-            # stdout print by air.run() for the life of me.
-            air = acq_info.AcqInfoRunner(phys_path)
-            air.run()
-            acq_date_str = (
-                air.reader.datafile.earliest_marker_created_at.isoformat()
-            ).split("T")[0]
+            # # Extract datetime from acq file - I could not suppress
+            # # stdout print by air.run() for the life of me.
+            # air = acq_info.AcqInfoRunner(phys_path)
+            # air.run()
+            # acq_date_str = (
+            #     air.reader.datafile.earliest_marker_created_at.isoformat()
+            # ).split("T")[0]
 
-            # bash_cmd = f"""
-            #     line=$(acq_info {phys_path} | grep "Earliest")
-            #     IFS=":" read -ra dt_arr <<< $line
-            #     echo ${{dt_arr[1]%T*}}
-            # """
-            # h_sp = subprocess.Popen(
-            #     bash_cmd, shell=True, stdout=subprocess.PIPE
-            # )
-            # h_out, h_err = h_sp.communicate()
-            # h_sp.wait()
-            # acq_date_str = h_out.decode("utf-8").strip()
-
+            bash_cmd = f"""
+                line=$(acq_info {phys_path} | grep "Earliest")
+                IFS=":" read -ra dt_arr <<< $line
+                echo ${{dt_arr[1]%T*}}
+            """
+            h_sp = subprocess.Popen(
+                bash_cmd,
+                shell=True,
+                executable="/bin/bash",
+                stdout=subprocess.PIPE,
+            )
+            h_out = h_sp.stdout.read()
+            h_acq_date_str = h_out.decode("utf-8").strip()
+            acq_date_str = h_acq_date_str.split("T")[0]
             acq_date = datetime.strptime(acq_date_str, "%Y-%m-%d")
 
             # Copy file for hosting

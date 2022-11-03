@@ -307,7 +307,6 @@ def make_manager_reports(manager_reports, query_date, proj_dir):
     )
     if len(redcap_clean) != 4:
         print("No clean data found in RedCap, cleaning ...")
-        # clean_surveys(proj_dir, clean_redcap=True)
         cl_data = CleanSurveys(proj_dir)
         cl_data.clean_redcap()
         print("\tDone.")
@@ -392,9 +391,8 @@ def make_nda_reports(nda_reports, proj_dir):
         f"{proj_dir}/data_survey/redcap_demographics/data_clean/*.csv"
     )
     visit_clean = glob.glob(f"{proj_dir}/data_survey/visit*/data_clean/*.csv")
-    if len(redcap_clean) != 4 and len(visit_clean) != 13:
+    if len(redcap_clean) != 4 or len(visit_clean) != 17:
         print("Missing RedCap, Qualtrics clean data. Cleaning ...")
-        # clean_surveys(proj_dir, clean_redcap=True, clean_qualtrics=True)
         cl_data = CleanSurveys(proj_dir)
         cl_data.clean_redcap()
         cl_data.clean_qualtrics()
@@ -496,7 +494,6 @@ def generate_guids(proj_dir, user_name, user_pass, find_mismatch):
     )
     if not os.path.exists(chk_demo):
         print("Missing clean RedCap demographics, cleaning ...")
-        # clean_surveys(proj_dir, clean_redcap=True)
         cl_data = CleanSurveys(proj_dir)
         cl_data.clean_redcap()
         print("\tDone.")
