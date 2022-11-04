@@ -507,3 +507,26 @@ def generate_guids(proj_dir, user_name, user_pass, find_mismatch):
             print(f"Mismatching GUIDs :\n\t{guid_obj.mismatch_list}")
         else:
             print("No mismatches found!")
+
+
+def calc_metrics(proj_dir):
+    """Title.
+
+    Desc.
+
+    """
+    # Check for clean RedCap/visit data, generate if needed
+    redcap_clean = glob.glob(
+        f"{proj_dir}/data_survey/redcap_demographics/data_clean/*.csv"
+    )
+    visit_clean = glob.glob(f"{proj_dir}/data_survey/visit*/data_clean/*.csv")
+    if len(redcap_clean) != 4 or len(visit_clean) != 17:
+        print("Missing RedCap, Qualtrics clean data. Cleaning ...")
+        cl_data = CleanSurveys(proj_dir)
+        cl_data.clean_redcap()
+        cl_data.clean_qualtrics()
+        print("\tDone.")
+
+    # Get redcap demo info, use only consented data
+    redcap_demo = build_reports.DemoAll(proj_dir)
+    redcap_demo.remove_withdrawn()
