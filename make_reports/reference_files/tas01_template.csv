@@ -1,2 +1,2 @@
-tas,1,,,,,,,,,,,,,,,,,,,,,,,,,,,,,
-subjectkey,src_subject_id,interview_age,interview_date,sex,tas20_1,tas20_2,tas20_3,tas20_4,tas20_5,tas20_6,tas20_7,tas20_8,tas20_9,tas20_10,tas20_11,tas20_12,tas20_13,tas20_14,tas20_15,tas20_16,tas20_17,tas20_18,tas20_19,tas20_20,tas_totalscore,tas_factor1_score,tas_factor2_score,tas_factor3_score,timepoint_label,studynumber
+"tas","01"
+"subjectkey","src_subject_id","interview_age","interview_date","sex","tas20_1","tas20_2","tas20_3","tas20_4","tas20_5","tas20_6","tas20_7","tas20_8","tas20_9","tas20_10","tas20_11","tas20_12","tas20_13","tas20_14","tas20_15","tas20_16","tas20_17","tas20_18","tas20_19","tas20_20","tas_totalscore","tas_factor1_score","tas_factor2_score","tas_factor3_score","timepoint_label","studynumber"

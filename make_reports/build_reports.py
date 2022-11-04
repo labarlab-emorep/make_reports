@@ -1198,7 +1198,7 @@ class NdarAls01:
 
         """
         # Remap response values and column names
-        resp_qual = ["1", "2", "3", "4"]
+        resp_qual = [1, 2, 3, 4]
         resp_ndar = [3, 2, 1, 0]
         map_item = {
             "ALS_1": "als5",
@@ -1230,6 +1230,9 @@ class NdarAls01:
         df_als_remap[als_cols] = df_als_remap[als_cols].astype("Int64")
         df_als_remap["als_glob"] = df_als_remap[als_cols].sum(axis=1)
         df_als_remap["als_sf_total"] = df_als_remap[als_cols].sum(axis=1)
+        df_als_remap["als_sf_total"] = df_als_remap["als_sf_total"].astype(
+            "Int64"
+        )
 
         # Add pilot notes for certain subjects
         pilot_list = report_helper.pilot_list()
@@ -1719,7 +1722,7 @@ class NdarDemoInfo01:
 
     """
 
-    def __init__(self, final_demo):
+    def __init__(self, proj_dir, final_demo):
         """Read in demographic info and make report.
 
         Read-in data, setup empty df_report, and coordinate
@@ -1727,6 +1730,8 @@ class NdarDemoInfo01:
 
         Parameters
         ----------
+        proj_dir : path
+            Project's experiment directory, unused
         final_demo : make_reports.build_reports.DemoAll.final_demo
             pd.DataFrame, compiled demographic info
 
@@ -1959,10 +1964,12 @@ class NdarImage03:
 
     Attributes
     ----------
-    df_report_pilot : pd.DataFrame
-        Image03 for pilot participants
-    df_report_study : pd.DataFrame
+    df_report : pd.DataFrame
         Image03 values for experiment/study participants
+    df_report_pilot : pd.DataFrame
+        Image03 values for pilot participants
+    df_report_study : pd.DataFrame
+        Image03 values for study participants
     final_demo : make_reports.build_reports.DemoAll.final_demo
         pd.DataFrame, compiled demographic info
     local_path : str
@@ -2243,7 +2250,7 @@ class NdarImage03:
             "src_subject_id": subj_id,
             "interview_date": interview_date,
             "interview_age": interview_age,
-            "gender": subj_sex,
+            "sex": subj_sex,
         }
 
     def _get_std_info(self, nii_json, dicom_hdr):
@@ -3079,12 +3086,20 @@ class NdarPhysio:
         interview_age = report_helper.calc_age_mo([subj_dob], [acq_date])[0]
         interview_date = datetime.strftime(acq_date, "%m/%d/%Y")
 
+        # Set babysex to M/F for requirements
+        bsex = 1 if subj_sex == "M" else 2
+
         return {
             "subjectkey": subj_guid,
             "src_subject_id": subj_id,
             "interview_date": interview_date,
             "interview_age": interview_age,
             "sex": subj_sex,
+            "child_subjectkey": subj_guid,
+            "ch_src_id": subj_id,
+            "bio_childage_1": interview_age,
+            "babysex": bsex,
+            "family_id": subj_id,
         }
 
     def _get_std_info(self):
@@ -3180,6 +3195,7 @@ class NdarPhysio:
             exp_id = (
                 exp_dict["old"] if subj_nda in pilot_list else exp_dict["new"]
             )
+            # exp_id = 3639
             stim_pres = 0 if task == "task-rest" else 1
             visit = sess[-1]
             phys_dict = {

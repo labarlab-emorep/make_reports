@@ -446,17 +446,14 @@ def make_nda_reports(nda_reports, proj_dir):
         rep_class = getattr(mod, h_class)
 
         # Generate report
-        if report == "demo_info01":
-            rep_obj = rep_class(redcap_demo.final_demo)
-        else:
-            rep_obj = rep_class(proj_dir, redcap_demo.final_demo)
+        rep_obj = rep_class(proj_dir, redcap_demo.final_demo)
 
         # Write out report
         out_file = os.path.join(report_dir, f"{report}_dataset.csv")
         print(f"\tWriting : {out_file}")
         rep_obj.df_report.to_csv(out_file, index=False, na_rep="")
 
-        # Preprend header
+        # Prepend header
         dummy_file = f"{out_file}.bak"
         with open(out_file, "r") as read_obj, open(
             dummy_file, "w"

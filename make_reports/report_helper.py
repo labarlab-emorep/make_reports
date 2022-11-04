@@ -262,6 +262,7 @@ def get_survey_age(df_survey, df_demo, subj_col):
     # Calculate age-in-months, update dataframe
     subj_age_mo = calc_age_mo(subj_dob, subj_dos)
     df_survey["interview_age"] = subj_age_mo
+    df_survey["interview_age"] = df_survey["interview_age"].astype("Int64")
     df_survey["interview_date"] = df_survey["datetime"].dt.strftime("%m/%d/%Y")
     return df_survey
 

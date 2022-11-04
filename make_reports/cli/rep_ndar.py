@@ -85,6 +85,7 @@ def main():
     nda_reports_all = args.report_all
     proj_dir = args.proj_dir
 
+    # Set supported reports
     rep_avail = [
         "affim01",
         "als01",
@@ -105,6 +106,7 @@ def main():
         print(f"Available reports for generation : \n\t{rep_avail}")
         sys.exit(0)
 
+    # Generate requested reports
     if nda_reports_all:
         nda_reports = rep_avail
     workflow.make_nda_reports(nda_reports, proj_dir)
