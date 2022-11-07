@@ -5,6 +5,7 @@ from datetime import datetime
 import pandas as pd
 from make_reports import survey_download, survey_clean
 from make_reports import build_reports, report_helper
+from make_reports import calc_descriptives
 
 
 def download_surveys(
@@ -509,7 +510,7 @@ def generate_guids(proj_dir, user_name, user_pass, find_mismatch):
             print("No mismatches found!")
 
 
-def calc_metrics(proj_dir):
+def calc_metrics(proj_dir, recruit_demo):
     """Title.
 
     Desc.
@@ -530,3 +531,8 @@ def calc_metrics(proj_dir):
     # Get redcap demo info, use only consented data
     redcap_demo = build_reports.DemoAll(proj_dir)
     redcap_demo.remove_withdrawn()
+
+    #
+    if recruit_demo:
+        print("Comparing planned vs. actual recruitment demographics ...")
+        _ = calc_descriptives.demographics(proj_dir, redcap_demo.final_demo)

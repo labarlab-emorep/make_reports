@@ -4,7 +4,7 @@ Desc.
 
 Example
 -------
-rep_metrics
+rep_metrics --recruit-demo
 
 """
 import sys
@@ -29,6 +29,16 @@ def _get_args():
             """
         ),
     )
+    parser.add_argument(
+        "--recruit-demo",
+        action="store_true",
+        help=textwrap.dedent(
+            """\
+            Whether to calculated recruitement demographics,
+            True if "--recruit-demo" else False.
+            """
+        ),
+    )
 
     if len(sys.argv) <= 1:
         parser.print_help(sys.stderr)
@@ -41,8 +51,9 @@ def main():
     """Capture arguments and trigger workflow."""
     args = _get_args().parse_args()
     proj_dir = args.proj_dir
+    recruit_demo = args.recruit_demo
 
-    workflow.calc_metrics(proj_dir)
+    workflow.calc_metrics(proj_dir, recruit_demo)
 
 
 if __name__ == "__main__":
