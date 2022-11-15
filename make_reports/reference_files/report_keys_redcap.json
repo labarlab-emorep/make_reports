@@ -1,8 +1,8 @@
 {
     "demographics": "48944",
     "guid": "48959",
-    "consent_new": "48960",
-    "consent_orig": "48981",
+    "consent_v1.22": "48960",
+    "consent_pilot": "48981",
     "bdi_day2": "48984",
     "bdi_day3": "48985"
 }
