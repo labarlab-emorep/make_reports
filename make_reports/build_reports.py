@@ -1473,7 +1473,7 @@ class NdarBdi01:
 
         # Drop non-ndar columns
         df_bdi_remap = df_bdi_remap.drop(
-            ["bdi_complete", "record_id"],
+            ["record_id"],
             axis=1,
         )
 
