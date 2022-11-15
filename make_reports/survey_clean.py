@@ -105,7 +105,7 @@ class CleanRedcap:
         print(f"Cleaning survey : {survey_name}")
         if survey_name == "bdi_day2" or survey_name == "bdi_day3":
             self._clean_bdi_day23()
-        elif survey_name == "consent_new" or survey_name == "consent_orig":
+        elif survey_name == "consent_v1.22" or survey_name == "consent_pilot":
             self._clean_consent()
         else:
             clean_method = getattr(self, f"_clean_{survey_name}")
@@ -412,9 +412,9 @@ class CleanRedcap:
 
         # Enforce datetime format
         col_rename = (
-            "bdi_2_timestamp"
-            if "bdi_2_timestamp" in col_names
-            else "bdi_timestamp"
+            "bdi_visit_2_timestamp"
+            if "bdi_visit_2_timestamp" in col_names
+            else "bdi_visit_3_timestamp"
         )
         df_raw.rename(
             {col_rename: "datetime"},
