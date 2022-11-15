@@ -91,8 +91,8 @@ class DemoAll:
         """
         # Set key, df mapping
         map_dict = {
-            "cons_orig": "df_consent_orig.csv",
-            "cons_new": "df_consent_new.csv",
+            "cons_orig": "df_consent_pilot.csv",
+            "cons_new": "df_consent_v1.22.csv",
             "demo": "df_demographics.csv",
             "guid": "df_guid.csv",
         }
@@ -132,7 +132,7 @@ class DemoAll:
         )
         del pilot_dict, clean_dict
 
-        # Update consent_new column names from original and merge
+        # Update consent_v1.22 column names from original and merge
         cols_new = df_cons_new.columns.tolist()
         cols_orig = df_cons_orig.columns.tolist()
         cols_replace = {}
