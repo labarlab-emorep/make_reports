@@ -400,9 +400,11 @@ class CleanRedcap:
         drop_list = ["guid_timestamp", "redcap_survey_identifier"]
         df_raw = self.df_raw.drop(drop_list, axis=1)
         col_names = df_raw.columns.tolist()
-        col_reorder = (
-            col_names[:1] + col_names[-1:] + col_names[-2:-1] + col_names[1:-2]
-        )
+        # col_reorder = (
+        #     col_names[:1] + col_names[-1:] +
+        #       col_names[-2:-1] + col_names[1:-2]
+        # )
+        col_reorder = col_names[:1] + col_names[-1:] + col_names[1:-1]
         df_raw = df_raw[col_reorder]
 
         # Remove rows without responses or study_id (from guid survey)
