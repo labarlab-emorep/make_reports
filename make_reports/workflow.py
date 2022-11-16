@@ -510,10 +510,16 @@ def generate_guids(proj_dir, user_name, user_pass, find_mismatch):
             print("No mismatches found!")
 
 
-def calc_metrics(proj_dir, recruit_demo):
+def calc_metrics(proj_dir, recruit_demo, pending_scans):
     """Title.
 
     Desc.
+
+    Parameters
+    ----------
+    proj_dir : path
+    recruit_demo : bool
+    pending_scans : bool
 
     """
     # Check for clean RedCap/visit data, generate if needed

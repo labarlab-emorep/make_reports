@@ -15,10 +15,16 @@ Calcualte survey stats:
 """
 # %%
 import os
+import json
+import datetime
+import seaborn as sns
 import pandas as pd
+import numpy as np
+import importlib.resources as pkg_resources
+from make_reports import report_helper
+from make_reports import reference_files
 
 # import matplotlib.pyplot as plt
-import seaborn as sns
 
 
 # %%
@@ -261,6 +267,63 @@ def demographics(proj_dir, final_demo):
     print(f"\tWrote : {out_file}")
 
     return {"all": df_plot_all, "sex": df_plot_sex}
+
+
+# %%
+def calc_pending():
+    """Title.
+
+    Desc.
+
+    """
+    today_date = datetime.date.today()
+
+    #
+    with pkg_resources.open_text(
+        reference_files, "log_keys_redcap.json"
+    ) as jf:
+        report_keys = json.load(jf)
+
+    df_complete = report_helper.pull_redcap_data(
+        redcap_token, report_keys["completion_log"]
+    )
+    df_visit2 = report_helper.pull_redcap_data(
+        redcap_token, report_keys["mri_visit2"]
+    )
+
+    #
+    df_complete = df_complete[
+        df_complete["day_2_fully_completed"].notna()
+    ].reset_index(drop=True)
+    idx_no3 = df_complete.index[
+        (
+            (df_complete["day_3_fully_completed"] == 0)
+            | df_complete["day_3_fully_completed"].apply(np.isnan)
+        )
+        & (df_complete["completion_log_complete"] == 0)
+    ]
+    subj_no3 = df_complete.loc[idx_no3, "record_id"].tolist()
+
+    #
+    df_visit2 = df_visit2[
+        df_visit2["session_numberv3_v2"].notna()
+    ].reset_index(drop=True)
+
+    df_visit2["date_mriv3_v2"] = df_visit2["date_mriv3_v2"].astype(
+        "datetime64[ns]"
+    )
+
+    # df_visit2["date_mriv3_v2"] = pd.to_datetime(
+    #     df_visit2["date_mriv3_v2"], format="%Y-%m-%d"
+    # )
+
+    idx_subj_no3 = df_visit2.index[df_visit2["record_id"].isin(subj_no3)]
+    scan2_dates = df_visit2.loc[idx_subj_no3, "date_mriv3_v2"].tolist()
+
+    #
+    pend_dict = {}
+    for h_subj, h_date in zip(subj_no3, scan2_dates):
+        pend_dict[h_subj] = today_date - h_date.date()
 
 
 # %%
