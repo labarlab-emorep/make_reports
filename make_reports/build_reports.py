@@ -1338,7 +1338,7 @@ class NdarBdi01:
 
         # Combine into final report
         df_report = pd.concat([df_nda_day2, df_nda_day3], ignore_index=True)
-        df_report = df_report.sort_values(by=["src_subject_id"])
+        df_report = df_report.sort_values(by=["src_subject_id", "visit"])
 
         # Add pilot notes for certain subjects
         pilot_list = report_helper.pilot_list()
@@ -1581,7 +1581,9 @@ class NdarBrd01:
         # Fill df_report for each session
         self._make_brd("day2")
         self._make_brd("day3")
-        self.df_report = self.df_report.sort_values(by=["src_subject_id"])
+        self.df_report = self.df_report.sort_values(
+            by=["src_subject_id", "visit"]
+        )
 
     def _get_subj_demo(self, survey_date, sub):
         """Gather required participant demographic information.
@@ -2748,7 +2750,7 @@ class NdarPanas01:
         df_report = pd.concat(
             [df_pilot, df_nda_day2, df_nda_day3], ignore_index=True
         )
-        df_report = df_report.sort_values(by=["src_subject_id"])
+        df_report = df_report.sort_values(by=["src_subject_id", "visit"])
         self.df_report = df_report[df_report["interview_date"].notna()]
 
     def _calc_metrics(self, df):
@@ -3421,7 +3423,7 @@ class NdarRest01:
 
         # Combine into final report
         df_report = pd.concat([df_nda_day2, df_nda_day3], ignore_index=True)
-        df_report = df_report.sort_values(by=["src_subject_id"])
+        df_report = df_report.sort_values(by=["src_subject_id", "visit"])
 
         # Add pilot notes for certain subjects
         pilot_list = report_helper.pilot_list()
