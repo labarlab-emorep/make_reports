@@ -5,7 +5,7 @@ Desc.
 Example
 -------
 rep_metrics --recruit-demo
-rep_metrics --pending-scans
+rep_metrics --pending-scans --redcap-token $PAT_REDCAP_EMOREP
 
 """
 import sys
@@ -24,7 +24,8 @@ def _get_args():
         action="store_true",
         help=textwrap.dedent(
             """\
-            Determine which participants need a second scan
+            Determine which participants need a second scan, requires
+            --redcap-token.
             True if "--pending-scans" else False.
             """
         ),
@@ -50,6 +51,12 @@ def _get_args():
             """
         ),
     )
+    parser.add_argument(
+        "--redcap-token",
+        type=str,
+        default=None,
+        help="API token for RedCap project",
+    )
 
     if len(sys.argv) <= 1:
         parser.print_help(sys.stderr)
@@ -64,8 +71,9 @@ def main():
     proj_dir = args.proj_dir
     recruit_demo = args.recruit_demo
     pending_scans = args.pending_scans
+    redcap_token = args.redcap_token
 
-    workflow.calc_metrics(proj_dir, recruit_demo, pending_scans)
+    workflow.calc_metrics(proj_dir, recruit_demo, pending_scans, redcap_token)
 
 
 if __name__ == "__main__":

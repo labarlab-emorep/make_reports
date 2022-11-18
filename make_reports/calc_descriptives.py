@@ -270,7 +270,7 @@ def demographics(proj_dir, final_demo):
 
 
 # %%
-def calc_pending():
+def calc_pending(redcap_token):
     """Title.
 
     Desc.
@@ -296,12 +296,16 @@ def calc_pending():
         df_complete["day_2_fully_completed"].notna()
     ].reset_index(drop=True)
     idx_no3 = df_complete.index[
-        (
-            (df_complete["day_3_fully_completed"] == 0)
-            | df_complete["day_3_fully_completed"].apply(np.isnan)
-        )
+        (df_complete["day_3_fully_completed"] != 1)
         & (df_complete["completion_log_complete"] == 0)
     ]
+    # idx_no3 = df_complete.index[
+    #     (
+    #         (df_complete["day_3_fully_completed"] == 0)
+    #         | df_complete["day_3_fully_completed"].apply(np.isnan)
+    #     )
+    #     & (df_complete["completion_log_complete"] == 0)
+    # ]
     subj_no3 = df_complete.loc[idx_no3, "record_id"].tolist()
 
     #
@@ -323,7 +327,9 @@ def calc_pending():
     #
     pend_dict = {}
     for h_subj, h_date in zip(subj_no3, scan2_dates):
-        pend_dict[h_subj] = today_date - h_date.date()
+        h_delta = today_date - h_date.date()
+        pend_dict[h_subj] = f"{h_delta.days} days"
+    return pend_dict
 
 
 # %%

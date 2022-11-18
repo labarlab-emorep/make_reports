@@ -510,7 +510,7 @@ def generate_guids(proj_dir, user_name, user_pass, find_mismatch):
             print("No mismatches found!")
 
 
-def calc_metrics(proj_dir, recruit_demo, pending_scans):
+def calc_metrics(proj_dir, recruit_demo, pending_scans, redcap_token):
     """Title.
 
     Desc.
@@ -534,11 +534,20 @@ def calc_metrics(proj_dir, recruit_demo, pending_scans):
         cl_data.clean_qualtrics()
         print("\tDone.")
 
-    # Get redcap demo info, use only consented data
-    redcap_demo = build_reports.DemoAll(proj_dir)
-    redcap_demo.remove_withdrawn()
-
     #
     if recruit_demo:
-        print("Comparing planned vs. actual recruitment demographics ...")
+        # Get redcap demo info, use only consented data
+        redcap_demo = build_reports.DemoAll(proj_dir)
+        redcap_demo.remove_withdrawn()
+
+        print("\nComparing planned vs. actual recruitment demographics ...")
         _ = calc_descriptives.demographics(proj_dir, redcap_demo.final_demo)
+
+    #
+    if pending_scans:
+        print("\nFinding participants missing day3 scan ...\n")
+        pend_dict = calc_descriptives.calc_pending(redcap_token)
+        print("\tSubj \t Time since day2 scan")
+        for subid, days in pend_dict.items():
+            print(f"\t{subid} \t {days}")
+        print("")
