@@ -352,7 +352,7 @@ def make_manager_reports(manager_reports, query_date, proj_dir):
         del mr
 
 
-def make_nda_reports(nda_reports, proj_dir):
+def make_nda_reports(nda_reports, proj_dir, close_date):
     """Make reports and organize data for NDAR upload.
 
     Generate requested NDAR reports and organize data (if required) for the
@@ -364,12 +364,8 @@ def make_nda_reports(nda_reports, proj_dir):
         Names of desired NDA reports e.g. ["demo_info01", "affim01"]
     proj_dir : path
         Project's experiment directory
-    post_labels : bool
-        Whether to use labels in post_scan_ratings pull
-    qualtrics_token : str
-        Qualtrics API token
-    redcap_token : str
-        RedCap API token
+    close_date : datetime
+        Submission cycle close date
 
     Returns
     -------
@@ -431,9 +427,10 @@ def make_nda_reports(nda_reports, proj_dir):
     if not os.path.exists(report_dir):
         os.makedirs(report_dir)
 
-    # Get redcap demo info, use only consented data
+    # Get redcap demo info, use only consented data in submission cycle
     redcap_demo = build_reports.DemoAll(proj_dir)
     redcap_demo.remove_withdrawn()
+    redcap_demo.submission_cycle(close_date)
 
     # Ignore loc warning
     pd.options.mode.chained_assignment = None
@@ -483,6 +480,9 @@ def generate_guids(proj_dir, user_name, user_pass, find_mismatch):
         NDA user name
     user_pass : str
         NDA user password
+    find_mismatch : bool
+        Whether to check for mismatches between REDCap
+        and generated GUIDs
 
     """
     # Check for clean RedCap data, generate if needed

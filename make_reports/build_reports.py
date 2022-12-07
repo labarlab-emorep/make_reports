@@ -331,6 +331,20 @@ class DemoAll:
         ]
         self.final_demo = self.final_demo.reset_index(drop=True)
 
+    def submission_cycle(self, close_date):
+        """Determine participants for NDAR submission cycle.
+
+        Remove participants consented on or after close_date.
+
+        Parameters
+        ----------
+        close_date : datetime
+            Submission cycle close date
+
+        """
+        include_mask = self.final_demo["interview_date"] < close_date
+        self.final_demo = self.final_demo.loc[include_mask]
+
 
 class ManagerRegular:
     """Make reports regularly submitted by lab manager.
