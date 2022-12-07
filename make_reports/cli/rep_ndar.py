@@ -9,15 +9,20 @@ Reports are written to:
 
 Examples
 --------
-rep_ndar \
-    --report-names demo_info01 affim01
+rep_ndar --report-avail
 
 rep_ndar \
-    --report-all
+    --report-names demo_info01 affim01 \
+    --close-date 2022-12-01
+
+rep_ndar \
+    --report-all \
+    --close-date 2022-12-01
 
 """
 import sys
 import textwrap
+from datetime import datetime
 from argparse import ArgumentParser, RawTextHelpFormatter
 from make_reports import workflow
 
@@ -26,6 +31,20 @@ def _get_args():
     """Get and parse arguments."""
     parser = ArgumentParser(
         description=__doc__, formatter_class=RawTextHelpFormatter
+    )
+    parser.add_argument(
+        "--close-date",
+        type=str,
+        default=None,
+        help=textwrap.dedent(
+            """\
+            YYYY-MM-DD format.
+            Close date for NDAR submission cycle, e.g.
+            "--close-date 2022-12-01" for 2023-01-15
+            submission. Used to submit data from
+            participants in the correct cycle.
+            """
+        ),
     )
     parser.add_argument(
         "--proj-dir",
@@ -43,6 +62,7 @@ def _get_args():
         action="store_true",
         help=textwrap.dedent(
             """\
+            Requires --close-date.
             Make all planned NDA reports.
             True if "--report-all" else False.
             """
@@ -64,6 +84,7 @@ def _get_args():
         nargs="+",
         help=textwrap.dedent(
             """\
+            Requires --close-date.
             Make specific NDA reports by name.
             e.g. --report-names affim01 als01
             """
@@ -106,10 +127,18 @@ def main():
         print(f"Available reports for generation : \n\t{rep_avail}")
         sys.exit(0)
 
+    # Check close date
+    if args.close_date:
+        close_date = datetime.strptime(args.close_date, "%Y-%m-%d").date()
+    else:
+        raise ValueError(
+            "--close-date required by --report-all and --report-names"
+        )
+
     # Generate requested reports
     if nda_reports_all:
         nda_reports = rep_avail
-    workflow.make_nda_reports(nda_reports, proj_dir)
+    workflow.make_nda_reports(nda_reports, proj_dir, close_date)
 
 
 if __name__ == "__main__":
