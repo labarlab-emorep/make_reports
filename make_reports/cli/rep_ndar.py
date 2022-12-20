@@ -117,7 +117,6 @@ def main():
         "image03",
         "panas01",
         "pswq01",
-        "psychophys_subj_exp01",
         "restsurv01",
         "rrs01",
         "stai01",

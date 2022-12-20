@@ -2174,7 +2174,7 @@ class NdarImage03:
         """
         # Specify MRI data types - these are used to match
         # and use private class methods to the data of the
-        # participants session.
+        # participant's session.
         type_list = ["anat", "func", "fmap"]
         cons_list = self.final_demo["src_subject_id"].tolist()
 
@@ -2330,10 +2330,10 @@ class NdarImage03:
             "visnum": float(self.sess[-1]),
         }
 
-    def _make_host(self, share_file, out_name):
+    def _make_host(self, share_file, out_name, out_dir="data_mri"):
         """Copy a file for hosting with NDA package builder.
 
-        Data will be copied to <proj_dir>/ndar_upload/data_mri.
+        Data will be copied to <proj_dir>/ndar_upload/<out_dir>.
 
         Parameters
         ----------
@@ -2341,6 +2341,8 @@ class NdarImage03:
             Location of desired file to share
         out_name : str
             Output name of file
+        out_dir : str, optional
+            Sub-directory destination of <proj_dir>/ndar_upload,
 
         Raises
         ------
@@ -2355,7 +2357,7 @@ class NdarImage03:
 
         # Setup output path
         host_file = os.path.join(
-            self.proj_dir, "ndar_upload/data_mri", out_name
+            self.proj_dir, "ndar_upload", out_dir, out_name
         )
 
         # Submit copy subprocess
@@ -2623,25 +2625,19 @@ class NdarImage03:
             demo_dict = self._get_subj_demo(scan_date)
 
             # Setup host nii
-            h_guid = demo_dict["subjectkey"]
-            h_task = task.split("-")[1]
-            h_run = run[-1]
-            # host_nii = f"{h_guid}_{day}_func_{h_task}_run{h_run}.nii.gz"
-            host_nii = f"{h_guid}_{day}_func_emostim_run{h_run}.nii.gz"
+            subj_guid = demo_dict["subjectkey"]
+            host_nii = f"{subj_guid}_{day}_func_emostim_run{run[-1]}.nii.gz"
             self._make_host(nii_path, host_nii)
 
             # Setup host events, account for no rest
             # events and missing task files.
             events_exists = False
-            if not h_task == "rest":
-                # host_events = (
-                #     f"{h_guid}_{day}_func_{h_task}_run{h_run}_events.tsv"
-                # )
+            if not task == "task-rest":
                 host_events = (
-                    f"{h_guid}_{day}_func_emostim_run{h_run}_events.tsv"
+                    f"{subj_guid}_{day}_func_emostim_run{run[-1]}_events.tsv"
                 )
                 events_path = re.sub("_bold.nii.gz$", "_events.tsv", nii_path)
-                events_exists = True if os.path.exists(events_path) else False
+                events_exists = os.path.exists(events_path)
                 if events_exists:
                     self._make_host(events_path, host_events)
 
@@ -2666,19 +2662,95 @@ class NdarImage03:
                 "image_slice_thickness": float(nii_json["SliceThickness"]),
                 "slice_timing": f"{nii_json['SliceTiming']}",
             }
-            if not h_task == "rest" and events_exists:
-                func_image03["data_file2"] = f"{self.local_path}/{host_events}"
-                func_image03["data_file2_type"] = "task event information"
 
-            # Combine all dicts
+            # Combine all dicts, write row
             func_image03.update(demo_dict)
             func_image03.update(std_dict)
 
-            # Add scan info to report
-            new_row = pd.DataFrame(func_image03, index=[0])
-            self.df_report_study = pd.concat(
-                [self.df_report_study.loc[:], new_row]
-            ).reset_index(drop=True)
+            # Add task events files in data_file2 fields, accounting for
+            # missing events files.
+            if events_exists:
+                func_image03["data_file2"] = f"{self.local_path}/{host_events}"
+                func_image03["data_file2_type"] = "task event information"
+
+            # Write one row for task-resting with physio in data_file2 fields,
+            # and two rows for task-movies|scenarios where the first row
+            # has the events and the seond the physio in data_file2_fields.
+            # Account for missing physio data.
+            if task == "task-rest":
+                new_row, _ = self._info_phys(
+                    task, run, day, subj_guid, func_image03
+                )
+                self.df_report_study = pd.concat(
+                    [self.df_report_study.loc[:], new_row]
+                ).reset_index(drop=True)
+            else:
+                new_row = pd.DataFrame(func_image03, index=[0])
+                self.df_report_study = pd.concat(
+                    [self.df_report_study.loc[:], new_row]
+                ).reset_index(drop=True)
+
+                phys_row, phys_exists = self._info_phys(
+                    task, run, day, subj_guid, func_image03
+                )
+                if phys_exists:
+                    self.df_report_study = pd.concat(
+                        [self.df_report_study.loc[:], phys_row]
+                    ).reset_index(drop=True)
+
+    def _info_phys(self, task, run, day, subj_guid, func_image03):
+        """Helper function of _info_func.
+
+        Find the physio file corresponding to a functional run,
+        host it and then update the data_file2 fields in func_image03.
+
+        Parameters
+        ----------
+        task : str
+            BIDS task identifier
+        run : str
+            BIDS run idenfitier
+        day : str
+            [day2|day3]
+            For keeping host data file name consistent
+        subj_guid : str
+            Participant GUID
+        func_image03 : dict
+            Info needed for writing an image03 line for functional data
+
+        Returns
+        -------
+        tuple
+            [0] = pd.DataFrame
+                func_image03 as a dataframe, contains data_file2 fields with
+                physio info if physio files exist
+            [1] = bool
+                Whether a physio file was detected
+
+        """
+        # Identify corresponding physio file
+        phys_file = (
+            f"{self.subj}_{self.sess}_{task}_{run}_"
+            + "recording-biopack_physio.acq"
+        )
+        phys_path = os.path.join(self.subj_sess, "phys", phys_file)
+        phys_exists = os.path.exists(phys_path)
+        if phys_exists:
+
+            # Host physio file
+            task_name = "rest" if task == "task-rest" else "emostim"
+            host_phys = (
+                f"{subj_guid}_{day}_func_{task_name}_"
+                + f"run{run[-1]}_physio.acq"
+            )
+            self._make_host(phys_path, host_phys, "data_phys")
+
+            # Update func_image03 with physio info
+            func_image03["data_file2"] = f"{self.local_path}/{host_phys}"
+            func_image03["data_file2_type"] = "psychophysiological recordings"
+
+        new_row = pd.DataFrame(func_image03, index=[0])
+        return (new_row, phys_exists)
 
 
 class NdarPanas01:
@@ -2979,6 +3051,10 @@ class NdarPanas01:
 
 class NdarPhysio:
     """Make psychophys_subj_exp01 report line-by-line.
+
+    DEPRECATED
+        NDAR is now recommending we submit our physio data as a second
+        line for each EPI run in image03.
 
     Identify all physio data in rawdata and add a line the NDAR report
     for each file.

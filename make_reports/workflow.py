@@ -406,7 +406,6 @@ def make_nda_reports(nda_reports, proj_dir, close_date):
         "emrq01": f"{mod_build}.NdarEmrq01",
         "image03": f"{mod_build}.NdarImage03",
         "panas01": f"{mod_build}.NdarPanas01",
-        "psychophys_subj_exp01": f"{mod_build}.NdarPhysio",
         "pswq01": f"{mod_build}.NdarPswq01",
         "restsurv01": f"{mod_build}.NdarRest01",
         "rrs01": f"{mod_build}.NdarRrs01",
