@@ -430,9 +430,6 @@ def make_nda_reports(nda_reports, proj_dir, close_date):
     redcap_demo.remove_withdrawn()
     redcap_demo.submission_cycle(close_date)
 
-    # Ignore loc warning
-    pd.options.mode.chained_assignment = None
-
     # Make requested reports
     for report in nda_reports:
 
@@ -460,8 +457,6 @@ def make_nda_reports(nda_reports, proj_dir, close_date):
         os.remove(out_file)
         os.rename(dummy_file, out_file)
         del rep_obj
-
-    pd.options.mode.chained_assignment = "warn"
 
 
 def generate_guids(proj_dir, user_name, user_pass, find_mismatch):

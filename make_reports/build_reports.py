@@ -1091,7 +1091,9 @@ class NdarAffim01:
 
         """
         # Get needed demographic info, combine with survey data
-        df_nda = self.final_demo[["subjectkey", "src_subject_id", "sex"]]
+        df_nda = self.final_demo[
+            ["subjectkey", "src_subject_id", "sex"]
+        ].copy()
         df_nda["sex"] = df_nda["sex"].replace(
             ["Male", "Female", "Neither"], ["M", "F", "O"]
         )
@@ -1256,7 +1258,9 @@ class NdarAls01:
         df_als_remap.loc[idx_pilot, "comments"] = "PILOT PARTICIPANT"
 
         # Combine demographic and als dataframes
-        df_nda = self.final_demo[["subjectkey", "src_subject_id", "sex"]]
+        df_nda = self.final_demo[
+            ["subjectkey", "src_subject_id", "sex"]
+        ].copy()
         df_nda["sex"] = df_nda["sex"].replace(
             ["Male", "Female", "Neither"], ["M", "F", "O"]
         )
@@ -1935,7 +1939,9 @@ class NdarEmrq01:
         ].astype("Int64")
 
         # Combine demographic and erq dataframes
-        df_nda = self.final_demo[["subjectkey", "src_subject_id", "sex"]]
+        df_nda = self.final_demo[
+            ["subjectkey", "src_subject_id", "sex"]
+        ].copy()
         df_nda["sex"] = df_nda["sex"].replace(
             ["Male", "Female", "Neither"], ["M", "F", "O"]
         )
@@ -3037,7 +3043,9 @@ class NdarPanas01:
         df_panas_remap["visit"] = sess
 
         # Combine demo and panas dataframes, get survey age
-        df_nda = self.final_demo[["subjectkey", "src_subject_id", "sex"]]
+        df_nda = self.final_demo[
+            ["subjectkey", "src_subject_id", "sex"]
+        ].copy()
         df_panas_demo = pd.merge(df_panas_remap, df_nda, on="src_subject_id")
         df_panas_demo = report_helper.get_survey_age(
             df_panas_demo, self.final_demo, "src_subject_id"
