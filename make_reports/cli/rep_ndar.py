@@ -5,7 +5,10 @@ NDAR submissions. List all reports available for generation
 via "--report-avail" option.
 
 Reports are written to:
-    <proj_dir>/ndar_upload/reports
+    <proj_dir>/ndar_upload/cycle_<close_date>
+
+Required data (e.g. image03) are copied to:
+    <proj_dir>/ndar_upload/data_<foo>
 
 Examples
 --------
@@ -102,8 +105,8 @@ def main():
     """Capture arguments and trigger workflow."""
     args = _get_args().parse_args()
     print_avail = args.report_avail
-    nda_reports = args.report_names
-    nda_reports_all = args.report_all
+    ndar_reports = args.report_names
+    ndar_reports_all = args.report_all
     proj_dir = args.proj_dir
 
     # Set supported reports
@@ -135,9 +138,9 @@ def main():
         )
 
     # Generate requested reports
-    if nda_reports_all:
-        nda_reports = rep_avail
-    workflow.make_nda_reports(nda_reports, proj_dir, close_date)
+    if ndar_reports_all:
+        ndar_reports = rep_avail
+    workflow.make_ndar_reports(ndar_reports, proj_dir, close_date)
 
 
 if __name__ == "__main__":
