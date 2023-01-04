@@ -1955,12 +1955,6 @@ class NdarImage03:
         Image03 values for study participants
     final_demo : make_reports.build_reports.DemoAll.final_demo
         pd.DataFrame, compiled demographic info
-
-    local_mri : str
-        Output MRI location for NDA's report package builder
-    local_phys : path
-        Output physio location for NDA's report package builder
-
     nda_cols : list
         NDA report template column names
     nda_label : list
@@ -2021,10 +2015,6 @@ class NdarImage03:
             Image03 values for experiment/study participants
         final_demo : make_reports.build_reports.DemoAll.final_demo
             pd.DataFrame, compiled demographic info
-
-        local_path : str
-            Output location for NDA's report package builder
-
         nda_cols : list
             NDA report template column names
         nda_label : list
@@ -2055,11 +2045,6 @@ class NdarImage03:
 
         # Set reference and orienting attributes
         self.proj_dir = proj_dir
-        # self.local_path = (
-        #     "/run/user/1001/gvfs/smb-share:server"
-        #     + "=ccn-keoki.win.duke.edu,share=experiments2/EmoRep/"
-        #     + "Exp2_Compute_Emotion/ndar_upload/data_mri"
-        # )
         self.source_dir = os.path.join(
             proj_dir, "data_scanner_BIDS/sourcedata"
         )
