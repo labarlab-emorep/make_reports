@@ -32,11 +32,6 @@ class DemoAll:
     have an assigned GUID, and have completed the demographic
     survey.
 
-    Parameters
-    ----------
-    proj_dir : path
-        Location of parent directory for project
-
     Attributes
     ----------
     df_merge : pd.DataFrame
@@ -355,15 +350,6 @@ class ManagerRegular:
     Query data from the appropriate period for the period, and
     construct a dataframe containing the required information
     for the report.
-
-    Parameters
-    ----------
-    query_date : datetime
-        Date for finding report range
-    final_demo : make_reports.build_reports.DemoAll.final_demo
-        pd.DataFrame, compiled demographic info
-    report : str
-        Type of report e.g. nih4 or duke3
 
     Attributes
     ----------
@@ -717,15 +703,6 @@ class GenerateGuids:
     Use existing RedCap demographic information to produce
     a batch of GUIDs via NDA's guid-tool.
 
-    Parameters
-    ----------
-    proj_dir : path
-        Project's experiment directory
-    user_name : str
-        NDA user name
-    user_pass : str
-        NDA user password
-
     Attributes
     ----------
     df_guid : pd.DataFrame
@@ -1000,13 +977,6 @@ class GenerateGuids:
 class NdarAffim01:
     """Make affim01 report for NDAR submission.
 
-    Parameters
-    ----------
-    final_demo : make_reports.build_reports.DemoAll.final_demo
-        pd.DataFrame, compiled demographic info
-    proj_dir : path
-        Project's experiment directory
-
     Attributes
     ----------
     df_aim : pd.DataFrame
@@ -1126,13 +1096,6 @@ class NdarAffim01:
 
 class NdarAls01:
     """Make als01 report for NDAR submission.
-
-    Parameters
-    ----------
-    proj_dir : path
-        Project's experiment directory
-    final_demo : make_reports.build_reports.DemoAll.final_demo
-        pd.DataFrame, compiled demographic info
 
     Attributes
     ----------
@@ -1291,13 +1254,6 @@ class NdarAls01:
 
 class NdarBdi01:
     """Make bdi01 report for NDAR submission.
-
-    Parameters
-    ----------
-    proj_dir : path
-        Project's experiment directory
-    final_demo : make_reports.build_reports.DemoAll.final_demo
-        pd.DataFrame, compiled demographic info
 
     Attributes
     ----------
@@ -1574,13 +1530,6 @@ class NdarBrd01:
         attributes, and trigger report generation method for
         each session.
 
-        Parameters
-        ----------
-        proj_dir : path
-            Project's experiment directory
-        final_demo : make_reports.build_reports.DemoAll.final_demo
-            pd.DataFrame, compiled demographic info
-
         Attributes
         ----------
         df_report : pd.DataFrame
@@ -1749,11 +1698,6 @@ class NdarBrd01:
 class NdarDemoInfo01:
     """Make demo_info01 report for NDAR submission.
 
-    Parameters
-    ----------
-    final_demo : make_reports.build_reports.DemoAll.final_demo
-        pd.DataFrame, compiled demographic info
-
     Attributes
     ----------
     df_report : pd.DataFrame
@@ -1863,13 +1807,6 @@ class NdarDemoInfo01:
 
 class NdarEmrq01:
     """Make emrq01 report for NDAR submission.
-
-    Parameters
-    ----------
-    proj_dir : path
-        Project's experiment directory
-    final_demo : make_reports.build_reports.DemoAll.final_demo
-        pd.DataFrame, compiled demographic info
 
     Attributes
     ----------
@@ -2008,15 +1945,6 @@ class NdarImage03:
     Make copies of study participants' NIfTI and events files in:
         <proj_dir>/ndar_report/data_mri
 
-    Parameters
-    ----------
-    proj_dir : path
-        Project's experiment directory
-    final_demo : make_reports.build_reports.DemoAll.final_demo
-        pd.DataFrame, compiled demographic info
-    test_subj : str, optional
-        BIDS subject identifier, for testing class
-
     Attributes
     ----------
     df_report : pd.DataFrame
@@ -2027,8 +1955,12 @@ class NdarImage03:
         Image03 values for study participants
     final_demo : make_reports.build_reports.DemoAll.final_demo
         pd.DataFrame, compiled demographic info
-    local_path : str
-        Output location for NDA's report package builder
+
+    local_mri : str
+        Output MRI location for NDA's report package builder
+    local_phys : path
+        Output physio location for NDA's report package builder
+
     nda_cols : list
         NDA report template column names
     nda_label : list
@@ -2089,8 +2021,10 @@ class NdarImage03:
             Image03 values for experiment/study participants
         final_demo : make_reports.build_reports.DemoAll.final_demo
             pd.DataFrame, compiled demographic info
+
         local_path : str
             Output location for NDA's report package builder
+
         nda_cols : list
             NDA report template column names
         nda_label : list
@@ -2121,11 +2055,11 @@ class NdarImage03:
 
         # Set reference and orienting attributes
         self.proj_dir = proj_dir
-        self.local_path = (
-            "/run/user/1001/gvfs/smb-share:server"
-            + "=ccn-keoki.win.duke.edu,share=experiments2/EmoRep/"
-            + "Exp2_Compute_Emotion/ndar_upload/data_mri"
-        )
+        # self.local_path = (
+        #     "/run/user/1001/gvfs/smb-share:server"
+        #     + "=ccn-keoki.win.duke.edu,share=experiments2/EmoRep/"
+        #     + "Exp2_Compute_Emotion/ndar_upload/data_mri"
+        # )
         self.source_dir = os.path.join(
             proj_dir, "data_scanner_BIDS/sourcedata"
         )
@@ -2491,7 +2425,7 @@ class NdarImage03:
         # Get general, anat specific acquisition info
         std_dict = self._get_std_info(nii_json, dicom_hdr)
         anat_image03 = {
-            "image_file": f"{self.local_path}/{host_name}",
+            "image_file": f"data_mri/{host_name}",
             "image_description": "MPRAGE",
             "scan_type": "MR structural (T1)",
             "image_history": "Face removed",
@@ -2573,7 +2507,7 @@ class NdarImage03:
 
         # Setup fmap-specific values
         fmap_image03 = {
-            "image_file": f"{self.local_path}/{host_nii}",
+            "image_file": f"data_mri/{host_nii}",
             "image_description": "fmap (reverse phase polarity)",
             "scan_type": "Field Map",
             "image_history": "No modifications",
@@ -2692,7 +2626,7 @@ class NdarImage03:
 
             # Setup func-specific values
             func_image03 = {
-                "image_file": f"{self.local_path}/{host_nii}",
+                "image_file": f"data_mri/{host_nii}",
                 "image_description": "EPI fMRI",
                 "experiment_id": exp_id,
                 "scan_type": "fMRI",
@@ -2716,7 +2650,7 @@ class NdarImage03:
             # Add task events files in data_file2 fields, accounting for
             # missing events files.
             if events_exists:
-                func_image03["data_file2"] = f"{self.local_path}/{host_events}"
+                func_image03["data_file2"] = f"data_mri/{host_events}"
                 func_image03["data_file2_type"] = "task event information"
 
             # Write one row for task-resting with physio in data_file2 fields,
@@ -2792,7 +2726,7 @@ class NdarImage03:
             self._make_host(phys_path, host_phys, "data_phys")
 
             # Update func_image03 with physio info
-            func_image03["data_file2"] = f"{self.local_path}/{host_phys}"
+            func_image03["data_file2"] = f"data_phys/{host_phys}"
             func_image03["data_file2_type"] = "psychophysiological recordings"
 
         new_row = pd.DataFrame(func_image03, index=[0])
@@ -2801,13 +2735,6 @@ class NdarImage03:
 
 class NdarPanas01:
     """Make panas01 report for NDAR submission.
-
-    Parameters
-    ----------
-    proj_dir : path
-        Project's experiment directory
-    final_demo : make_reports.build_reports.DemoAll.final_demo
-        pd.DataFrame, compiled demographic info
 
     Attributes
     ----------
@@ -3115,13 +3042,6 @@ class NdarPhysio:
     Make copies of physio files in:
         <proj_dir>/ndar_report/data_phys
 
-    Parameters
-    ----------
-    proj_dir : path
-        Project's experiment directory
-    final_demo : make_reports.build_reports.DemoAll.final_demo
-        pd.DataFrame, compiled demographic info
-
     Attributes
     ----------
     df_report : pd.DataFrame
@@ -3367,13 +3287,6 @@ class NdarPhysio:
 class NdarPswq01:
     """Make pswq01 report for NDAR submission.
 
-    Parameters
-    ----------
-    proj_dir : path
-        Project's experiment directory
-    final_demo : make_reports.build_reports.DemoAll.final_demo
-        pd.DataFrame, compiled demographic info
-
     Attributes
     ----------
     df_report : pd.DataFrame
@@ -3493,13 +3406,6 @@ class NdarPswq01:
 
 class NdarRest01:
     """Make restsurv01 report for NDAR submission.
-
-    Parameters
-    ----------
-    proj_dir : path
-        Project's experiment directory
-    final_demo : make_reports.build_reports.DemoAll.final_demo
-        pd.DataFrame, compiled demographic info
 
     Attributes
     ----------
@@ -3740,13 +3646,6 @@ class NdarRest01:
 class NdarRrs01:
     """Make rrs01 report for NDAR submission.
 
-    Parameters
-    ----------
-    proj_dir : path
-        Project's experiment directory
-    final_demo : make_reports.build_reports.DemoAll.final_demo
-        pd.DataFrame, compiled demographic info
-
     Attributes
     ----------
     df_report : pd.DataFrame
@@ -3903,13 +3802,6 @@ class NdarRrs01:
 
 class NdarStai01:
     """Make stai01 report for NDAR submission.
-
-    Parameters
-    ----------
-    proj_dir : path
-        Project's experiment directory
-    final_demo : make_reports.build_reports.DemoAll.final_demo
-        pd.DataFrame, compiled demographic info
 
     Attributes
     ----------
@@ -4251,13 +4143,6 @@ class NdarStai01:
 
 class NdarTas01:
     """Make tas01 report for NDAR submission.
-
-    Parameters
-    ----------
-    proj_dir : path
-        Project's experiment directory
-    final_demo : make_reports.build_reports.DemoAll.final_demo
-        pd.DataFrame, compiled demographic info
 
     Attributes
     ----------
