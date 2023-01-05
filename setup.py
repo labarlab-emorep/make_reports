@@ -20,9 +20,11 @@ setup(
         "": ["reference_files/*template.csv", "reference_files/*.json"]
     },
     install_requires=[
-        "numpy==1.23.1",
-        "pandas==1.4.3",
-        "requests==2.22.0",
-        "setuptools==45.2.0",
+        "numpy>=1.23.1",
+        "pandas>=1.4.3",
+        "pydicom>=2.3.1",
+        "requests>=2.22.0",
+        "seaborn>=0.12.2",
+        "setuptools>=45.2.0",
     ],
 )
