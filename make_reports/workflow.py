@@ -1,4 +1,5 @@
 """Setup workflows for specific types of reports."""
+# %%
 import os
 import glob
 from datetime import datetime
@@ -7,6 +8,7 @@ from make_reports import build_reports, report_helper
 from make_reports import calc_descriptives
 
 
+# %%
 def download_surveys(
     proj_dir,
     redcap_token=None,
@@ -548,3 +550,37 @@ def calc_metrics(proj_dir, recruit_demo, pending_scans, redcap_token):
         for subid, days in pend_dict.items():
             print(f"\t{subid} \t {days}")
         print("")
+
+
+def calc_stats(proj_dir, desc_survey):
+    """Title.
+
+    Desc.
+
+    """
+
+    #
+    mod_calc = "make_reports.calc_descriptives"
+    survey_switch = {
+        "AIM": f"{mod_calc}.DescAim",
+        "ALS": f"{mod_calc}.DescAls",
+    }
+    has_subscales = ["ALS"]
+
+    #
+    for sur in desc_survey:
+        h_pkg, h_mod, h_class = survey_switch[sur].split(".")
+        mod = __import__(f"{h_pkg}.{h_mod}", fromlist=[h_class])
+        rep_class = getattr(mod, h_class)
+
+        #
+        rep_obj = rep_class(proj_dir)
+        rep_obj.metrics()
+        rep_obj.violin_plot()
+
+        if sur in has_subscales and hasattr(rep_obj, "subscales"):
+            rep_obj.subscales()
+
+    # test_inst = calc_descriptives.DescAls(proj_dir)
+    # test_inst.metrics()
+    # test_inst.violin_plot()

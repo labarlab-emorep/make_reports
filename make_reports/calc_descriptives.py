@@ -17,9 +17,11 @@ Calcualte survey stats:
 import os
 import json
 import datetime
-import seaborn as sns
+import textwrap
 import pandas as pd
 import numpy as np
+import seaborn as sns
+import matplotlib.pyplot as plt
 import importlib.resources as pkg_resources
 from make_reports import report_helper
 from make_reports import reference_files
@@ -333,3 +335,256 @@ def calc_pending(redcap_token):
 
 
 # %%
+def _prep_df(df, name, has_datetime=True):
+    """Title.
+
+    Desc.
+
+    """
+    if has_datetime:
+        df = df.drop(labels=["datetime"], axis=1)
+    val_list = [x for x in df.columns if name in x]
+    df[val_list] = df[val_list].astype("Int64")
+    return (df, val_list)
+
+
+def _write_metrics(name, num, mean, std, proj_dir):
+    """Title.
+
+    Desc.
+
+    Parameters
+    ----------
+
+    Returns
+    -------
+
+    """
+    report = f"""\
+    {name} Descriptive Stats
+
+    n    = {num}
+    mean = {mean}
+    std  = {std}
+    """
+    report = textwrap.dedent(report)
+
+    #
+    out_txt = os.path.join(
+        proj_dir,
+        "analyses/stats_descriptive_surveys",
+        f"stats_{name}.txt",
+    )
+    with open(out_txt, "w") as f:
+        for _line in report:
+            f.writelines(_line)
+    print(f"\tWrote stats : {out_txt}")
+    return report
+
+
+def _draw_violin(df, lb, ub, mean, std, title, out_path):
+    """Title.
+
+    Desc.
+
+    """
+    #
+    fig, ax = plt.subplots()
+    sns.violinplot(x=df["mean"])
+    ax.collections[0].set_alpha(0.5)
+    ax.set_xlim(lb, ub)
+    plt.title(title)
+    plt.ylabel("Response Density")
+    plt.xlabel("Participant Average")
+    plt.text(
+        lb + 0.2,
+        -0.42,
+        f"mean(sd) = {mean}({std})",
+        horizontalalignment="left",
+    )
+
+    #
+    plt.savefig(out_path)
+    print(f"\tDrew plot : {out_path}")
+    return out_path
+
+
+# %%
+class DescAim:
+    """Title.
+
+    Desc.
+
+    """
+
+    def __init__(self, proj_dir):
+        """Title.
+
+        Desc.
+
+        """
+        self.proj_dir = proj_dir
+        df_aim = pd.read_csv(
+            os.path.join(
+                self.proj_dir,
+                "data_survey",
+                "visit_day1/data_clean",
+                "df_AIM.csv",
+            ),
+            index_col="study_id",
+        )
+        self.df_aim, self.data_col = _prep_df(df_aim, "AIM")
+
+    def _calc_metrics(self):
+        """Title.
+
+        Desc.
+
+        """
+        self.mean = round(self.df_aim.stack().mean(), 2)
+        self.std = round(self.df_aim.stack().std(), 2)
+
+    def metrics(self):
+        """Title.
+
+        Desc.
+
+        """
+        self._calc_metrics()
+        _ = _write_metrics(
+            "AIM", self.df_aim.shape[0], self.mean, self.std, self.proj_dir
+        )
+
+    def violin_plot(self):
+        """Title.
+
+        Desc.
+
+        """
+        #
+        if not hasattr(self, "mean") or not hasattr(self, "std"):
+            self._calc_metrics()
+        self.df_aim["mean"] = self.df_aim[self.data_col].mean(axis=1)
+
+        #
+        plot_path = os.path.join(
+            self.proj_dir,
+            "analyses/stats_descriptive_surveys",
+            "plot_violin_AIM.png",
+        )
+        _ = _draw_violin(
+            self.df_aim,
+            1,
+            6,
+            self.mean,
+            self.std,
+            "Affective Intensity Measure",
+            plot_path,
+        )
+
+
+# %%
+class DescAls:
+    """Title.
+
+    Desc.
+
+    """
+
+    def __init__(self, proj_dir):
+        """Title.
+
+        Desc.
+
+        """
+        self.proj_dir = proj_dir
+        df_als = pd.read_csv(
+            os.path.join(
+                self.proj_dir,
+                "data_survey",
+                "visit_day1/data_clean",
+                "df_ALS.csv",
+            ),
+            index_col="study_id",
+        )
+        self.df_als, self.data_col = _prep_df(df_als, "ALS")
+
+    def _calc_metrics(self, df):
+        """Title.
+
+        Desc.
+
+        """
+        mean = round(df.stack().mean(), 2)
+        std = round(df.stack().std(), 2)
+        return (mean, std)
+
+    def metrics(self, sub_df=None, sub_name=None):
+        """Title.
+
+        Desc.
+
+        """
+        df = sub_df if isinstance(sub_df, pd.DataFrame) else self.df_als
+        file_name = "ALS" if not sub_name else f"ALS_{sub_name}"
+        mean, std = self._calc_metrics(df)
+        _ = _write_metrics(file_name, df.shape[0], mean, std, self.proj_dir)
+
+    def violin_plot(self, sub_df=None, sub_col=None, sub_name=None):
+        """Title.
+
+        Desc.
+
+        """
+        #
+        df = sub_df if isinstance(sub_df, pd.DataFrame) else self.df_als
+        col = self.data_col if not sub_col else sub_col
+        title = "Affective Lability Scale -- 18"
+        if sub_name:
+            title = title + f", {sub_name}"
+
+        #
+        mean, std = self._calc_metrics(df)
+        df["mean"] = df[col].mean(axis=1)
+
+        #
+        plot_name = (
+            "plot_violin_ALS.png"
+            if not sub_name
+            else f"plot_violin_ALS_{sub_name}.png"
+        )
+        plot_path = os.path.join(
+            self.proj_dir, "analyses/stats_descriptive_surveys", plot_name
+        )
+        _ = _draw_violin(
+            df,
+            1,
+            5,
+            mean,
+            std,
+            title,
+            plot_path,
+        )
+
+    def subscales(self):
+        """Title.
+
+        ALS-18
+        https://www.sciencedirect.com/science/article/pii/S0191886903004793
+
+        Desc.
+        """
+        anx_dep = [f"ALS_{x}" for x in [1, 3, 5, 6, 7]]
+        dep_ela = [f"ALS_{x}" for x in [2, 10, 12, 13, 15, 16, 17, 18]]
+        anger = [f"ALS_{x}" for x in [4, 8, 9, 11, 14]]
+
+        sub_dict = {
+            "Anx-Dep": self.df_als[anx_dep].copy(),
+            "Dep-Ela": self.df_als[dep_ela].copy(),
+            "Anger": self.df_als[anger].copy(),
+        }
+
+        for name, df in sub_dict.items():
+            self.metrics(sub_df=df, sub_name=name)
+            _, sub_col_list = _prep_df(df, "ALS", has_datetime=False)
+            self.violin_plot(sub_df=df, sub_col=sub_col_list, sub_name=name)
