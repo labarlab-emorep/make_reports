@@ -4,6 +4,7 @@ import glob
 from datetime import datetime
 from make_reports import survey_download, survey_clean
 from make_reports import build_reports, report_helper
+from make_reports import calc_descriptives
 
 
 def download_surveys(
@@ -504,3 +505,46 @@ def generate_guids(proj_dir, user_name, user_pass, find_mismatch):
             print(f"Mismatching GUIDs :\n\t{guid_obj.mismatch_list}")
         else:
             print("No mismatches found!")
+
+
+def calc_metrics(proj_dir, recruit_demo, pending_scans, redcap_token):
+    """Title.
+
+    Desc.
+
+    Parameters
+    ----------
+    proj_dir : path
+    recruit_demo : bool
+    pending_scans : bool
+
+    """
+    # Check for clean RedCap/visit data, generate if needed
+    redcap_clean = glob.glob(
+        f"{proj_dir}/data_survey/redcap_demographics/data_clean/*.csv"
+    )
+    visit_clean = glob.glob(f"{proj_dir}/data_survey/visit*/data_clean/*.csv")
+    if len(redcap_clean) != 4 or len(visit_clean) != 17:
+        print("Missing RedCap, Qualtrics clean data. Cleaning ...")
+        cl_data = CleanSurveys(proj_dir)
+        cl_data.clean_redcap()
+        cl_data.clean_qualtrics()
+        print("\tDone.")
+
+    #
+    if recruit_demo:
+        # Get redcap demo info, use only consented data
+        redcap_demo = build_reports.DemoAll(proj_dir)
+        redcap_demo.remove_withdrawn()
+
+        print("\nComparing planned vs. actual recruitment demographics ...")
+        _ = calc_descriptives.demographics(proj_dir, redcap_demo.final_demo)
+
+    #
+    if pending_scans:
+        print("\nFinding participants missing day3 scan ...\n")
+        pend_dict = calc_descriptives.calc_pending(redcap_token)
+        print("\tSubj \t Time since day2 scan")
+        for subid, days in pend_dict.items():
+            print(f"\t{subid} \t {days}")
+        print("")

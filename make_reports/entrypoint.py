@@ -11,9 +11,12 @@ def main():
         rep_dl      : Download RedCap and Qualtrics surveys
         rep_cl      : Clean RedCap and Qualtrics surveys, aggregate rest ratings
         rep_manager : Generate regular reports submitted by lab manager
-        rep_metrics : Generate study metrics
         rep_ndar    : Generate reports for NDAR submission
         gen_guids   : Generate GUIDs
+
+    Sub-packages under development:
+
+        rep_metrics : Generate study metrics and calculate descriptive stats
 
     """
     )
