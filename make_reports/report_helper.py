@@ -262,6 +262,7 @@ def get_survey_age(df_survey, df_demo, subj_col):
     # Calculate age-in-months, update dataframe
     subj_age_mo = calc_age_mo(subj_dob, subj_dos)
     df_survey["interview_age"] = subj_age_mo
+    df_survey["interview_age"] = df_survey["interview_age"].astype("Int64")
     df_survey["interview_date"] = df_survey["datetime"].dt.strftime("%m/%d/%Y")
     return df_survey
 
@@ -273,12 +274,12 @@ def pilot_list():
 
 def redcap_dict():
     """Return a dict of RedCap surveys."""
-    # Key : RedCap dataframe
+    # Key : RedCap dataframe, matches reference_files.report_keys_redcap.json
     # Value : output parent directory name
     return {
         "demographics": "redcap_demographics",
-        "consent_orig": "redcap_demographics",
-        "consent_new": "redcap_demographics",
+        "consent_pilot": "redcap_demographics",
+        "consent_v1.22": "redcap_demographics",
         "guid": "redcap_demographics",
         "bdi_day2": "visit_day2",
         "bdi_day3": "visit_day3",
@@ -287,7 +288,8 @@ def redcap_dict():
 
 def qualtrics_dict():
     """Return a dict of Qualtrics surveys."""
-    # Key : Qualtrics dataframe
+    # Key : Qualtrics dataframe, matches
+    #       reference_files.report_keys_qualtrics.json
     # Value : output parent directory identifier
     return {
         "EmoRep_Session_1": "visit_day1",

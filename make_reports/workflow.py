@@ -2,9 +2,9 @@
 import os
 import glob
 from datetime import datetime
-import pandas as pd
 from make_reports import survey_download, survey_clean
 from make_reports import build_reports, report_helper
+from make_reports import calc_descriptives
 
 
 def download_surveys(
@@ -351,7 +351,7 @@ def make_manager_reports(manager_reports, query_date, proj_dir):
         del mr
 
 
-def make_nda_reports(nda_reports, proj_dir):
+def make_ndar_reports(ndar_reports, proj_dir, close_date):
     """Make reports and organize data for NDAR upload.
 
     Generate requested NDAR reports and organize data (if required) for the
@@ -359,16 +359,12 @@ def make_nda_reports(nda_reports, proj_dir):
 
     Parameters
     ----------
-    nda_reports : list
+    ndar_reports : list
         Names of desired NDA reports e.g. ["demo_info01", "affim01"]
     proj_dir : path
         Project's experiment directory
-    post_labels : bool
-        Whether to use labels in post_scan_ratings pull
-    qualtrics_token : str
-        Qualtrics API token
-    redcap_token : str
-        RedCap API token
+    close_date : datetime
+        Submission cycle close date
 
     Returns
     -------
@@ -383,7 +379,7 @@ def make_nda_reports(nda_reports, proj_dir):
     Notes
     -----
     Reports are written to:
-        <proj_dir>/ndar_upload/reports
+        <proj_dir>/ndar_upload/cycle_<close_date>
 
     """
     # Check for clean RedCap/visit data, generate if needed
@@ -410,7 +406,6 @@ def make_nda_reports(nda_reports, proj_dir):
         "emrq01": f"{mod_build}.NdarEmrq01",
         "image03": f"{mod_build}.NdarImage03",
         "panas01": f"{mod_build}.NdarPanas01",
-        "psychophys_subj_exp01": f"{mod_build}.NdarPhysio",
         "pswq01": f"{mod_build}.NdarPswq01",
         "restsurv01": f"{mod_build}.NdarRest01",
         "rrs01": f"{mod_build}.NdarRrs01",
@@ -418,27 +413,29 @@ def make_nda_reports(nda_reports, proj_dir):
         "tas01": f"{mod_build}.NdarTas01",
     }
 
-    # Validate nda_reports arguments
-    for report in nda_reports:
+    # Validate ndar_reports arguments
+    for report in ndar_reports:
         if report not in nda_switch.keys():
             raise ValueError(
-                f"Inappropriate --nda-reports argument : {report}"
+                f"Inappropriate --ndar-reports argument : {report}"
             )
 
     # Setup output directories
-    report_dir = os.path.join(proj_dir, "ndar_upload/reports")
+    report_dir = os.path.join(
+        proj_dir,
+        "ndar_upload",
+        f"cycle_{close_date.strftime('%Y-%m-%d')}",
+    )
     if not os.path.exists(report_dir):
         os.makedirs(report_dir)
 
-    # Get redcap demo info, use only consented data
+    # Get redcap demo info, use only consented data in submission cycle
     redcap_demo = build_reports.DemoAll(proj_dir)
     redcap_demo.remove_withdrawn()
-
-    # Ignore loc warning
-    pd.options.mode.chained_assignment = None
+    redcap_demo.submission_cycle(close_date)
 
     # Make requested reports
-    for report in nda_reports:
+    for report in ndar_reports:
 
         # Get appropriate class
         h_pkg, h_mod, h_class = nda_switch[report].split(".")
@@ -446,17 +443,14 @@ def make_nda_reports(nda_reports, proj_dir):
         rep_class = getattr(mod, h_class)
 
         # Generate report
-        if report == "demo_info01":
-            rep_obj = rep_class(redcap_demo.final_demo)
-        else:
-            rep_obj = rep_class(proj_dir, redcap_demo.final_demo)
+        rep_obj = rep_class(proj_dir, redcap_demo.final_demo)
 
         # Write out report
         out_file = os.path.join(report_dir, f"{report}_dataset.csv")
         print(f"\tWriting : {out_file}")
         rep_obj.df_report.to_csv(out_file, index=False, na_rep="")
 
-        # Preprend header
+        # Prepend header
         dummy_file = f"{out_file}.bak"
         with open(out_file, "r") as read_obj, open(
             dummy_file, "w"
@@ -467,8 +461,6 @@ def make_nda_reports(nda_reports, proj_dir):
         os.remove(out_file)
         os.rename(dummy_file, out_file)
         del rep_obj
-
-    pd.options.mode.chained_assignment = "warn"
 
 
 def generate_guids(proj_dir, user_name, user_pass, find_mismatch):
@@ -485,6 +477,9 @@ def generate_guids(proj_dir, user_name, user_pass, find_mismatch):
         NDA user name
     user_pass : str
         NDA user password
+    find_mismatch : bool
+        Whether to check for mismatches between REDCap
+        and generated GUIDs
 
     """
     # Check for clean RedCap data, generate if needed
@@ -510,3 +505,46 @@ def generate_guids(proj_dir, user_name, user_pass, find_mismatch):
             print(f"Mismatching GUIDs :\n\t{guid_obj.mismatch_list}")
         else:
             print("No mismatches found!")
+
+
+def calc_metrics(proj_dir, recruit_demo, pending_scans, redcap_token):
+    """Title.
+
+    Desc.
+
+    Parameters
+    ----------
+    proj_dir : path
+    recruit_demo : bool
+    pending_scans : bool
+
+    """
+    # Check for clean RedCap/visit data, generate if needed
+    redcap_clean = glob.glob(
+        f"{proj_dir}/data_survey/redcap_demographics/data_clean/*.csv"
+    )
+    visit_clean = glob.glob(f"{proj_dir}/data_survey/visit*/data_clean/*.csv")
+    if len(redcap_clean) != 4 or len(visit_clean) != 17:
+        print("Missing RedCap, Qualtrics clean data. Cleaning ...")
+        cl_data = CleanSurveys(proj_dir)
+        cl_data.clean_redcap()
+        cl_data.clean_qualtrics()
+        print("\tDone.")
+
+    #
+    if recruit_demo:
+        # Get redcap demo info, use only consented data
+        redcap_demo = build_reports.DemoAll(proj_dir)
+        redcap_demo.remove_withdrawn()
+
+        print("\nComparing planned vs. actual recruitment demographics ...")
+        _ = calc_descriptives.demographics(proj_dir, redcap_demo.final_demo)
+
+    #
+    if pending_scans:
+        print("\nFinding participants missing day3 scan ...\n")
+        pend_dict = calc_descriptives.calc_pending(redcap_token)
+        print("\tSubj \t Time since day2 scan")
+        for subid, days in pend_dict.items():
+            print(f"\t{subid} \t {days}")
+        print("")

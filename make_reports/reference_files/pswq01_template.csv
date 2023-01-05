@@ -1,7 +1,2 @@
-pswq,1,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,
-subjectkey,src_subject_id,interview_date,interview_age,sex,pswq1,pswq2,pswq3,pswq4,pswq5,pswq6,pswq7,pswq8,pswq9,pswq10,pswq11,pswq12,pswq13,pswq14,pswq15,pswq16,pswq_total,fspgod,site,pswqc_child_1,pswqc_child_2,pswqc_child_3,pswqc_child_4,pswqc_child_5,pswqc_child_6,pswqc_child_7,pswqc_child_8,pswqc_child_9,pswqc_child_10,pswqc_child_11,pswqc_child_12,pswqc_child_13,pswqc_child_14,respondent,version_form,comments_misc
-NDARAK108DK2,ER0001,7/18/2021,311,M,2,3,4,2,2,4,2,2,4,4,2,3,4,2,3,4,47,,,,,,,,,,,,,,,,,,,
-NDARGL591HN9,ER0002,7/30/2021,299,F,4,3,4,4,5,4,4,1,4,4,4,3,4,4,3,4,59,,,,,,,,,,,,,,,,,,,
-NDARCB534FAV,ER0003,8/8/2021,299,M,4,1,2,1,1,4,1,2,3,3,1,2,2,1,1,1,30,,,,,,,,,,,,,,,,,,,
-,ER0004,8/10/2021,533,M,4,2,3,3,2,4,2,2,2,4,2,2,2,4,2,2,42,,,,,,,,,,,,,,,,,,,
-NDARME938UZ4,ER0005,8/20/2021,296,F,5,4,5,4,4,4,5,4,3,5,4,3,4,4,4,4,66,,,,,,,,,,,,,,,,,,,
+"pswq","01"
+"subjectkey","src_subject_id","interview_date","interview_age","sex","pswq1","pswq2","pswq3","pswq4","pswq5","pswq6","pswq7","pswq8","pswq9","pswq10","pswq11","pswq12","pswq13","pswq14","pswq15","pswq16","pswq_total","fspgod","site","pswqc_child_1","pswqc_child_2","pswqc_child_3","pswqc_child_4","pswqc_child_5","pswqc_child_6","pswqc_child_7","pswqc_child_8","pswqc_child_9","pswqc_child_10","pswqc_child_11","pswqc_child_12","pswqc_child_13","pswqc_child_14","respondent","version_form","comments_misc","rt_","time_elapsed","ref_child_id","timepoint_label"

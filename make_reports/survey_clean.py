@@ -19,11 +19,6 @@ class CleanRedcap:
     who have withdraw consent are included in the cleaned dataframes
     for NIH/Duke reporting purposes.
 
-    Parameters
-    ----------
-    proj_dir : path
-        Location of parent directory for project
-
     Attributes
     ----------
     df_clean : pd.DataFrame
@@ -105,7 +100,7 @@ class CleanRedcap:
         print(f"Cleaning survey : {survey_name}")
         if survey_name == "bdi_day2" or survey_name == "bdi_day3":
             self._clean_bdi_day23()
-        elif survey_name == "consent_new" or survey_name == "consent_orig":
+        elif survey_name == "consent_v1.22" or survey_name == "consent_pilot":
             self._clean_consent()
         else:
             clean_method = getattr(self, f"_clean_{survey_name}")
@@ -400,9 +395,11 @@ class CleanRedcap:
         drop_list = ["guid_timestamp", "redcap_survey_identifier"]
         df_raw = self.df_raw.drop(drop_list, axis=1)
         col_names = df_raw.columns.tolist()
-        col_reorder = (
-            col_names[:1] + col_names[-1:] + col_names[-2:-1] + col_names[1:-2]
-        )
+        # col_reorder = (
+        #     col_names[:1] + col_names[-1:] +
+        #       col_names[-2:-1] + col_names[1:-2]
+        # )
+        col_reorder = col_names[:1] + col_names[-1:] + col_names[1:-1]
         df_raw = df_raw[col_reorder]
 
         # Remove rows without responses or study_id (from guid survey)
@@ -412,9 +409,9 @@ class CleanRedcap:
 
         # Enforce datetime format
         col_rename = (
-            "bdi_2_timestamp"
-            if "bdi_2_timestamp" in col_names
-            else "bdi_timestamp"
+            "bdi_visit_2_timestamp"
+            if "bdi_visit_2_timestamp" in col_names
+            else "bdi_visit_3_timestamp"
         )
         df_raw.rename(
             {col_rename: "datetime"},
@@ -440,11 +437,6 @@ class CleanQualtrics:
 
      Find downloaded original/raw Qualtrics survey responses, and
      convert values into usable dataframe tyeps and formats.
-
-    Parameters
-    ----------
-    proj_dir : path
-        Location of parent directory for project
 
     Attributes
     ----------
