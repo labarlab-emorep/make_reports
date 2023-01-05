@@ -19,11 +19,6 @@ class CleanRedcap:
     who have withdraw consent are included in the cleaned dataframes
     for NIH/Duke reporting purposes.
 
-    Parameters
-    ----------
-    proj_dir : path
-        Location of parent directory for project
-
     Attributes
     ----------
     df_clean : pd.DataFrame
@@ -442,11 +437,6 @@ class CleanQualtrics:
 
      Find downloaded original/raw Qualtrics survey responses, and
      convert values into usable dataframe tyeps and formats.
-
-    Parameters
-    ----------
-    proj_dir : path
-        Location of parent directory for project
 
     Attributes
     ----------
