@@ -560,27 +560,16 @@ def calc_stats(proj_dir, desc_survey):
     """
 
     #
-    mod_calc = "make_reports.calc_descriptives"
-    survey_switch = {
-        "AIM": f"{mod_calc}.DescAim",
-        "ALS": f"{mod_calc}.DescAls",
-    }
-    has_subscales = ["ALS"]
+    has_subscales = ["ALS", "ERQ"]
+    visit1_path = os.path.join(
+        proj_dir, "data_survey", "visit_day1", "data_clean"
+    )
 
     #
     for sur in desc_survey:
-        h_pkg, h_mod, h_class = survey_switch[sur].split(".")
-        mod = __import__(f"{h_pkg}.{h_mod}", fromlist=[h_class])
-        rep_class = getattr(mod, h_class)
+        csv_path = os.path.join(visit1_path, f"df_{sur}.csv")
+        sur_stat = calc_descriptives.SurveyStats(proj_dir, csv_path, sur)
+        sur_stat.stats_plot()
 
-        #
-        rep_obj = rep_class(proj_dir)
-        rep_obj.metrics()
-        rep_obj.violin_plot()
-
-        if sur in has_subscales and hasattr(rep_obj, "subscales"):
-            rep_obj.subscales()
-
-    # test_inst = calc_descriptives.DescAls(proj_dir)
-    # test_inst.metrics()
-    # test_inst.violin_plot()
+        if sur in has_subscales:
+            sur_stat.stats_plot_subscale()

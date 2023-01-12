@@ -106,7 +106,7 @@ def main():
             proj_dir, recruit_demo, pending_scans, redcap_token
         )
 
-    sur_avail = ["AIM", "ALS"]
+    sur_avail = ["AIM", "ALS", "ERQ"]
     if survey_avail:
         print(f"Available surveys : \n\t{sur_avail}")
         sys.exit(0)
