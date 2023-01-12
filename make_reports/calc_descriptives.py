@@ -333,7 +333,7 @@ def calc_pending(redcap_token):
 
 
 # %%
-class _DescStat:
+class SurveyDescript:
     """Title.
 
     Desc.
@@ -349,73 +349,60 @@ class _DescStat:
         #
         self.proj_dir = proj_dir
         df = pd.read_csv(csv_path, index_col="study_id")
-        self.df, self.data_col = self._prep_df(df, survey_name)
+        self._prep_df(df, survey_name)
 
-    def _prep_df(self, df, name, has_datetime=True):
+    def _prep_df(self, df, name):
         """Title.
 
         Desc.
 
         """
-        if has_datetime:
-            df = df.drop(labels=["datetime"], axis=1)
-        val_list = [x for x in df.columns if name in x]
-        df[val_list] = df[val_list].astype("Int64")
-        return (df, val_list)
-        # self.df = df
-        # self.data_col = val_list
+        df = df.drop(labels=["datetime"], axis=1)
+        col_list = [x for x in df.columns if name in x]
+        df[col_list] = df[col_list].astype("Int64")
+        self.df = df
+        self.df_col = col_list
 
-    def mean_std(self, df):
+    def calc_stats(self):
         """Title.
 
         Desc.
 
         """
-        mean = round(df.stack().mean(), 2)
-        std = round(df.stack().std(), 2)
-        return (mean, std)
+        self.mean = round(self.df.stack().mean(), 2)
+        self.std = round(self.df.stack().std(), 2)
 
-    def metrics(self, name, df_sub=None):
+    def write_mean_std(self, out_path):
         """Title.
 
         Desc.
 
         """
         #
-        df_work = df_sub if isinstance(df_sub, pd.DataFrame) else self.df
-        mean, std = self.mean_std(df_work)
-
-        #
+        self.calc_stats()
         report = {
             "Title": "Descriptive Stats",
-            "n": df_work.shape[0],
-            "mean": mean,
-            "std": std,
+            "n": self.df.shape[0],
+            "mean": self.mean,
+            "std": self.std,
         }
 
         #
-        out_path = os.path.join(
-            self.proj_dir,
-            "analyses/surveys_stats_descriptive",
-            f"stats_{name}.json",
-        )
         with open(out_path, "w") as jf:
             json.dump(report, jf)
         print(f"\tSaved descriptive stats : {out_path}")
         return report
 
-    def violin_plot(self, lb, ub, title, plot_name, df_sub=None, col_sub=None):
+    def violin_plot(self, lb, ub, title, out_path):
         """Title.
 
         Desc.
 
         """
         #
-        df_work = df_sub if isinstance(df_sub, pd.DataFrame) else self.df
-        df_col = col_sub if col_sub else self.data_col
-
-        mean, std = self.mean_std(df_work)
-        df_work["mean"] = df_work[df_col].mean(axis=1)
+        self.calc_stats()
+        df_work = self.df.copy()
+        df_work["mean"] = df_work[self.df_col].mean(axis=1)
 
         #
         fig, ax = plt.subplots()
@@ -428,129 +415,11 @@ class _DescStat:
         plt.text(
             lb + 0.2,
             -0.42,
-            f"mean(sd) = {mean}({std})",
+            f"mean(sd) = {self.mean}({self.std})",
             horizontalalignment="left",
         )
 
         #
-        out_path = os.path.join(
-            self.proj_dir, "analyses/surveys_stats_descriptive", plot_name
-        )
         plt.savefig(out_path)
         print(f"\tDrew violin plot : {out_path}")
         return out_path
-
-
-# %%
-class SurveyStats(_DescStat):
-    """Title.
-
-    Desc.
-
-    """
-
-    def __init__(self, proj_dir, csv_path, survey_name):
-        """Title.
-
-        Desc.
-
-        """
-        super().__init__(proj_dir, csv_path, survey_name)
-        self.survey_name = survey_name
-
-    def _survey_switch(self):
-        """Title.
-
-        Desc.
-
-        """
-
-        #
-        violin_name = f"plot_violing_{self.survey_name}.png"
-        _dict = {
-            "AIM": (1, 6, "Affective Intensity Measure", violin_name),
-            "ALS": (1, 5, "Affective Lability Scale -- 18", violin_name),
-            "ERQ": (0, 8, "Emotion Regulation Questionnaire", violin_name),
-        }
-
-        # Validate survey name
-        if self.survey_name not in _dict.keys():
-            raise AttributeError(
-                f"Unexpected survey name : {self.survey_name}"
-            )
-
-        #
-        param_dict = {}
-        for key, value in _dict.items():
-            param_dict[key] = {}
-            for c, val in enumerate(["lb", "ub", "title", "violin_file"]):
-                param_dict[key][val] = value[c]
-
-        #
-        self.survey_dict = param_dict[self.survey_name]
-
-    def _subscale_switch(self):
-        """Title.
-
-        Desc.
-
-        """
-        subscale_dict = {
-            "ALS": {
-                "Anx-Dep": [f"ALS_{x}" for x in [1, 3, 5, 6, 7]],
-                "Dep-Ela": [
-                    f"ALS_{x}" for x in [2, 10, 12, 13, 15, 16, 17, 18]
-                ],
-                "Anger": [f"ALS_{x}" for x in [4, 8, 9, 11, 14]],
-            },
-            "ERQ": {
-                "Reappraisal": [f"ERQ_{x}" for x in [1, 3, 5, 7, 8, 10]],
-                "Suppression": [f"ERQ_{x}" for x in [2, 4, 6, 9]],
-            },
-        }
-        return subscale_dict[self.survey_name]
-
-    def stats_plot(self):
-        """Title.
-
-        Desc.
-
-        """
-        self._survey_switch()
-        self.metrics(name=self.survey_name)
-        self.violin_plot(
-            lb=self.survey_dict["lb"],
-            ub=self.survey_dict["ub"],
-            title=self.survey_dict["title"],
-            plot_name=self.survey_dict["violin_file"],
-        )
-
-    def stats_plot_subscale(self):
-        """Title.
-
-        Desc.
-
-        """
-        # Get columns for subscales
-        sub_dict = self._subscale_switch()
-        self._survey_switch()
-
-        #
-        for sub_name, sub_cols in sub_dict.items():
-            sub_df = self.df[sub_cols].copy()
-            stat_name = f"{self.survey_name}_{sub_name}"
-            self.metrics(name=stat_name, df_sub=sub_df)
-
-            #
-            sub_title = f"{self.survey_dict['title']}, {sub_name}"
-            sub_name = self.survey_dict["violin_file"].replace(
-                ".png", f"_{sub_name}.png"
-            )
-            self.violin_plot(
-                lb=self.survey_dict["lb"],
-                ub=self.survey_dict["ub"],
-                title=sub_title,
-                plot_name=sub_name,
-                df_sub=sub_df,
-                col_sub=sub_cols,
-            )
