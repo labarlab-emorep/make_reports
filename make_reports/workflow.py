@@ -575,10 +575,18 @@ class _SurveyInfo:
 
         """
         #
+        # _dict = {
+        #     "AIM": (1, 6, "Affective Intensity Measure"),
+        #     "ALS": (1, 5, "Affective Lability Scale -- 18"),
+        #     "ERQ": (0, 8, "Emotion Regulation Questionnaire"),
+        #     "PSWQ": (0, 6, "Penn State Worry Questionnaire"),
+        # }
         _dict = {
-            "AIM": (1, 6, "Affective Intensity Measure"),
-            "ALS": (1, 5, "Affective Lability Scale -- 18"),
-            "ERQ": (0, 8, "Emotion Regulation Questionnaire"),
+            "AIM": ["Affective Intensity Measure"],
+            "ALS": ["Affective Lability Scale -- 18"],
+            "ERQ": ["Emotion Regulation Questionnaire"],
+            "PSWQ": ["Penn State Worry Questionnaire"],
+            "RRS": ["Ruminative Response Scale"],
         }
 
         # Validate survey name
@@ -591,7 +599,7 @@ class _SurveyInfo:
         param_dict = {}
         for key, value in _dict.items():
             param_dict[key] = {}
-            for c, val in enumerate(["lb", "ub", "title"]):
+            for c, val in enumerate(["title"]):
                 param_dict[key][val] = value[c]
 
         #
@@ -643,10 +651,10 @@ def calc_stats(proj_dir, desc_survey):
             csv_path = os.path.join(visit1_path, f"df_{sur}.csv")
 
         sur_stat = calc_descriptives.SurveyDescript(proj_dir, csv_path, sur)
-        _ = sur_stat.write_mean_std(os.path.join(out_dir, f"stats_{sur}.json"))
+        _ = sur_stat.write_mean_std(
+            os.path.join(out_dir, f"stats_{sur}.json"), plot_dict["title"]
+        )
         _ = sur_stat.violin_plot(
-            lb=plot_dict["lb"],
-            ub=plot_dict["ub"],
             title=plot_dict["title"],
             out_path=os.path.join(out_dir, f"plot_violin_{sur}.png"),
         )
@@ -660,19 +668,20 @@ def calc_stats(proj_dir, desc_survey):
 
             #
             sur_stat.df = df_work[sub_cols].copy()
-            _ = sur_stat.write_mean_std(
-                os.path.join(out_dir, f"stats_{sur}_{sub_name}.json")
-            )
+            sur_stat.df_col = sub_cols
 
             #
-            sur_stat.df_col = sub_cols
             sub_title = plot_dict["title"] + f", {sub_name}"
             sub_out = os.path.join(
                 out_dir, f"plot_violin_{sur}_{sub_name}.png"
             )
+
+            #
+            _ = sur_stat.write_mean_std(
+                os.path.join(out_dir, f"stats_{sur}_{sub_name}.json"),
+                sub_title,
+            )
             _ = sur_stat.violin_plot(
-                lb=plot_dict["lb"],
-                ub=plot_dict["ub"],
                 title=sub_title,
                 out_path=sub_out,
             )
