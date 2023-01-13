@@ -106,12 +106,13 @@ class CleanSurveys:
             clean_redcap.clean_surveys(sur_name)
 
             # Write study data
+            out_name = "BDI" if "bdi" in sur_name else sur_name
             clean_file = os.path.join(
                 self.proj_dir,
                 "data_survey",
                 dir_name,
                 "data_clean",
-                f"df_{sur_name}.csv",
+                f"df_{out_name}.csv",
             )
             out_dir = os.path.dirname(clean_file)
             if not os.path.exists(out_dir):
@@ -124,7 +125,7 @@ class CleanSurveys:
                 "data_pilot/data_survey",
                 dir_name,
                 "data_clean",
-                f"df_{sur_name}.csv",
+                f"df_{out_name}.csv",
             )
             out_dir = os.path.dirname(pilot_file)
             if not os.path.exists(out_dir):
@@ -553,36 +554,155 @@ def calc_metrics(proj_dir, recruit_demo, pending_scans, redcap_token):
 
 
 # %%
-class _SurveyInfo:
+class CalcSurveyStats:
     """Title.
 
     Desc.
 
     """
 
-    def __init__(self, survey_name):
-        """Title.
-
-        Desc.
-
-        """
-        self.survey_name = survey_name
-
-    def plot_switch(self):
+    def __init__(self, proj_dir, desc_survey):
         """Title.
 
         Desc.
 
         """
         #
+        self.proj_dir = proj_dir
+        self.desc_survey = desc_survey
+        self.out_dir = os.path.join(
+            proj_dir, "analyses/surveys_stats_descriptive"
+        )
+        self.has_subscales = ["ALS", "ERQ", "RRS"]
+
+        #
+        self.visit1_list = [
+            "AIM",
+            "ALS",
+            "ERQ",
+            "PSWQ",
+            "RRS",
+            "STAI_Trait",
+            "TAS",
+        ]
+        self.visit23_list = ["STAI_State", "PANAS", "BDI"]
+
+    def coord_visits(self):
+        """Title.
+
+        Desc.
+
+        """
+        #
+        for self.survey_name in self.desc_survey:
+            if (
+                self.survey_name not in self.visit1_list
+                and self.survey_name not in self.visit23_list
+            ):
+                raise ValueError(
+                    f"Unexpected survey name : {self.survey_name}"
+                )
+
+            #
+
+            if self.survey_name in self.visit1_list:
+                print(f"Getting stats for {self.survey_name}")
+                csv_path = os.path.join(
+                    self.proj_dir,
+                    "data_survey/visit_day1/data_clean",
+                    f"df_{self.survey_name}.csv",
+                )
+                self.plot_dict = self._plot_switch()
+                self.desc_plots(csv_path, self.survey_name)
+            elif self.survey_name in self.visit23_list:
+
+                #
+                for day in ["day2", "day3"]:
+                    print(f"Getting stats for {self.survey_name}, {day}")
+                    csv_path = os.path.join(
+                        self.proj_dir,
+                        f"data_survey/visit_{day}/data_clean",
+                        f"df_{self.survey_name}.csv",
+                    )
+                    out_name = f"{self.survey_name}_{day}"
+                    self.plot_dict = self._plot_switch(day=day)
+                    self.desc_plots(csv_path, out_name)
+
+    def desc_plots(self, csv_path, out_name):
+        """Title.
+
+        Desc.
+
+        """
+        #
+        sur_stat = calc_descriptives.SurveyDescript(
+            self.proj_dir, csv_path, self.survey_name
+        )
+        _ = sur_stat.write_mean_std(
+            os.path.join(self.out_dir, f"stats_{out_name}.json"),
+            self.plot_dict["title"],
+        )
+        _ = sur_stat.violin_plot(
+            title=self.plot_dict["title"],
+            out_path=os.path.join(self.out_dir, f"plot_violin_{out_name}.png"),
+        )
+
+        #
+        if self.survey_name not in self.has_subscales:
+            return
+
+        #
+        df_work = sur_stat.df.copy()
+        subscale_dict = self._subscale_switch()
+        for sub_name, sub_cols in subscale_dict.items():
+
+            #
+            sur_stat.df = df_work[sub_cols].copy()
+            sur_stat.df_col = sub_cols
+
+            #
+            sub_title = self.plot_dict["title"] + f", {sub_name}"
+            sub_out = os.path.join(
+                self.out_dir, f"plot_violin_{out_name}_{sub_name}.png"
+            )
+
+            #
+            _ = sur_stat.write_mean_std(
+                os.path.join(
+                    self.out_dir, f"stats_{out_name}_{sub_name}.json"
+                ),
+                sub_title,
+            )
+            _ = sur_stat.violin_plot(
+                title=sub_title,
+                out_path=sub_out,
+            )
+
+    def _plot_switch(self, day="day2"):
+        """Title.
+
+        Desc.
+
+        """
+        #
+        visit_switch = {
+            "day2": "Visit 2",
+            "day3": "Visit 3",
+        }
+        vis = visit_switch[day]
+
+        #
         _dict = {
             "AIM": ["Affective Intensity Measure"],
-            "ALS": ["Affective Lability Scale -- 18"],
+            "ALS": ["Affective Lability Scale"],
             "ERQ": ["Emotion Regulation Questionnaire"],
             "PSWQ": ["Penn State Worry Questionnaire"],
             "RRS": ["Ruminative Response Scale"],
-            "STAI": ["Spielberg Trait Anxiety Inventory Form Y"],
+            "STAI_Trait": ["Spielberg Trait Anxiety Inventory"],
             "TAS": ["Toronto Alexithymia Scale"],
+            "STAI_State": [f"{vis} Spielberg State Anxiety Inventory"],
+            "PANAS": [f"{vis} Positive and Negative Affect Schedule"],
+            "BDI": [f"{vis} Beck Depression Inventory"],
         }
         _keys = ["title"]
 
@@ -602,7 +722,7 @@ class _SurveyInfo:
         #
         return param_dict[self.survey_name]
 
-    def subscale_switch(self):
+    def _subscale_switch(self):
         """Title.
 
         Desc.
@@ -635,66 +755,6 @@ class _SurveyInfo:
         for sub_name, sub_dict in zip(_sub_names, _sub_dicts):
             all_dict[sub_name] = sub_dict
         return all_dict[self.survey_name]
-
-
-# %%
-def calc_stats(proj_dir, desc_survey):
-    """Title.
-
-    Desc.
-
-    """
-    #
-    has_subscales = ["ALS", "ERQ", "RRS"]
-    visit1_list = ["AIM", "ALS", "ERQ", "PSWQ", "RRS", "STAI", "TAS"]
-    visit1_path = os.path.join(
-        proj_dir, "data_survey", "visit_day1", "data_clean"
-    )
-    out_dir = os.path.join(proj_dir, "analyses/surveys_stats_descriptive")
-
-    #
-    for sur in desc_survey:
-        sur_info = _SurveyInfo(sur)
-        plot_dict = sur_info.plot_switch()
-
-        if sur in visit1_list:
-            csv_path = os.path.join(visit1_path, f"df_{sur}.csv")
-
-        sur_stat = calc_descriptives.SurveyDescript(proj_dir, csv_path, sur)
-        _ = sur_stat.write_mean_std(
-            os.path.join(out_dir, f"stats_{sur}.json"), plot_dict["title"]
-        )
-        _ = sur_stat.violin_plot(
-            title=plot_dict["title"],
-            out_path=os.path.join(out_dir, f"plot_violin_{sur}.png"),
-        )
-
-        if sur not in has_subscales:
-            continue
-
-        df_work = sur_stat.df.copy()
-        subscale_dict = sur_info.subscale_switch()
-        for sub_name, sub_cols in subscale_dict.items():
-
-            #
-            sur_stat.df = df_work[sub_cols].copy()
-            sur_stat.df_col = sub_cols
-
-            #
-            sub_title = plot_dict["title"] + f", {sub_name}"
-            sub_out = os.path.join(
-                out_dir, f"plot_violin_{sur}_{sub_name}.png"
-            )
-
-            #
-            _ = sur_stat.write_mean_std(
-                os.path.join(out_dir, f"stats_{sur}_{sub_name}.json"),
-                sub_title,
-            )
-            _ = sur_stat.violin_plot(
-                title=sub_title,
-                out_path=sub_out,
-            )
 
 
 # %%

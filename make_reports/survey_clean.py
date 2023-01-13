@@ -391,21 +391,20 @@ class CleanRedcap:
             Clean bdi info for pilot participants
 
         """
-        # Remove unneeded columns and reorder
+        # Rename then remove unneeded columns, reorder
         drop_list = ["guid_timestamp", "redcap_survey_identifier"]
         df_raw = self.df_raw.drop(drop_list, axis=1)
+        if "q_1_v2" in df_raw.columns.tolist():
+            df_raw.columns = df_raw.columns.str.replace("_v2", "")
+        df_raw.columns = df_raw.columns.str.replace("q_", "BDI_")
+
         col_names = df_raw.columns.tolist()
-        # col_reorder = (
-        #     col_names[:1] + col_names[-1:] +
-        #       col_names[-2:-1] + col_names[1:-2]
-        # )
         col_reorder = col_names[:1] + col_names[-1:] + col_names[1:-1]
         df_raw = df_raw[col_reorder]
 
         # Remove rows without responses or study_id (from guid survey)
         df_raw = df_raw[df_raw["study_id"].notna()]
-        col_drop = "q_1_v2" if "q_1_v2" in col_names else "q_1"
-        df_raw = df_raw[df_raw[col_drop].notna()]
+        df_raw = df_raw[df_raw["BDI_1"].notna()]
 
         # Enforce datetime format
         col_rename = (
@@ -564,7 +563,7 @@ class CleanQualtrics:
             "ERQ",
             "PSWQ",
             "RRS",
-            "STAI",
+            "STAI_Trait",
             "TAS",
         ]
 

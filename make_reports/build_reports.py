@@ -1359,7 +1359,7 @@ class NdarBdi01:
                 self.proj_dir,
                 "data_pilot/data_survey",
                 "visit_day2/data_clean",
-                "df_bdi_day2.csv",
+                "df_BDI.csv",
             )
         )
         df_study2 = pd.read_csv(
@@ -1367,7 +1367,7 @@ class NdarBdi01:
                 self.proj_dir,
                 "data_survey",
                 "visit_day2/data_clean",
-                "df_bdi_day2.csv",
+                "df_BDI.csv",
             )
         )
 
@@ -1384,7 +1384,7 @@ class NdarBdi01:
                 self.proj_dir,
                 "data_pilot/data_survey",
                 "visit_day3/data_clean",
-                "df_bdi_day3.csv",
+                "df_BDI.csv",
             )
         )
         df_study3 = pd.read_csv(
@@ -1392,7 +1392,7 @@ class NdarBdi01:
                 self.proj_dir,
                 "data_survey",
                 "visit_day3/data_clean",
-                "df_bdi_day3.csv",
+                "df_BDI.csv",
             )
         )
         df_bdi_day3 = pd.concat([df_pilot3, df_study3], ignore_index=True)
@@ -1433,33 +1433,33 @@ class NdarBdi01:
         df_bdi = getattr(self, f"df_bdi_{sess}")
 
         # Convert response values to int
-        q_cols = [x for x in df_bdi.columns if "q_" in x]
+        q_cols = [x for x in df_bdi.columns if "BDI_" in x]
         df_bdi[q_cols] = df_bdi[q_cols].astype("Int64")
 
         # Remap column names
         map_item = {
-            "q_1": "bdi1",
-            "q_2": "bdi2",
-            "q_3": "bdi3",
-            "q_4": "bdi4",
-            "q_5": "bdi5",
-            "q_6": "bdi6",
-            "q_7": "beck07",
-            "q_8": "beck08",
-            "q_9": "bdi9",
-            "q_10": "bdi10",
-            "q_11": "bdi_irritated",
-            "q_12": "bdi_lost",
-            "q_13": "bdi_indecision",
-            "q_14": "beck14",
-            "q_15": "beck15",
-            "q_16": "beck16",
-            "q_17": "beck17",
-            "q_18": "bd_017",
-            "q_19": "beck19",
-            "q_19b": "beck20",
-            "q_20": "beck21",
-            "q_21": "beck22",
+            "BDI_1": "bdi1",
+            "BDI_2": "bdi2",
+            "BDI_3": "bdi3",
+            "BDI_4": "bdi4",
+            "BDI_5": "bdi5",
+            "BDI_6": "bdi6",
+            "BDI_7": "beck07",
+            "BDI_8": "beck08",
+            "BDI_9": "bdi9",
+            "BDI_10": "bdi10",
+            "BDI_11": "bdi_irritated",
+            "BDI_12": "bdi_loss",
+            "BDI_13": "bdi_indecision",
+            "BDI_14": "beck14",
+            "BDI_15": "beck15",
+            "BDI_16": "beck16",
+            "BDI_17": "beck17",
+            "BDI_18": "bd_017",
+            "BDI_19": "beck19",
+            "BDI_19b": "beck20",
+            "BDI_20": "beck21",
+            "BDI_21": "beck22",
         }
         df_bdi_remap = df_bdi.rename(columns=map_item)
 
@@ -3883,7 +3883,7 @@ class NdarStai01:
                 self.proj_dir,
                 "data_pilot/data_survey",
                 "visit_day1/data_clean",
-                "df_STAI.csv",
+                "df_STAI_Trait.csv",
             )
         )
         df_study = pd.read_csv(
@@ -3891,7 +3891,7 @@ class NdarStai01:
                 self.proj_dir,
                 "data_survey",
                 "visit_day1/data_clean",
-                "df_STAI.csv",
+                "df_STAI_Trait.csv",
             )
         )
         df_stai_trait = pd.concat([df_pilot, df_study], ignore_index=True)
