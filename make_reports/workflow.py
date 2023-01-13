@@ -575,19 +575,16 @@ class _SurveyInfo:
 
         """
         #
-        # _dict = {
-        #     "AIM": (1, 6, "Affective Intensity Measure"),
-        #     "ALS": (1, 5, "Affective Lability Scale -- 18"),
-        #     "ERQ": (0, 8, "Emotion Regulation Questionnaire"),
-        #     "PSWQ": (0, 6, "Penn State Worry Questionnaire"),
-        # }
         _dict = {
             "AIM": ["Affective Intensity Measure"],
             "ALS": ["Affective Lability Scale -- 18"],
             "ERQ": ["Emotion Regulation Questionnaire"],
             "PSWQ": ["Penn State Worry Questionnaire"],
             "RRS": ["Ruminative Response Scale"],
+            "STAI": ["Spielberg Trait Anxiety Inventory Form Y"],
+            "TAS": ["Toronto Alexithymia Scale"],
         }
+        _keys = ["title"]
 
         # Validate survey name
         if self.survey_name not in _dict.keys():
@@ -597,10 +594,10 @@ class _SurveyInfo:
 
         #
         param_dict = {}
-        for key, value in _dict.items():
-            param_dict[key] = {}
-            for c, val in enumerate(["title"]):
-                param_dict[key][val] = value[c]
+        for sur_name, sur_list in _dict.items():
+            param_dict[sur_name] = {}
+            for c, val in enumerate(_keys):
+                param_dict[sur_name][val] = sur_list[c]
 
         #
         return param_dict[self.survey_name]
@@ -611,20 +608,33 @@ class _SurveyInfo:
         Desc.
 
         """
-        subscale_dict = {
-            "ALS": {
-                "Anx-Dep": [f"ALS_{x}" for x in [1, 3, 5, 6, 7]],
-                "Dep-Ela": [
-                    f"ALS_{x}" for x in [2, 10, 12, 13, 15, 16, 17, 18]
-                ],
-                "Anger": [f"ALS_{x}" for x in [4, 8, 9, 11, 14]],
-            },
-            "ERQ": {
-                "Reappraisal": [f"ERQ_{x}" for x in [1, 3, 5, 7, 8, 10]],
-                "Suppression": [f"ERQ_{x}" for x in [2, 4, 6, 9]],
-            },
+        #
+        _als_sub = {
+            "Anx-Dep": [f"ALS_{x}" for x in [1, 3, 5, 6, 7]],
+            "Dep-Ela": [f"ALS_{x}" for x in [2, 10, 12, 13, 15, 16, 17, 18]],
+            "Anger": [f"ALS_{x}" for x in [4, 8, 9, 11, 14]],
         }
-        return subscale_dict[self.survey_name]
+        _erq_sub = {
+            "Reappraisal": [f"ERQ_{x}" for x in [1, 3, 5, 7, 8, 10]],
+            "Suppression": [f"ERQ_{x}" for x in [2, 4, 6, 9]],
+        }
+        _rrs_sub = {
+            "Depression": [
+                f"RRS_{x}" for x in [1, 2, 3, 4, 6, 8, 9, 14, 17, 18, 19, 22]
+            ],
+            "Brooding": [f"RRS_{x}" for x in [5, 10, 13, 15, 16]],
+            "Reflection": [f"RRS_{x}" for x in [7, 11, 12, 20, 21]],
+        }
+
+        #
+        _sub_names = ["ALS", "ERQ", "RRS"]
+        _sub_dicts = [_als_sub, _erq_sub, _rrs_sub]
+
+        #
+        all_dict = {}
+        for sub_name, sub_dict in zip(_sub_names, _sub_dicts):
+            all_dict[sub_name] = sub_dict
+        return all_dict[self.survey_name]
 
 
 # %%
@@ -635,7 +645,7 @@ def calc_stats(proj_dir, desc_survey):
 
     """
     #
-    has_subscales = ["ALS", "ERQ"]
+    has_subscales = ["ALS", "ERQ", "RRS"]
     visit1_list = ["AIM", "ALS", "ERQ", "PSWQ", "RRS", "STAI", "TAS"]
     visit1_path = os.path.join(
         proj_dir, "data_survey", "visit_day1", "data_clean"
