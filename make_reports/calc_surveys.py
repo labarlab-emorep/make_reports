@@ -11,8 +11,6 @@ Calcualte survey stats:
 import os
 import json
 import pandas as pd
-
-# from pandas.api.types import CategoricalDtype
 import seaborn as sns
 import matplotlib.pyplot as plt
 
@@ -256,8 +254,53 @@ def descript_stim_ratings(proj_dir):
         "data_survey/visit_day2/data_clean",
         "df_post_scan_ratings.csv",
     )
+    df_day2 = pd.read_csv(day2_path)
+
     day3_path = os.path.join(
         proj_dir,
         "data_survey/visit_day3/data_clean",
         "df_post_scan_ratings.csv",
     )
+    df_day3 = pd.read_csv(day3_path)
+
+    #
+    df_all = pd.concat([df_day2, df_day3], ignore_index=True)
+    df_all = df_all.sort_values(
+        by=["study_id", "session", "type", "emotion", "prompt"]
+    ).reset_index(drop=True)
+    df_all["emotion"] = df_all["emotion"].str.title()
+    emo_list = df_all["emotion"].unique().tolist()
+    del df_day2, df_day3
+
+    #
+    df_movies = df_all[df_all["type"] == "Videos"]
+
+    #
+    # df_movies_aro = df_movies[df_movies["prompt"] == "Arousal"]
+    # df_movies_val = df_movies[df_movies["prompt"] == "Valence"]
+
+    # Find concordance of endorsement (emotion=Calm, response=Calm)
+    df_movies_end = df_movies[df_movies["prompt"] == "Endorsement"]
+    num_subj = len(df_movies["study_id"].unique())
+    max_total = num_subj * 5
+
+    count_dict = {}
+    for emo in emo_list:
+        count_dict[emo] = {}
+        df_emo = df_movies_end[df_movies_end["emotion"] == emo]
+        for sub_emo in emo_list:
+            count_emo = len(df_emo[df_emo["response"].str.contains(sub_emo)])
+            count_dict[emo][sub_emo] = count_emo / max_total
+
+    #
+    df_corr = pd.DataFrame.from_dict(
+        {i: count_dict[i] for i in count_dict.keys()},
+        orient="index",
+    )
+    df_t = df_corr.transpose()
+    ax = sns.heatmap(df_t)
+    ax.set(xlabel="Stimulus Category", ylabel="Participant Endorsement")
+    ax.set_title("Video Endorsement Likelihood")
+
+
+# %%
