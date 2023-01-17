@@ -74,12 +74,12 @@ def main():
     """Capture arguments and trigger workflow."""
     args = _get_args().parse_args()
     proj_dir = args.proj_dir
-    survey_name = args.survey_name
+    survey_list = args.survey_name
     survey_all = args.survey_all
     survey_avail = args.survey_avail
 
     #
-    sur_avail = [
+    sur_rc_qual = [
         "AIM",
         "ALS",
         "BDI",
@@ -91,22 +91,33 @@ def main():
         "STAI_State",
         "TAS",
     ]
+    sur_scan = ["rest", "stim"]
+    sur_all = sur_rc_qual + sur_scan
     if survey_avail:
-        print(f"Available surveys : \n\t{sur_avail}")
+        print(f"Available surveys : \n\t{sur_all}")
         sys.exit(0)
 
+    #
     if survey_all:
-        survey_name = sur_avail
+        survey_list = sur_all
+
+    # Validate survey names
+    for sur in survey_list:
+        if sur not in sur_rc_qual and sur not in sur_scan:
+            raise ValueError(
+                f"Unexpected survey requested : {sur}, see --survey-avail."
+            )
 
     #
-    if survey_name:
-        for sur in survey_name:
-            if sur not in sur_avail:
-                raise ValueError(
-                    f"Unexpected survey requested : {sur}, see --survey-avail."
-                )
-        sur_stat = workflow.CalcRedcapQualtricsStats(proj_dir, survey_name)
+    sur_online = [x for x in survey_list if x in sur_rc_qual]
+    sur_scan = [x for x in survey_list if x in sur_scan]
+
+    if sur_online:
+        sur_stat = workflow.CalcRedcapQualtricsStats(proj_dir, sur_online)
         sur_stat.coord_visits()
+
+    if sur_scan:
+        workflow.survey_scan(proj_dir, sur_scan)
 
 
 if __name__ == "__main__":

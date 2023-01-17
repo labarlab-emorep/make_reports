@@ -567,7 +567,7 @@ class CalcRedcapQualtricsStats:
 
     """
 
-    def __init__(self, proj_dir, desc_survey):
+    def __init__(self, proj_dir, sur_list):
         """Title.
 
         Desc.
@@ -575,7 +575,7 @@ class CalcRedcapQualtricsStats:
         """
         #
         self.proj_dir = proj_dir
-        self.desc_survey = desc_survey
+        self.sur_list = sur_list
         self.out_dir = os.path.join(
             proj_dir, "analyses/surveys_stats_descriptive"
         )
@@ -600,7 +600,7 @@ class CalcRedcapQualtricsStats:
 
         """
         #
-        for self.survey_name in self.desc_survey:
+        for self.survey_name in self.sur_list:
             if (
                 self.survey_name not in self.visit1_list
                 and self.survey_name not in self.visit23_list
@@ -761,6 +761,26 @@ class CalcRedcapQualtricsStats:
         for sub_name, sub_dict in zip(_sub_names, _sub_dicts):
             all_dict[sub_name] = sub_dict
         return all_dict[self.survey_name]
+
+
+# %%
+def survey_scan(proj_dir, survey_list):
+    """Title
+
+    Desc.
+
+    """
+    # Validate
+    for sur in survey_list:
+        if sur not in ["rest", "stim"]:
+            raise ValueError(f"Unexpected survey name : {sur}")
+
+    if "rest" in survey_list:
+        print("\nWorking on rest-ratings data")
+        _ = calc_surveys.descript_rest_ratings(proj_dir)
+
+    if "stim" in survey_list:
+        pass
 
 
 # %%
