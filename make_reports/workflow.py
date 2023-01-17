@@ -1,11 +1,16 @@
-"""Setup workflows for specific types of reports."""
+"""Sub-package workflows.
+
+Each workflow function or class will coordinate the methods
+and data needed.
+
+"""
 # %%
 import os
 import glob
 from datetime import datetime
 from make_reports import survey_download, survey_clean
 from make_reports import build_reports, report_helper
-from make_reports import calc_descriptives
+from make_reports import calc_metrics, calc_surveys
 
 
 # %%
@@ -397,9 +402,10 @@ def make_ndar_reports(ndar_reports, proj_dir, close_date):
         cl_data.clean_qualtrics()
         print("\tDone.")
 
-    # Set switch to find appropriate class: key = user-specified
-    # report name, value = relevant class.
-    mod_build = "make_reports.build_reports"
+    # Set switch to find appropriate class in make_reports.build_ndar:
+    #   key = user-specified report name
+    #   value = relevant class
+    mod_build = "make_reports.build_ndar"
     nda_switch = {
         "demo_info01": f"{mod_build}.NdarDemoInfo01",
         "affim01": f"{mod_build}.NdarAffim01",
@@ -440,7 +446,7 @@ def make_ndar_reports(ndar_reports, proj_dir, close_date):
     # Make requested reports
     for report in ndar_reports:
 
-        # Get appropriate class
+        # Get appropriate class from make_reports.build_ndar
         h_pkg, h_mod, h_class = nda_switch[report].split(".")
         mod = __import__(f"{h_pkg}.{h_mod}", fromlist=[h_class])
         rep_class = getattr(mod, h_class)
@@ -510,7 +516,7 @@ def generate_guids(proj_dir, user_name, user_pass, find_mismatch):
             print("No mismatches found!")
 
 
-def calc_metrics(proj_dir, recruit_demo, pending_scans, redcap_token):
+def get_metrics(proj_dir, recruit_demo, pending_scans, redcap_token):
     """Title.
 
     Desc.
@@ -541,12 +547,12 @@ def calc_metrics(proj_dir, recruit_demo, pending_scans, redcap_token):
         redcap_demo.remove_withdrawn()
 
         print("\nComparing planned vs. actual recruitment demographics ...")
-        _ = calc_descriptives.demographics(proj_dir, redcap_demo.final_demo)
+        _ = calc_metrics.demographics(proj_dir, redcap_demo.final_demo)
 
     #
     if pending_scans:
         print("\nFinding participants missing day3 scan ...\n")
-        pend_dict = calc_descriptives.calc_pending(redcap_token)
+        pend_dict = calc_metrics.calc_pending(redcap_token)
         print("\tSubj \t Time since day2 scan")
         for subid, days in pend_dict.items():
             print(f"\t{subid} \t {days}")
@@ -554,7 +560,7 @@ def calc_metrics(proj_dir, recruit_demo, pending_scans, redcap_token):
 
 
 # %%
-class CalcSurveyStats:
+class CalcRedcapQualtricsStats:
     """Title.
 
     Desc.
@@ -635,7 +641,7 @@ class CalcSurveyStats:
 
         """
         #
-        sur_stat = calc_descriptives.SurveyDescript(
+        sur_stat = calc_surveys.DescriptRedcapQualtrics(
             self.proj_dir, csv_path, self.survey_name
         )
         _ = sur_stat.write_mean_std(
