@@ -780,7 +780,9 @@ def survey_scan(proj_dir, survey_list):
         _ = calc_surveys.descript_rest_ratings(proj_dir)
 
     if "stim" in survey_list:
-        pass
+        stim_stats = calc_surveys.DescriptStimRatings(proj_dir)
+        for stim_type in ["Videos", "Scenarios"]:
+            stim_stats.endorsement(stim_type)
 
 
 # %%

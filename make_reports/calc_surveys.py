@@ -243,64 +243,122 @@ def descript_rest_ratings(proj_dir):
     return df_mean
 
 
-def descript_stim_ratings(proj_dir):
+class DescriptStimRatings:
     """Title.
 
     Desc.
 
     """
-    day2_path = os.path.join(
-        proj_dir,
-        "data_survey/visit_day2/data_clean",
-        "df_post_scan_ratings.csv",
-    )
-    df_day2 = pd.read_csv(day2_path)
 
-    day3_path = os.path.join(
-        proj_dir,
-        "data_survey/visit_day3/data_clean",
-        "df_post_scan_ratings.csv",
-    )
-    df_day3 = pd.read_csv(day3_path)
+    def __init__(self, proj_dir):
+        """Title.
 
-    #
-    df_all = pd.concat([df_day2, df_day3], ignore_index=True)
-    df_all = df_all.sort_values(
-        by=["study_id", "session", "type", "emotion", "prompt"]
-    ).reset_index(drop=True)
-    df_all["emotion"] = df_all["emotion"].str.title()
-    emo_list = df_all["emotion"].unique().tolist()
-    del df_day2, df_day3
+        Desc.
 
-    #
-    df_movies = df_all[df_all["type"] == "Videos"]
+        """
+        self.proj_dir = proj_dir
+        self.out_dir = os.path.join(
+            proj_dir, "analyses/surveys_stats_descriptive"
+        )
+        self._get_data()
 
-    #
-    # df_movies_aro = df_movies[df_movies["prompt"] == "Arousal"]
-    # df_movies_val = df_movies[df_movies["prompt"] == "Valence"]
+    def _get_data(self):
+        """Title.
 
-    # Find concordance of endorsement (emotion=Calm, response=Calm)
-    df_movies_end = df_movies[df_movies["prompt"] == "Endorsement"]
-    num_subj = len(df_movies["study_id"].unique())
-    max_total = num_subj * 5
+        Desc.
 
-    count_dict = {}
-    for emo in emo_list:
-        count_dict[emo] = {}
-        df_emo = df_movies_end[df_movies_end["emotion"] == emo]
-        for sub_emo in emo_list:
-            count_emo = len(df_emo[df_emo["response"].str.contains(sub_emo)])
-            count_dict[emo][sub_emo] = count_emo / max_total
+        Attributes
+        ----------
+        df_all
+        emo_list
 
-    #
-    df_corr = pd.DataFrame.from_dict(
-        {i: count_dict[i] for i in count_dict.keys()},
-        orient="index",
-    )
-    df_t = df_corr.transpose()
-    ax = sns.heatmap(df_t)
-    ax.set(xlabel="Stimulus Category", ylabel="Participant Endorsement")
-    ax.set_title("Video Endorsement Likelihood")
+        """
+        day2_path = os.path.join(
+            self.proj_dir,
+            "data_survey/visit_day2/data_clean",
+            "df_post_scan_ratings.csv",
+        )
+        df_day2 = pd.read_csv(day2_path)
+
+        day3_path = os.path.join(
+            self.proj_dir,
+            "data_survey/visit_day3/data_clean",
+            "df_post_scan_ratings.csv",
+        )
+        df_day3 = pd.read_csv(day3_path)
+
+        #
+        df_all = pd.concat([df_day2, df_day3], ignore_index=True)
+        df_all = df_all.sort_values(
+            by=["study_id", "session", "type", "emotion", "prompt"]
+        ).reset_index(drop=True)
+        df_all["emotion"] = df_all["emotion"].str.title()
+        self.emo_list = df_all["emotion"].unique().tolist()
+        self.df_all = df_all
+
+    def endorsement(self, stim_type):
+        """Title
+
+        Desc.
+
+        Parameters
+        ----------
+        stim_type : str
+            [Videos | Scenarios]
+
+        Raises
+        ------
+
+        """
+        #
+        if stim_type not in ["Videos", "Scenarios"]:
+            raise ValueError(f"Unexpected stimulus type : {stim_type}")
+
+        #
+        df = self.df_all[self.df_all["type"] == stim_type].copy()
+        df_end = df[df["prompt"] == "Endorsement"]
+
+        # Find concordance of endorsement (emotion=Calm, response=Calm)
+        num_subj = len(df_end["study_id"].unique())
+        max_total = num_subj * 5
+
+        #
+        count_dict = {}
+        for emo in self.emo_list:
+            count_dict[emo] = {}
+            df_emo = df_end[df_end["emotion"] == emo]
+            for sub_emo in self.emo_list:
+                count_emo = len(
+                    df_emo[df_emo["response"].str.contains(sub_emo)]
+                )
+                count_dict[emo][sub_emo] = count_emo / max_total
+
+        #
+        del df, df_end, df_emo
+        df_corr = pd.DataFrame.from_dict(
+            {i: count_dict[i] for i in count_dict.keys()},
+            orient="index",
+        )
+        df_trans = df_corr.transpose()
+        out_path = os.path.join(
+            self.out_dir, f"stats_stim-ratings_{stim_type.lower()}.csv"
+        )
+        df_trans.to_csv(out_path)
+        print(f"\t Wrote dataset : {out_path}")
+
+        #
+        ax = sns.heatmap(df_trans)
+        ax.set(xlabel="Stimulus Category", ylabel="Participant Endorsement")
+        ax.set_title(f"{stim_type[:-1]} Endorsement Proportion")
+
+        out_path = os.path.join(
+            self.out_dir,
+            f"plot_heat-prob_stim-ratings_{stim_type.lower()}.png",
+        )
+        plt.subplots_adjust(bottom=0.25, left=0.2)
+        plt.savefig(out_path)
+        plt.close()
+        print(f"\tDrew heat-prob plot : {out_path}")
 
 
 # %%
