@@ -782,7 +782,8 @@ def survey_scan(proj_dir, survey_list):
     if "stim" in survey_list:
         stim_stats = calc_surveys.DescriptStimRatings(proj_dir)
         for stim_type in ["Videos", "Scenarios"]:
-            stim_stats.endorsement(stim_type)
+            _ = stim_stats.endorsement(stim_type)
+            _ = stim_stats.arousal(stim_type)
 
 
 # %%

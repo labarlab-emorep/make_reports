@@ -315,8 +315,10 @@ class DescriptStimRatings:
             raise ValueError(f"Unexpected stimulus type : {stim_type}")
 
         #
-        df = self.df_all[self.df_all["type"] == stim_type].copy()
-        df_end = df[df["prompt"] == "Endorsement"]
+        df_end = self.df_all[
+            (self.df_all["type"] == stim_type)
+            & (self.df_all["prompt"] == "Endorsement")
+        ].copy()
 
         # Find concordance of endorsement (emotion=Calm, response=Calm)
         num_subj = len(df_end["study_id"].unique())
@@ -334,14 +336,15 @@ class DescriptStimRatings:
                 count_dict[emo][sub_emo] = count_emo / max_total
 
         #
-        del df, df_end, df_emo
+        del df_end, df_emo
         df_corr = pd.DataFrame.from_dict(
             {i: count_dict[i] for i in count_dict.keys()},
             orient="index",
         )
         df_trans = df_corr.transpose()
         out_path = os.path.join(
-            self.out_dir, f"stats_stim-ratings_{stim_type.lower()}.csv"
+            self.out_dir,
+            f"stats_stim-ratings_endorsement_{stim_type.lower()}.csv",
         )
         df_trans.to_csv(out_path)
         print(f"\t Wrote dataset : {out_path}")
@@ -353,12 +356,65 @@ class DescriptStimRatings:
 
         out_path = os.path.join(
             self.out_dir,
-            f"plot_heat-prob_stim-ratings_{stim_type.lower()}.png",
+            f"plot_heat-prob_stim-ratings_endorsement_{stim_type.lower()}.png",
         )
         plt.subplots_adjust(bottom=0.25, left=0.2)
         plt.savefig(out_path)
         plt.close()
         print(f"\tDrew heat-prob plot : {out_path}")
+        return df_trans
+
+    def arousal(self, stim_type):
+        """Title.
+
+        Desc.
+
+        """
+        if stim_type not in ["Videos", "Scenarios"]:
+            raise ValueError(f"Unexpected stimulus type : {stim_type}")
+
+        #
+        df = self.df_all[
+            (self.df_all["type"] == stim_type)
+            & (self.df_all["prompt"] == "Arousal")
+        ].copy()
+        df["response"] = df["response"].astype("Int64")
+
+        #
+        response_dict = {}
+        for emo in self.emo_list:
+            _mean = df.loc[df["emotion"] == emo, "response"].mean()
+            _std = df.loc[df["emotion"] == emo, "response"].std()
+            response_dict[emo] = {
+                "mean": round(_mean, 2),
+                "std": round(_std, 2),
+            }
+        df_stat = pd.DataFrame.from_dict(response_dict).transpose()
+        out_path = os.path.join(
+            self.out_dir, f"stats_stim-ratings_arousal_{stim_type.lower()}.csv"
+        )
+        df_stat.to_csv(out_path)
+        print(f"\t Wrote dataset : {out_path}")
+
+        #
+        df["response"] = df["response"].astype("float")
+        fig, ax = plt.subplots()
+        sns.violinplot(x="emotion", y="response", data=df)
+        plt.title(f"{stim_type[:-1]} Arousal Ratings")
+        plt.ylabel("Arousal Rating")
+        plt.xlabel("Emotion")
+        plt.xticks(rotation=45, horizontalalignment="right")
+
+        #
+        out_path = os.path.join(
+            self.out_dir,
+            f"plot_violin_stim-ratings_arousal_{stim_type.lower()}.png",
+        )
+        plt.subplots_adjust(bottom=0.25, left=0.1)
+        plt.savefig(out_path)
+        plt.close(fig)
+        print(f"\tDrew violin plot : {out_path}")
+        return df_stat
 
 
 # %%
