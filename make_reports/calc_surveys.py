@@ -364,7 +364,7 @@ class DescriptStimRatings:
         print(f"\tDrew heat-prob plot : {out_path}")
         return df_trans
 
-    def arousal(self, stim_type):
+    def arousal_valence(self, stim_type, prompt_name):
         """Title.
 
         Desc.
@@ -373,10 +373,12 @@ class DescriptStimRatings:
         if stim_type not in ["Videos", "Scenarios"]:
             raise ValueError(f"Unexpected stimulus type : {stim_type}")
 
+        # Validate prompt_name
+
         #
         df = self.df_all[
             (self.df_all["type"] == stim_type)
-            & (self.df_all["prompt"] == "Arousal")
+            & (self.df_all["prompt"] == prompt_name)
         ].copy()
         df["response"] = df["response"].astype("Int64")
 
@@ -391,7 +393,9 @@ class DescriptStimRatings:
             }
         df_stat = pd.DataFrame.from_dict(response_dict).transpose()
         out_path = os.path.join(
-            self.out_dir, f"stats_stim-ratings_arousal_{stim_type.lower()}.csv"
+            self.out_dir,
+            "stats_stim-ratings_"
+            + f"{prompt_name.lower()}_{stim_type.lower()}.csv",
         )
         df_stat.to_csv(out_path)
         print(f"\t Wrote dataset : {out_path}")
@@ -400,15 +404,16 @@ class DescriptStimRatings:
         df["response"] = df["response"].astype("float")
         fig, ax = plt.subplots()
         sns.violinplot(x="emotion", y="response", data=df)
-        plt.title(f"{stim_type[:-1]} Arousal Ratings")
-        plt.ylabel("Arousal Rating")
+        plt.title(f"{stim_type[:-1]} {prompt_name} Ratings")
+        plt.ylabel(f"{prompt_name} Rating")
         plt.xlabel("Emotion")
         plt.xticks(rotation=45, horizontalalignment="right")
 
         #
         out_path = os.path.join(
             self.out_dir,
-            f"plot_violin_stim-ratings_arousal_{stim_type.lower()}.png",
+            "plot_violin_stim-ratings_"
+            + f"{prompt_name.lower()}_{stim_type.lower()}.png",
         )
         plt.subplots_adjust(bottom=0.25, left=0.1)
         plt.savefig(out_path)
