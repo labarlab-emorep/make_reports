@@ -1,9 +1,14 @@
-r"""Title.
+r"""Generate descriptives for survey data.
 
-Desc.
+Calculate descriptive statistics and draw plots for
+REDCap, Qualtrics, rest-ratings, and stim-ratings
+surveys.
 
-Example
--------
+Output files are written to:
+    <proj_dir>/analyses/surveys_stats_descriptive
+
+Examples
+--------
 sur_stats --survey-avail
 sur_stats --survey-all
 sur_stats --survey-name AIM ALS
@@ -78,7 +83,7 @@ def main():
     survey_all = args.survey_all
     survey_avail = args.survey_avail
 
-    #
+    # Set redcap/qualtircs and scan lists
     sur_rc_qual = [
         "AIM",
         "ALS",
@@ -93,11 +98,11 @@ def main():
     ]
     sur_scan = ["rest", "stim"]
     sur_all = sur_rc_qual + sur_scan
+
+    # Manage avail, all options
     if survey_avail:
         print(f"Available surveys : \n\t{sur_all}")
         sys.exit(0)
-
-    #
     if survey_all:
         survey_list = sur_all
 
@@ -108,13 +113,13 @@ def main():
                 f"Unexpected survey requested : {sur}, see --survey-avail."
             )
 
-    #
+    # Sort requested survey names, trigger appropriate workflows
     sur_online = [x for x in survey_list if x in sur_rc_qual]
     sur_scan = [x for x in survey_list if x in sur_scan]
 
     if sur_online:
         sur_stat = workflow.CalcRedcapQualtricsStats(proj_dir, sur_online)
-        sur_stat.coord_visits()
+        sur_stat.wrap_visits()
 
     if sur_scan:
         workflow.survey_scan(proj_dir, sur_scan)
