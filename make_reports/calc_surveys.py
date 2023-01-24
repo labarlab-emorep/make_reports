@@ -7,13 +7,17 @@ Output files are written to:
     experiment2/EmoRep/Exp2_Compute_Emotion/analyses/surveys_stats_descriptive
 
 """
+# %%
 import os
 import json
+import glob
 import pandas as pd
+import numpy as np
 import seaborn as sns
 import matplotlib.pyplot as plt
 
 
+# %%
 class DescriptRedcapQualtrics:
     """Describe survey responses.
 
@@ -225,6 +229,58 @@ class DescriptRedcapQualtrics:
 
 
 # %%
+def _split_violin_plots(
+    emo_all,
+    df,
+    sub_col,
+    x_col,
+    x_lab,
+    y_col,
+    y_lab,
+    hue_col,
+    hue_order,
+    title,
+    out_path,
+):
+    """Title.
+
+    Desc.
+
+    """
+    # Split plot into 4 subplots
+    emo_a = emo_all[:4]
+    emo_b = emo_all[4:8]
+    emo_c = emo_all[8:12]
+    emo_d = emo_all[12:]
+
+    # Make each subplot
+    for cnt, emo in enumerate([emo_a, emo_b, emo_c, emo_d]):
+        df_plot = df[df[sub_col].isin(emo)].copy()
+        df_plot[y_col] = df_plot[y_col].astype(float)
+
+        # Draw violin plots
+        fix, ax = plt.subplots()
+        sns.violinplot(
+            x=x_col,
+            y=y_col,
+            hue=hue_col,
+            data=df_plot,
+            hue_order=hue_order,
+        )
+        plt.legend(bbox_to_anchor=(1.02, 1), loc="upper left", borderaxespad=0)
+        plt.title(title)
+        plt.ylabel(y_lab)
+        plt.xlabel(x_lab)
+        plt.xticks(rotation=45, ha="right")
+
+        # Save and close
+        out_plot = out_path.replace(".png", f"_{cnt+1}.png")
+        plt.savefig(out_plot, bbox_inches="tight")
+        plt.close()
+        print(f"\tDrew violin plot : {out_plot}")
+
+
+# %%
 def descript_rest_ratings(proj_dir):
     """Generate descriptive stats for resting state ratings.
 
@@ -276,30 +332,29 @@ def descript_rest_ratings(proj_dir):
     # Get integer responses
     df_rest_int = df_rest_all[df_rest_all["resp_type"] == "resp_int"].copy()
     df_rest_int = df_rest_int.drop(["datetime", "resp_type"], axis=1)
-    emo_list = [
-        x for x in df_rest_int.columns if x != "study_id" and x != "visit"
-    ]
+    excl_list = ["study_id", "visit", "task"]
+    emo_list = [x for x in df_rest_int.columns if x not in excl_list]
     df_rest_int[emo_list] = df_rest_int[emo_list].astype("Int64")
 
     # Convert to long form, organize columns
     df_long = pd.melt(
         df_rest_int,
-        id_vars=["study_id", "visit"],
+        id_vars=["study_id", "visit", "task"],
         value_vars=emo_list,
         var_name="emotion",
         value_name="rating",
     )
     df_long["emotion"] = df_long["emotion"].str.title()
-    df_long["visit"] = df_long["visit"].str.replace("ses-", "")
     df_long["rating"] = df_long["rating"].astype("Int64")
     df_long = df_long.dropna(axis=0)
     emo_title = [x.title() for x in emo_list]
 
     # Make dataframe of descriptives for reporting, write out
-    df_mean = df_long.groupby(["visit", "emotion"]).mean()
+    df_mean = df_long.groupby(["task", "emotion"]).mean()
     df_mean = df_mean.rename(columns={"rating": "mean"})
     df_mean["mean"] = round(df_mean["mean"], 2)
-    df_std = df_long.groupby(["visit", "emotion"]).std()
+
+    df_std = df_long.groupby(["task", "emotion"]).std()
     df_std = df_std.rename(columns={"rating": "std"})
     df_std["std"] = round(df_std["std"], 2)
     df_mean["std"] = df_std["std"]
@@ -309,41 +364,24 @@ def descript_rest_ratings(proj_dir):
     df_mean.to_csv(out_csv)
     print(f"\tWrote csv : {out_csv}")
 
-    # Split plot into 4 subplots
-    emo_a = emo_title[:4]
-    emo_b = emo_title[4:8]
-    emo_c = emo_title[8:12]
-    emo_d = emo_title[12:]
-
-    # Make each subplot
-    for cnt, emo in enumerate([emo_a, emo_b, emo_c, emo_d]):
-        df_sub = df_long[df_long["emotion"].isin(emo)]
-        plot_dict = pd.DataFrame(df_sub.to_dict())
-
-        # Draw violin plots
-        fix, ax = plt.subplots()
-        sns.violinplot(
-            x="emotion",
-            y="rating",
-            hue="visit",
-            data=plot_dict,
-            hue_order=["day2", "day3"],
-        )
-        plt.legend(bbox_to_anchor=(1.02, 1), loc="upper left", borderaxespad=0)
-        plt.title("Emotion Frequence During Rest")
-        plt.ylabel("Frequency")
-        plt.xlabel("Emotion")
-        plt.xticks(rotation=45, ha="right")
-
-        # Save and close
-        out_path = os.path.join(
-            out_dir,
-            f"plot_violin_rest-ratings_{cnt+1}.png",
-        )
-        plt.savefig(out_path, bbox_inches="tight")
-        plt.close()
-        print(f"\tDrew violin plot : {out_path}")
-
+    # Draw plots
+    out_path = os.path.join(
+        out_dir,
+        "plot_violin_rest-ratings.png",
+    )
+    _split_violin_plots(
+        emo_title,
+        df=df_long,
+        sub_col="emotion",
+        x_col="emotion",
+        x_lab="Emotion",
+        y_col="rating",
+        y_lab="Frequency",
+        hue_col="task",
+        hue_order=["movies", "scenarios"],
+        title="Emotion Frequence During Rest",
+        out_path=out_path,
+    )
     return df_mean
 
 
@@ -588,6 +626,162 @@ class DescriptStimRatings:
         plt.close(fig)
         print(f"\t\tDrew violin plot : {out_path}")
         return df_stat
+
+
+# %%
+class DescriptTask:
+    """Title.
+
+    Desc.
+
+    """
+
+    def __init__(self, proj_dir):
+        """Title.
+
+        Desc.
+
+        Parameters
+        ----------
+        proj_dir
+
+        Attributes
+        ----------
+        out_dir
+        _events_all
+
+        """
+        #
+        self.out_dir = os.path.join(
+            proj_dir, "analyses/surveys_stats_descriptive"
+        )
+        mri_rawdata = os.path.join(proj_dir, "data_scanner_BIDS", "rawdata")
+        self._events_all = sorted(
+            glob.glob(f"{mri_rawdata}/**/*_events.tsv", recursive=True)
+        )
+        if not self.events_all:
+            raise ValueError(
+                f"Expected to find BIDS events files in : {mri_rawdata}"
+            )
+        self._mk_master_df()
+
+    def _mk_master_df(self):
+        """Title.
+
+        Desc.
+
+        Attributes
+        ----------
+        df_intensity
+        df_emotion
+
+        """
+        #
+        print("\tBuilding dataframe of all participant events.tsv")
+        df_all = pd.DataFrame(
+            columns=[
+                "onset",
+                "duration",
+                "trial_type",
+                "stim_info",
+                "response",
+                "response_time",
+                "accuracy",
+                "emotion",
+                "subj",
+                "sess",
+                "task",
+                "run",
+            ]
+        )
+        for event_path in self._events_all:
+            subj, sess, task, run, _ = os.path.basename(event_path).split("_")
+            df = pd.read_csv(event_path, sep="\t")
+            df["subj"] = subj.split("-")[-1]
+            df["sess"] = sess.split("-")[-1]
+            df["task"] = task.split("-")[-1]
+            df["run"] = int(run[-1])
+            df_all = pd.concat([df_all, df], ignore_index=True)
+            del df
+
+        #
+        df_task = df_all.loc[
+            df_all["trial_type"].isin(
+                ["movie", "scenario", "emotion", "intensity"]
+            )
+        ].reset_index(drop=True)
+        df_task["emotion"] = df_task["emotion"].fillna(method="ffill")
+        df_task = df_task.loc[
+            ~df_task["trial_type"].isin(["movie", "scenario"])
+        ].reset_index(drop=True)
+        df_task = df_task.drop(
+            ["onset", "duration", "accuracy", "stim_info"], axis=1
+        )
+        df_task["emotion"] = df_task["emotion"].str.title()
+        df_task["run"] = df_task["run"].astype("Int64")
+
+        #
+        df_intensity = df_task.loc[df_task["trial_type"] == "intensity"].copy()
+        df_intensity["response"] = df_intensity["response"].replace(
+            "NONE", np.nan
+        )
+        df_intensity["response"] = df_intensity["response"].astype("Int64")
+        df_emotion = df_task.loc[df_task["trial_type"] == "emotion"].copy()
+        df_emotion["response"] = df_emotion["response"].str.title()
+        self.df_intensity = df_intensity
+        self.df_emotion = df_emotion
+
+    def desc_intensity(self):
+        """Title.
+
+        Desc.
+
+        """
+        #
+        task_list = ["movies", "scenarios"]
+        emo_all = self.df_intensity["emotion"].unique().tolist()
+        df_avg = pd.DataFrame(columns=["emotion", "mean", "std", "task"])
+        for task in task_list:
+            response_dict = {}
+            for emo in emo_all:
+                df = self.df_intensity[
+                    (self.df_intensity["emotion"] == emo)
+                    & (self.df_intensity["task"] == task)
+                ]
+                response_dict[emo] = {
+                    "mean": round(df.response.mean(), 2),
+                    "std": round(df.response.std(), 2),
+                }
+            df_tmp = pd.DataFrame.from_dict(response_dict).transpose()
+            df_tmp.index = df_tmp.index.set_names(["emotion"])
+            df_tmp = df_tmp.reset_index()
+            df_tmp["task"] = task
+            df_avg = pd.concat([df_avg, df_tmp], ignore_index=True)
+
+        col_task = df_avg.pop("task")
+        df_avg.insert(0, "task", col_task)
+        out_csv = os.path.join(self.out_dir, "stats_task-intensity.csv")
+        df_avg.to_csv(out_csv)
+        print(f"\tWrote csv : {out_csv}")
+
+        #
+        out_path = os.path.join(
+            self.out_dir,
+            "plot_violin_task-intensity.png",
+        )
+        _split_violin_plots(
+            emo_all,
+            df=self.df_intensity,
+            sub_col="emotion",
+            x_col="emotion",
+            x_lab="Emotion",
+            y_col="response",
+            y_lab="Intensity Rating",
+            hue_col="task",
+            hue_order=["movies", "scenarios"],
+            title="Stimulus Intensity During Scan",
+            out_path=out_path,
+        )
 
 
 # %%

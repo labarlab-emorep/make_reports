@@ -17,7 +17,7 @@ def main():
     Sub-packages under development:
 
         rep_metrics : Track recruitment demographics, pending scans
-        sur_stats   : Get descriptive stats and plots for surveys
+        sur_stats   : Get descriptive stats and plots for surveys and task
 
     """
     )

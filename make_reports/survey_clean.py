@@ -956,6 +956,7 @@ class CombineRestRatings:
         col_names = [
             "study_id",
             "visit",
+            "task",
             "datetime",
             "resp_type",
             "AMUSEMENT",
@@ -977,11 +978,11 @@ class CombineRestRatings:
         df_sess = pd.DataFrame(columns=col_names)
 
         # Find all session files
-        beh_path = f"{rawdata_path}/sub-*/ses-{sess}/beh"
-        beh_list = sorted(glob.glob(f"{beh_path}/*rest-ratings*.tsv"))
+        beh_search_path = f"{rawdata_path}/sub-*/ses-{sess}/beh"
+        beh_list = sorted(glob.glob(f"{beh_search_path}/*rest-ratings*.tsv"))
         if not beh_list:
             raise FileNotFoundError(
-                f"No rest-ratings files found in {beh_path}."
+                f"No rest-ratings files found in {beh_search_path}."
                 + "\n\tTry running dcm_conversion."
             )
 
@@ -990,9 +991,22 @@ class CombineRestRatings:
 
             # Get session info
             beh_file = os.path.basename(beh_path)
-            subj, sess, task, date_ext = beh_file.split("_")
+            subj, sess, _, date_ext = beh_file.split("_")
             subj_str = subj.split("-")[1]
             date_str = date_ext.split(".")[0]
+
+            # Determine sesion stimulus type by finding a BIDS
+            # events file.
+            search_path = os.path.join(rawdata_path, subj, sess, "func")
+            try:
+                task_path = glob.glob(f"{search_path}/*_run-02_events.tsv")[0]
+                _, _, task, _, _ = os.path.basename(task_path).split("_")
+            except (IndexError):
+                print(
+                    f"\n\t\tNo run-02 BIDS event file detected for {subj}, "
+                    + f"{sess}. Continuing ..."
+                )
+                continue
 
             # Get data, organize for concat with df_sess
             df_beh = pd.read_csv(beh_path, sep="\t", index_col="prompt")
@@ -1000,8 +1014,9 @@ class CombineRestRatings:
             df_beh_trans.reset_index(inplace=True)
             df_beh_trans = df_beh_trans.rename(columns={"index": "resp_type"})
             df_beh_trans["study_id"] = subj_str
-            df_beh_trans["visit"] = sess
+            df_beh_trans["visit"] = sess.split("-")[-1]
             df_beh_trans["datetime"] = date_str
+            df_beh_trans["task"] = task.split("-")[-1]
 
             # Add info to df_sess
             df_sess = pd.concat([df_sess, df_beh_trans], ignore_index=True)

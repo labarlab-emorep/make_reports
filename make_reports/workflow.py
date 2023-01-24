@@ -841,7 +841,7 @@ def survey_scan(proj_dir, survey_list):
     proj_dir : path
         Location of project's experiment directory
     survey_list : list
-        [rest | stim]
+        [rest | stim | task]
         Survey names, for triggering different workflows
 
     Raises
@@ -851,7 +851,7 @@ def survey_scan(proj_dir, survey_list):
 
     """
     for sur in survey_list:
-        if sur not in ["rest", "stim"]:
+        if sur not in ["rest", "stim", "task"]:
             raise ValueError(f"Unexpected survey name : {sur}")
 
     if "rest" in survey_list:
@@ -864,6 +864,9 @@ def survey_scan(proj_dir, survey_list):
             _ = stim_stats.endorsement(stim_type)
             for prompt_name in ["Arousal", "Valence"]:
                 _ = stim_stats.arousal_valence(stim_type, prompt_name)
+
+    if "task" in survey_list:
+        pass
 
 
 # %%

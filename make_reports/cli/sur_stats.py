@@ -96,7 +96,7 @@ def main():
         "STAI_State",
         "TAS",
     ]
-    sur_scan = ["rest", "stim"]
+    sur_scan = ["rest", "stim", "task"]
     sur_all = sur_rc_qual + sur_scan
 
     # Manage avail, all options
@@ -108,21 +108,21 @@ def main():
 
     # Validate survey names
     for sur in survey_list:
-        if sur not in sur_rc_qual and sur not in sur_scan:
+        if sur not in sur_all:
             raise ValueError(
                 f"Unexpected survey requested : {sur}, see --survey-avail."
             )
 
     # Sort requested survey names, trigger appropriate workflows
     sur_online = [x for x in survey_list if x in sur_rc_qual]
-    sur_scan = [x for x in survey_list if x in sur_scan]
+    sur_scanner = [x for x in survey_list if x in sur_scan]
 
     if sur_online:
         sur_stat = workflow.CalcRedcapQualtricsStats(proj_dir, sur_online)
         sur_stat.wrap_visits()
 
-    if sur_scan:
-        workflow.survey_scan(proj_dir, sur_scan)
+    if sur_scanner:
+        workflow.survey_scan(proj_dir, sur_scanner)
 
 
 if __name__ == "__main__":
