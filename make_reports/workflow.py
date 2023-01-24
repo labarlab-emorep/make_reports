@@ -52,13 +52,19 @@ def download_surveys(
 class CleanSurveys:
     """Coordinate cleaning of survey data.
 
+    Each class method will read in raw data from their respective
+    sources and then corrdinate cleaning methods from survey_clean.
+
+    Cleaned dataframes are written to:
+        <proj_dir>/data_survey/<visit>/data_clean
+
     Methods
     -------
-    clean_redcap
+    clean_redcap()
         Clean all RedCap surveys
-    clean_rest
+    clean_rest()
         Clean ratings of resting state experiences
-    clean_qualtrics
+    clean_qualtrics()
         Clean all Qualtrics surveys
 
     """
@@ -73,11 +79,12 @@ class CleanSurveys:
 
         Attributes
         ----------
-        proj_dir : path
+        _proj_dir : path
             Project's experiment directory
 
         """
-        self.proj_dir = proj_dir
+        print("Initializing CleanSurveys")
+        self._proj_dir = proj_dir
 
     def clean_redcap(self):
         """Coordinate cleaning of RedCap surveys.
@@ -94,7 +101,7 @@ class CleanSurveys:
         """
         # Check for data
         redcap_raw = glob.glob(
-            f"{self.proj_dir}/data_survey/redcap*/data_raw/*latest.csv"
+            f"{self._proj_dir}/data_survey/redcap*/data_raw/*latest.csv"
         )
         if len(redcap_raw) != 4:
             raise FileNotFoundError(
@@ -103,8 +110,9 @@ class CleanSurveys:
             )
 
         # Get cleaning obj
+        print("\tRunning CleanSurveys.clean_redcap")
         redcap_dict = report_helper.redcap_dict()
-        clean_redcap = survey_clean.CleanRedcap(self.proj_dir)
+        clean_redcap = survey_clean.CleanRedcap(self._proj_dir)
 
         # Clean each planned survey, write out
         for sur_name, dir_name in redcap_dict.items():
@@ -113,7 +121,7 @@ class CleanSurveys:
             # Write study data
             out_name = "BDI" if "bdi" in sur_name else sur_name
             clean_file = os.path.join(
-                self.proj_dir,
+                self._proj_dir,
                 "data_survey",
                 dir_name,
                 "data_clean",
@@ -126,7 +134,7 @@ class CleanSurveys:
 
             # Write pilot data
             pilot_file = os.path.join(
-                self.proj_dir,
+                self._proj_dir,
                 "data_pilot/data_survey",
                 dir_name,
                 "data_clean",
@@ -151,12 +159,14 @@ class CleanSurveys:
 
         """
 
-        def _write_clean_qualtrics(clean_dict, pilot_dict, dir_name):
+        def _write_clean_qualtrics(
+            clean_dict: dict, pilot_dict: dict, dir_name: str
+        ) -> None:
             """Write cleaned dataframes for RedCap surveys."""
             # Unpack study clean data
             for h_name, h_df in clean_dict.items():
                 out_file = os.path.join(
-                    self.proj_dir,
+                    self._proj_dir,
                     "data_survey",
                     dir_name,
                     "data_clean",
@@ -171,7 +181,7 @@ class CleanSurveys:
             # Unpack pilot clean data
             for h_name, h_df in pilot_dict.items():
                 out_file = os.path.join(
-                    self.proj_dir,
+                    self._proj_dir,
                     "data_pilot/data_survey",
                     dir_name,
                     "data_clean",
@@ -185,7 +195,7 @@ class CleanSurveys:
 
         # Check for data
         visit_raw = glob.glob(
-            f"{self.proj_dir}/data_survey/visit*/data_raw/*latest.csv"
+            f"{self._proj_dir}/data_survey/visit*/data_raw/*latest.csv"
         )
         if len(visit_raw) != 7:
             raise FileNotFoundError(
@@ -194,8 +204,9 @@ class CleanSurveys:
             )
 
         # Get cleaning obj
+        print("\tRunning CleanSurveys.clean_qualtrics")
         qualtrics_dict = report_helper.qualtrics_dict()
-        clean_qualtrics = survey_clean.CleanQualtrics(self.proj_dir)
+        clean_qualtrics = survey_clean.CleanQualtrics(self._proj_dir)
 
         # Clean each planned survey and write out
         for sur_name, dir_name in qualtrics_dict.items():
@@ -229,7 +240,7 @@ class CleanSurveys:
 
         # Check for data
         raw_path = os.path.join(
-            self.proj_dir,
+            self._proj_dir,
             "data_scanner_BIDS",
             "rawdata",
         )
@@ -240,13 +251,14 @@ class CleanSurveys:
             )
 
         # Aggregate rest ratings, for each session day
-        agg_rest = survey_clean.CombineRestRatings(self.proj_dir)
+        print("\tRunning CleanSurveys.clean_rest")
+        agg_rest = survey_clean.CombineRestRatings(self._proj_dir)
         for day in ["day2", "day3"]:
 
             # Get, write out study data
             agg_rest.get_rest_ratings(day, raw_path)
             out_file = os.path.join(
-                self.proj_dir,
+                self._proj_dir,
                 "data_survey",
                 f"visit_{day}",
                 "data_clean",
@@ -260,11 +272,11 @@ class CleanSurveys:
 
             # Get, write out pilot data
             rawdata_pilot = os.path.join(
-                self.proj_dir, "data_pilot/data_scanner_BIDS", "rawdata"
+                self._proj_dir, "data_pilot/data_scanner_BIDS", "rawdata"
             )
             agg_rest.get_rest_ratings(day, rawdata_pilot)
             out_file = os.path.join(
-                self.proj_dir,
+                self._proj_dir,
                 "data_pilot/data_survey",
                 f"visit_{day}",
                 "data_clean",
@@ -475,6 +487,9 @@ def make_ndar_reports(ndar_reports, proj_dir, close_date):
 def generate_guids(proj_dir, user_name, user_pass, find_mismatch):
     """Compile needed demographic info and make GUIDs.
 
+    Also supports checking newly generated GUIDs against those entered
+    into RedCap to help detect clerical errors.
+
     Generated GUIDs are written to:
         <proj_dir>/data_survey/redcap_demographics/data_clean/output_guid_*.txt
 
@@ -489,6 +504,11 @@ def generate_guids(proj_dir, user_name, user_pass, find_mismatch):
     find_mismatch : bool
         Whether to check for mismatches between REDCap
         and generated GUIDs
+
+    Notes
+    -----
+    Attempts to trigger CleanSurveys.clean_redcap if a cleaned dataframe for
+    demographic info is not detected.
 
     """
     # Check for clean RedCap data, generate if needed
@@ -737,27 +757,8 @@ class CalcRedcapQualtricsStats:
                 title=sub_title,
             )
 
-    def _plot_switch(self, day="day2"):
-        """Supply plot variables for survey.
-
-        Parameters
-        ----------
-        day : str, optional
-            [day2 | day3]
-
-        Returns
-        -------
-        dict
-            Survey-specific plotting info
-
-        Raises
-        ------
-        AttributeError
-            Unexpected survey name
-        KeyError
-            Unexpected day
-
-        """
+    def _plot_switch(self, day: str = "day2") -> dict:
+        """Supply plot variables for survey."""
         # Get visit name
         visit_switch = {
             "day2": "Visit 2",
@@ -795,15 +796,8 @@ class CalcRedcapQualtricsStats:
                 param_dict[sur_name][val] = sur_list[c]
         return param_dict[self._sur_name]
 
-    def _subscale_switch(self):
-        """Align subscale items and names.
-
-        Returns
-        -------
-        dict
-            Survey-specific subscale names and items
-
-        """
+    def _subscale_switch(self) -> dict:
+        """Align subscale items and names."""
         # Build specific dicts for matching subscale names to
         # survey items for each survey.
         _als_sub = {

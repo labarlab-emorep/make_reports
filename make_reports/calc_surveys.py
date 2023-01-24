@@ -357,7 +357,7 @@ class DescriptStimRatings:
     ----------
     out_dir : path
         Output destination for generated files
-     df_all : pd.DataFrame
+    df_all : pd.DataFrame
         Day2, day3 stimulus ratings
     emo_list : list
         Emotion categories of stimuli
