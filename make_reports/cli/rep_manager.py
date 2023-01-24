@@ -6,13 +6,15 @@ submitted to the NIH or Duke.
 Reports are written to:
     <proj_dir>/documents/manager_reports
 
+Previous submissions can also be generated via --query-date.
+
 Examples
 --------
 rep_manager \
-    --manager-reports nih4 nih12 duke3
+    --report-names nih4 nih12 duke3
 
 rep_manager \
-    --manager-reports nih4 \
+    --report-names nih4 \
     --query-date 2022-06-29
 
 """
@@ -57,7 +59,7 @@ def _get_args():
 
     required_args = parser.add_argument_group("Required Arguments")
     required_args.add_argument(
-        "--manager-reports",
+        "--report-names",
         nargs="+",
         required=True,
         type=str,
@@ -83,7 +85,7 @@ def _get_args():
 def main():
     """Capture arguments and trigger workflow."""
     args = _get_args().parse_args()
-    manager_reports = args.manager_reports
+    manager_reports = args.report_names
     proj_dir = args.proj_dir
     query_date = args.query_date
 

@@ -24,10 +24,10 @@ class _CalcProp:
 
     Desc.
 
-    Parameters
+    Attributes
     ----------
-    df_plan
-    final_demo
+    prop_actual
+    prop_plan
 
     """
 
@@ -37,8 +37,8 @@ class _CalcProp:
         Desc.
 
         """
-        self.final_demo = final_demo
-        self.total_rec = final_demo.shape[0]
+        self._final_demo = final_demo
+        self._total_rec = final_demo.shape[0]
         self._planned_demo()
 
     def get_demo_props(self, names, values):
@@ -62,8 +62,8 @@ class _CalcProp:
             raise ValueError("Lengths of names and values are not equal.")
 
         #
-        self.names = names
-        self.values = values
+        self._names = names
+        self._values = values
 
         #
         meth_dict = {1: "_one_fact", 2: "_two_fact"}
@@ -72,9 +72,9 @@ class _CalcProp:
 
         #
         self.prop_plan = round(
-            (self.df_plan.loc[idx_plan, "prop"].sum() / 100), 3
+            (self._df_plan.loc[idx_plan, "prop"].sum() / 100), 3
         )
-        self.prop_actual = round((len(idx_final) / self.total_rec), 3)
+        self.prop_actual = round((len(idx_final) / self._total_rec), 3)
 
     def _one_fact(self):
         """Title.
@@ -82,11 +82,11 @@ class _CalcProp:
         Desc.
 
         """
-        idx_plan = self.df_plan.index[
-            self.df_plan[self.names[0]] == self.values[0]
+        idx_plan = self._df_plan.index[
+            self._df_plan[self._names[0]] == self._values[0]
         ]
-        idx_final = self.final_demo.index[
-            self.final_demo[self.names[0]] == self.values[0]
+        idx_final = self._final_demo.index[
+            self._final_demo[self._names[0]] == self._values[0]
         ].tolist()
         return (idx_plan, idx_final)
 
@@ -96,13 +96,13 @@ class _CalcProp:
         Desc.
 
         """
-        idx_plan = self.df_plan.index[
-            (self.df_plan[self.names[0]] == self.values[0])
-            & (self.df_plan[self.names[1]] == self.values[1])
+        idx_plan = self._df_plan.index[
+            (self._df_plan[self._names[0]] == self._values[0])
+            & (self._df_plan[self._names[1]] == self._values[1])
         ]
-        idx_final = self.final_demo.index[
-            (self.final_demo[self.names[0]] == self.values[0])
-            & (self.final_demo[self.names[1]] == self.values[1])
+        idx_final = self._final_demo.index[
+            (self._final_demo[self._names[0]] == self._values[0])
+            & (self._final_demo[self._names[1]] == self._values[1])
         ].tolist()
         return (idx_plan, idx_final)
 
@@ -157,7 +157,7 @@ class _CalcProp:
             "race": race_list,
             "prop": prop_list,
         }
-        self.df_plan = pd.DataFrame.from_dict(demo_plan)
+        self._df_plan = pd.DataFrame.from_dict(demo_plan)
 
 
 # %%

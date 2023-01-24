@@ -11,7 +11,7 @@ Examples
 --------
 sur_stats --survey-avail
 sur_stats --survey-all
-sur_stats --survey-name AIM ALS
+sur_stats --survey-names AIM ALS
 
 """
 import sys
@@ -57,7 +57,7 @@ def _get_args():
         ),
     )
     parser.add_argument(
-        "--survey-name",
+        "--survey-names",
         nargs="+",
         type=str,
         help=textwrap.dedent(
@@ -79,7 +79,7 @@ def main():
     """Capture arguments and trigger workflow."""
     args = _get_args().parse_args()
     proj_dir = args.proj_dir
-    survey_list = args.survey_name
+    survey_list = args.survey_names
     survey_all = args.survey_all
     survey_avail = args.survey_avail
 

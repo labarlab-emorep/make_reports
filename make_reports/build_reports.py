@@ -18,26 +18,18 @@ class DemoAll:
 
     Attributes
     ----------
-    df_merge : pd.DataFrame
-        Participant data from consent, demographic, and GUID surveys
     final_demo : pd.DataFrame
         Complete report containing demographic info for NDA submission,
         regular manager reports.
-    proj_dir : path
-        Location of parent directory for project
-    race_resp : list
-        Participant responses to race item
-    subj_ethnic : list
-        Participants' ethnicity status
-    subj_minor : list
-        Particiapnts' minority status
 
     Methods
     -------
-    make_complete
+    make_complete()
         Used for regular manager reports and common NDAR fields
-    remove_withdrawn
+    remove_withdrawn()
         Remove participants from final_demo that have withdrawn consent
+    submission_cycle(close_date: datetime)
+        Remove participants from final_demo after a certain date
 
     """
 
@@ -46,7 +38,7 @@ class DemoAll:
 
         Attributes
         ----------
-        proj_dir : path
+        _proj_dir : path
             Location of parent directory for project
 
         """
@@ -55,7 +47,7 @@ class DemoAll:
             "\nBuilding final_demo from RedCap demographic,"
             + " guid, consent reports ..."
         )
-        self.proj_dir = proj_dir
+        self._proj_dir = proj_dir
         self._read_data()
 
         # Generate final_demo
@@ -81,7 +73,7 @@ class DemoAll:
 
         # Read in study reports
         redcap_clean = os.path.join(
-            self.proj_dir, "data_survey", "redcap_demographics", "data_clean"
+            self._proj_dir, "data_survey", "redcap_demographics", "data_clean"
         )
         clean_dict = {}
         for h_key, h_df in map_dict.items():
@@ -89,7 +81,7 @@ class DemoAll:
 
         # Read in pilot reports
         redcap_pilot = os.path.join(
-            self.proj_dir,
+            self._proj_dir,
             "data_pilot/data_survey",
             "redcap_demographics",
             "data_clean",
@@ -130,7 +122,7 @@ class DemoAll:
         # only participants who have data in all dataframes.
         df_merge = pd.merge(df_consent, df_guid, on="record_id")
         df_merge = pd.merge(df_merge, df_demo, on="record_id")
-        self.df_merge = df_merge
+        self._df_merge = df_merge
         del df_guid, df_demo, df_consent, df_merge
 
     def _get_race(self):
@@ -142,12 +134,12 @@ class DemoAll:
 
         Attributes
         ----------
-        race_resp : list
+        _race_resp : list
             Participant responses to race item
 
         """
         # Get attribute for readibility, testing
-        df_merge = self.df_merge
+        df_merge = self._df_merge
 
         # Get race response - deal with "More than one" (6) and
         # "Other" (8) separately.
@@ -211,7 +203,7 @@ class DemoAll:
         idx_more = df_merge.index[df_merge["race_more"] == "More"].tolist()
         df_merge.loc[idx_more, "race_resp"] = "More than one race"
         race_resp = df_merge["race_resp"].tolist()
-        self.race_resp = race_resp
+        self._race_resp = race_resp
         del df_merge
 
     def _get_ethnic_minority(self):
@@ -219,14 +211,14 @@ class DemoAll:
 
         Attributes
         ----------
-        subj_ethnic : list
+        _subj_ethnic : list
             Participants' ethnicity status
-        subj_minor : list
+        _subj_minor : list
             Particiapnts' minority status
 
         """
         # Get ethnicity selection, convert to english
-        h_ethnic = self.df_merge["ethnicity"].tolist()
+        h_ethnic = self._df_merge["ethnicity"].tolist()
         ethnic_switch = {
             1.0: "Hispanic or Latino",
             2.0: "Not Hispanic or Latino",
@@ -235,13 +227,13 @@ class DemoAll:
 
         # Determine if minority i.e. not white or hispanic
         subj_minor = []
-        for race, ethnic in zip(self.race_resp, subj_ethnic):
+        for race, ethnic in zip(self._race_resp, subj_ethnic):
             if race != "White" and ethnic == "Not Hispanic or Latino":
                 subj_minor.append("Minority")
             else:
                 subj_minor.append("Not Minority")
-        self.subj_ethnic = subj_ethnic
-        self.subj_minor = subj_minor
+        self._subj_ethnic = subj_ethnic
+        self._subj_minor = subj_minor
 
     def make_complete(self):
         """Make a demographic dataframe.
@@ -257,7 +249,7 @@ class DemoAll:
 
         """
         # Capture attribute for easy testing
-        df_merge = self.df_merge
+        df_merge = self._df_merge
 
         # Get GUID, study IDs
         subj_guid = df_merge["guid"].tolist()
@@ -295,9 +287,9 @@ class DemoAll:
             "sex": subj_sex,
             "age": subj_age,
             "dob": subj_dob,
-            "ethnicity": self.subj_ethnic,
-            "race": self.race_resp,
-            "is_minority": self.subj_minor,
+            "ethnicity": self._subj_ethnic,
+            "race": self._race_resp,
+            "is_minority": self._subj_minor,
             "years_education": subj_educate,
         }
         self.final_demo = pd.DataFrame(out_dict, columns=out_dict.keys())
@@ -337,28 +329,20 @@ class ManagerRegular:
 
     Attributes
     ----------
-    df_range : pd.DataFrame
-        Data found within the range_start, range_end period
     df_report : pd.DataFrame
         Relevant info and format for requested report
-    final_demo : make_reports.build_reports.DemoAll.final_demo
-        pd.DataFrame, compiled demographic info
-    query_date : datetime
-        Date for finding report range
     range_end : datetime
         End of period for report
     range_start : datetime
         Start of period for report
-    report : str
-        Type of report e.g. nih4 or duke3
 
     Methods
     -------
-    make_duke3
+    make_duke3()
         Generate report submitted to Duke every 3 months
-    make_nih4
+    make_nih4()
         Generate report submitted to NIH every 4 months
-    make_nih12
+    make_nih12()
         Generate report submitted to NIH every 12 months
 
     """
@@ -377,9 +361,9 @@ class ManagerRegular:
 
         Attributes
         ----------
-        final_demo : make_reports.build_reports.DemoAll.final_demo
+        _final_demo : make_reports.build_reports.DemoAll.final_demo
             pd.DataFrame, compiled demographic info
-        query_date : datetime
+        _query_date : datetime
             Date for finding report range
 
         Raises
@@ -389,8 +373,8 @@ class ManagerRegular:
 
         """
         print(f"Buiding manager report : {report} ...")
-        self.query_date = query_date
-        self.final_demo = final_demo
+        self._query_date = query_date
+        self._final_demo = final_demo
 
         # Trigger appropriate method
         valid_reports = ["nih12", "nih4", "duke3"]
@@ -427,11 +411,11 @@ class ManagerRegular:
 
             # Check if query_date is found in range, allow for
             # first/last days.
-            if h_start <= self.query_date <= h_end:
+            if h_start <= self._query_date <= h_end:
                 start_end = (h_start, h_end)
                 break
         if not start_end:
-            raise ValueError(f"Date range not found for {self.query_date}.")
+            raise ValueError(f"Date range not found for {self._query_date}.")
         return start_end
 
     def _get_data_range(self, range_list, start_date=None):
@@ -449,12 +433,12 @@ class ManagerRegular:
 
         Attributes
         ----------
-        df_range : pd.DataFrame
-            Data found within the range_start, range_end period
         range_end : datetime
             End of period for report
         range_start : datetime
             Start of period for report
+        _df_range : pd.DataFrame
+            Data found within the range_start, range_end period
 
         Raises
         ------
@@ -469,12 +453,12 @@ class ManagerRegular:
 
         # Mask the dataframe for the dates of interest
         range_bool = (
-            self.final_demo["interview_date"] >= self.range_start
-        ) & (self.final_demo["interview_date"] <= self.range_end)
+            self._final_demo["interview_date"] >= self.range_start
+        ) & (self._final_demo["interview_date"] <= self.range_end)
 
         # Subset final_demo according to mask, check if data exist
-        self.df_range = self.final_demo.loc[range_bool]
-        if self.df_range.empty:
+        self._df_range = self._final_demo.loc[range_bool]
+        if self._df_range.empty:
             raise ValueError(
                 "No data collected for query range : "
                 + f"{self.range_start} - {self.range_end}"
@@ -531,14 +515,14 @@ class ManagerRegular:
 
         # Calculate number of minority, hispanic, and total recruited
         num_minority = len(
-            self.df_range.index[self.df_range["is_minority"] == "Minority"]
+            self._df_range.index[self._df_range["is_minority"] == "Minority"]
         )
         num_hispanic = len(
-            self.df_range.index[
-                self.df_range["ethnicity"] == "Hispanic or Latino"
+            self._df_range.index[
+                self._df_range["ethnicity"] == "Hispanic or Latino"
             ]
         )
-        num_total = len(self.df_range.index)
+        num_total = len(self._df_range.index)
 
         # Update calculations with mturk values
         num_minority += mturk_nums["minority"]
@@ -598,7 +582,9 @@ class ManagerRegular:
         self._get_data_range(duke_3mo_ranges)
 
         # Get gender, ethnicity, race responses
-        df_hold = self.df_range[["src_subject_id", "sex", "ethnicity", "race"]]
+        df_hold = self._df_range[
+            ["src_subject_id", "sex", "ethnicity", "race"]
+        ]
 
         # Combine responses for easy tabulation, silence pd warnings
         pd.options.mode.chained_assignment = None
@@ -667,7 +653,7 @@ class ManagerRegular:
             "sex",
             "age",
         ]
-        self.df_report = self.df_range[cols_desired]
+        self.df_report = self._df_range[cols_desired]
 
         # Reformat dataframe into desired format
         col_names = {
@@ -687,27 +673,22 @@ class GenerateGuids:
     Use existing RedCap demographic information to produce
     a batch of GUIDs via NDA's guid-tool.
 
+    Writes GUIDs as txt file to:
+        <proj_dir>/data_survey/redcap_demographics/data_clean
+
     Attributes
     ----------
-    df_guid : pd.DataFrame
-        Formatted for use with guid-tool
     df_guid_file : path
         Location of intermediate file for subprocess accessibility
     mismatch_list : list
         Record IDs of participants who differ between RedCap and
         generated GUIDs
-    proj_dir : path
-        Project's experiment directory
-    user_name : str
-        NDA user name
-    user_pass : str
-        NDA user password
 
     Methods
     -------
-    check_guids
+    check_guids()
         Compare generate GUIDs to those in RedCap
-    make_guids
+    make_guids()
         Use compiled demographic info from _get_demo to generate GUIDs
 
     """
@@ -726,17 +707,17 @@ class GenerateGuids:
 
         Attributes
         ----------
-        proj_dir : path
+        _proj_dir : path
             Project's experiment directory
-        user_name : str
+        _user_name : str
             NDA user name
-        user_pass : str
+        _user_pass : str
             NDA user password
 
         """
-        self.proj_dir = proj_dir
-        self.user_name = user_name
-        self.user_pass = user_pass
+        self._proj_dir = proj_dir
+        self._user_name = user_name
+        self._user_pass = user_pass
         self._get_demo()
 
     def _get_demo(self):
@@ -747,26 +728,22 @@ class GenerateGuids:
 
         Attributes
         ----------
-        df_guid : pd.DataFrame
-            Formatted for use with guid-tool
         df_guid_file : path
             Location of intermediate file for subprocess accessibility
+        _df_guid : pd.DataFrame
+            Formatted for use with guid-tool
 
         Raises
         ------
         FileNotFoundError
             Cleaned RedCap demographic information not found
 
-        Notes
-        -----
-        Writes df_guid to df_guid_file.
-
         """
         print("Compiling RedCap demographic info ...")
 
         # Check for, read-in demographic info
         chk_demo = os.path.join(
-            self.proj_dir,
+            self._proj_dir,
             "data_survey/redcap_demographics/data_clean",
             "df_demographics.csv",
         )
@@ -829,13 +806,13 @@ class GenerateGuids:
         # TODO validate required fields
         self.df_guid_file = os.path.join(
             os.path.join(
-                self.proj_dir,
+                self._proj_dir,
                 "data_survey/redcap_demographics/data_clean",
                 "tmp_df_for_guid_tool.csv",
             )
         )
         df_guid.to_csv(self.df_guid_file, index=False, na_rep="")
-        self.df_guid = df_guid
+        self._df_guid = df_guid
 
     def make_guids(self):
         """Generate GUIDs via guid-tool.
@@ -845,7 +822,7 @@ class GenerateGuids:
 
         Attributes
         ----------
-        guid_file : path
+        _guid_file : path
             Location, file out guid-tool output
 
         Raises
@@ -882,8 +859,8 @@ class GenerateGuids:
         bash_guid = f"""\
             guid-tool \
                 -a get \
-                -u {self.user_name} \
-                -p {self.user_pass} \
+                -u {self._user_name} \
+                -p {self._user_pass} \
                 -b "{self.df_guid_file}"
         """
         h_sp = subprocess.Popen(bash_guid, shell=True, stdout=subprocess.PIPE)
@@ -895,7 +872,7 @@ class GenerateGuids:
         if not len(guid_output) > len(guid_old) or not guid_output:
             raise FileNotFoundError("Failed to generate new GUID output.")
         print(f"\tWrote : {guid_output[-1]}")
-        self.guid_file = guid_output[-1]
+        self._guid_file = guid_output[-1]
 
     def check_guids(self):
         """Check RedCap GUID database against newly generate GUIDs.
@@ -919,7 +896,7 @@ class GenerateGuids:
 
         # Get cleaned RedCap GUID survey
         guid_redcap = os.path.join(
-            self.proj_dir,
+            self._proj_dir,
             "data_survey/redcap_demographics/data_clean",
             "df_guid.csv",
         )
@@ -932,7 +909,7 @@ class GenerateGuids:
         # Get generated GUIDs
         try:
             df_guid_gen = pd.read_csv(
-                self.guid_file,
+                self._guid_file,
                 sep="-",
                 names=["record_id", "guid_new", "notes"],
             )

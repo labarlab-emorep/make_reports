@@ -23,16 +23,8 @@ class CleanRedcap:
     ----------
     df_clean : pd.DataFrame
         Cleaned survey responses for study participants
-    df_raw : pd.DataFrame
-        Original RedCap survey data
     df_pilot : pd.DataFrame
         Cleaned survey responses for pilot participants
-    pilot_list : make_reports.report_helper.pilot_list
-        Pilot participants
-    proj_dir : path
-        Location of parent directory for project
-    redcap_dict : make_reports.report_helper.redcap_dict
-        Mapping of survey name to directory organization
 
     Methods
     -------
@@ -51,22 +43,23 @@ class CleanRedcap:
 
         Attributes
         ----------
-        pilot_list : make_reports.report_helper.pilot_list
+        _pilot_list : make_reports.report_helper.pilot_list
             Pilot participants
-        proj_dir : path
+        _proj_dir : path
             Location of parent directory for project
-        redcap_dict : make_reports.report_helper.redcap_dict
+        _redcap_dict : make_reports.report_helper.redcap_dict
             Mapping of survey name to directory organization
 
         """
-        self.proj_dir = proj_dir
-        self.redcap_dict = report_helper.redcap_dict()
-        self.pilot_list = report_helper.pilot_list()
+        self._proj_dir = proj_dir
+        self._redcap_dict = report_helper.redcap_dict()
+        self._pilot_list = report_helper.pilot_list()
 
     def clean_surveys(self, survey_name):
         """Clean original RedCap survey data.
 
-        Find data_raw csv dataframes and coordinate cleaning methods.
+        Wrapper method, find data_raw csv dataframes and coordinate
+        appropriate cleaning methods for survey.
 
         Parameters
         ----------
@@ -75,7 +68,7 @@ class CleanRedcap:
 
         Attributes
         ----------
-        df_raw : pd.DataFrame
+        _df_raw : pd.DataFrame
             Original RedCap survey data
 
         Raises
@@ -86,15 +79,15 @@ class CleanRedcap:
         """
         # Load raw data
         raw_file = os.path.join(
-            self.proj_dir,
+            self._proj_dir,
             "data_survey",
-            self.redcap_dict[survey_name],
+            self._redcap_dict[survey_name],
             "data_raw",
             f"df_{survey_name}_latest.csv",
         )
         if not os.path.exists(raw_file):
             raise FileNotFoundError(f"Failed to find {raw_file}.")
-        self.df_raw = pd.read_csv(raw_file)
+        self._df_raw = pd.read_csv(raw_file)
 
         # Get and run cleaning method
         print(f"Cleaning survey : {survey_name}")
@@ -186,9 +179,9 @@ class CleanRedcap:
         educate_switch = {2: 12, 3: 13, 4: 14, 5: 16, 6: 17, 7: 18, 8: 20}
 
         # Get education level, and self-report of years educated
-        edu_year = self.df_raw["years_education"].tolist()
-        edu_level = self.df_raw["level_education"].tolist()
-        record_id = self.df_raw["record_id"].tolist()
+        edu_year = self._df_raw["years_education"].tolist()
+        edu_level = self._df_raw["level_education"].tolist()
+        record_id = self._df_raw["record_id"].tolist()
 
         # Convert into years (deal with self-reports)
         subj_educate = []
@@ -212,8 +205,8 @@ class CleanRedcap:
             4. San Jose CA
 
         """
-        self.df_raw = self.df_raw.rename(columns={"city": "city-state"})
-        city_state = self.df_raw["city-state"].tolist()
+        self._df_raw = self._df_raw.rename(columns={"city": "city-state"})
+        city_state = self._df_raw["city-state"].tolist()
         city_list = []
         state_list = []
         for cs in city_state:
@@ -235,10 +228,10 @@ class CleanRedcap:
             city_list.append(h_city)
             state_list.append(h_state)
 
-        self.df_raw["city"] = city_list
-        self.df_raw["state"] = state_list
+        self._df_raw["city"] = city_list
+        self._df_raw["state"] = state_list
 
-        self.df_raw = self.df_raw.drop("city-state", axis=1)
+        self._df_raw = self._df_raw.drop("city-state", axis=1)
         col_reorder = [
             "record_id",
             "demographics_complete",
@@ -266,7 +259,7 @@ class CleanRedcap:
             "level_education",
             "handedness",
         ]
-        self.df_raw = self.df_raw[col_reorder]
+        self._df_raw = self._df_raw[col_reorder]
 
     def _clean_demographics(self):
         """Cleaning method for RedCap demographics survey.
@@ -283,25 +276,25 @@ class CleanRedcap:
 
         """
         # Reorder columns, drop rows without last name response
-        col_names = self.df_raw.columns.tolist()
+        col_names = self._df_raw.columns.tolist()
         col_reorder = col_names[-1:] + col_names[-2:-1] + col_names[:-2]
-        self.df_raw = self.df_raw[col_reorder]
-        self.df_raw = self.df_raw[self.df_raw["lastname"].notna()]
+        self._df_raw = self._df_raw[col_reorder]
+        self._df_raw = self._df_raw[self._df_raw["lastname"].notna()]
 
         # Convert DOB response to datetime
-        dob_list = self.df_raw["dob"].tolist()
+        dob_list = self._df_raw["dob"].tolist()
         dob_clean = self._dob_convert(dob_list)
-        self.df_raw["dob"] = dob_clean
+        self._df_raw["dob"] = dob_clean
 
         # Fix years of education
         yrs_edu = self._get_educ_years()
-        self.df_raw["years_education"] = yrs_edu
+        self._df_raw["years_education"] = yrs_edu
 
         # Fix City, State of birth
         self._clean_city_state()
 
         # Clean middle name responses for NA and special characters
-        df_raw = self.df_raw
+        df_raw = self._df_raw
         na_mask = (
             df_raw.middle_name.eq("na")
             | df_raw.middle_name.eq("NA")
@@ -317,7 +310,7 @@ class CleanRedcap:
         df_raw.loc[sp_mask, ["middle_name"]] = np.nan
 
         # Separate pilot from study data
-        pilot_list = [int(x[-1]) for x in self.pilot_list]
+        pilot_list = [int(x[-1]) for x in self._pilot_list]
         idx_pilot = df_raw[df_raw["record_id"].isin(pilot_list)].index.tolist()
         idx_study = df_raw[
             ~df_raw["record_id"].isin(pilot_list)
@@ -339,14 +332,14 @@ class CleanRedcap:
 
         """
         # Drop rows without signature, account for multiple consent forms
-        col_names = self.df_raw.columns.tolist()
+        col_names = self._df_raw.columns.tolist()
         col_drop = (
             "signature_v2" if "signature_v2" in col_names else "signature"
         )
-        df_raw = self.df_raw[self.df_raw[col_drop].notna()]
+        df_raw = self._df_raw[self._df_raw[col_drop].notna()]
 
         # Separate pilot from study data
-        pilot_list = [int(x[-1]) for x in self.pilot_list]
+        pilot_list = [int(x[-1]) for x in self._pilot_list]
         idx_pilot = df_raw[df_raw["record_id"].isin(pilot_list)].index.tolist()
         idx_study = df_raw[
             ~df_raw["record_id"].isin(pilot_list)
@@ -368,14 +361,14 @@ class CleanRedcap:
 
         """
         # Drop rows without guid
-        df_raw = self.df_raw[self.df_raw["guid"].notna()]
+        df_raw = self._df_raw[self._df_raw["guid"].notna()]
 
         # Separate pilot from study data
         idx_pilot = df_raw[
-            df_raw["study_id"].isin(self.pilot_list)
+            df_raw["study_id"].isin(self._pilot_list)
         ].index.tolist()
         idx_study = df_raw[
-            ~df_raw["study_id"].isin(self.pilot_list)
+            ~df_raw["study_id"].isin(self._pilot_list)
         ].index.tolist()
         self.df_pilot = df_raw.loc[idx_pilot]
         self.df_clean = df_raw.loc[idx_study]
@@ -393,7 +386,7 @@ class CleanRedcap:
         """
         # Rename then remove unneeded columns, reorder
         drop_list = ["guid_timestamp", "redcap_survey_identifier"]
-        df_raw = self.df_raw.drop(drop_list, axis=1)
+        df_raw = self._df_raw.drop(drop_list, axis=1)
         if "q_1_v2" in df_raw.columns.tolist():
             df_raw.columns = df_raw.columns.str.replace("_v2", "")
         df_raw.columns = df_raw.columns.str.replace("q_", "BDI_")
@@ -422,10 +415,10 @@ class CleanRedcap:
 
         # Separate pilot from study data
         idx_pilot = df_raw[
-            df_raw["study_id"].isin(self.pilot_list)
+            df_raw["study_id"].isin(self._pilot_list)
         ].index.tolist()
         idx_study = df_raw[
-            ~df_raw["study_id"].isin(self.pilot_list)
+            ~df_raw["study_id"].isin(self._pilot_list)
         ].index.tolist()
         self.df_pilot = df_raw.loc[idx_pilot]
         self.df_clean = df_raw.loc[idx_study]
@@ -447,16 +440,6 @@ class CleanQualtrics:
         Cleaned survey data of pilot participant responses
         {survey_name: pd.DataFrame}, or
         {visit: {survey_name: pd.DataFrame}}
-    df_raw : pd.DataFrame
-        Original qualtrics survey session data
-    pilot_list : make_reports.report_helper.pilot_list
-        Pilot participants
-    proj_dir : path
-        Location of parent directory for project
-    qualtrics_dict : make_reports.report_helper.qualtrics_dict
-        Mapping of survey name to directory organization
-    withdrew_list : make_reports.report_helper.withdrew_list
-        Participant who have withdrawn from study
 
     Methods
     -------
@@ -475,20 +458,20 @@ class CleanQualtrics:
 
         Attributes
         ----------
-        pilot_list : make_reports.report_helper.pilot_list
+        _pilot_list : make_reports.report_helper.pilot_list
             Pilot participants
-        proj_dir : path
+        _proj_dir : path
             Location of parent directory for project
-        qualtrics_dict : make_reports.report_helper.qualtrics_dict
+        _qualtrics_dict : make_reports.report_helper.qualtrics_dict
             Mapping of survey name to directory organization
-        withdrew_list : make_reports.report_helper.withdrew_list
+        _withdrew_list : make_reports.report_helper.withdrew_list
             Participant who have withdrawn from study
 
         """
-        self.proj_dir = proj_dir
-        self.qualtrics_dict = report_helper.qualtrics_dict()
-        self.pilot_list = report_helper.pilot_list()
-        self.withdrew_list = report_helper.withdrew_list()
+        self._proj_dir = proj_dir
+        self._qualtrics_dict = report_helper.qualtrics_dict()
+        self._pilot_list = report_helper.pilot_list()
+        self._withdrew_list = report_helper.withdrew_list()
 
     def clean_surveys(self, survey_name):
         """Split and clean original Qualtrics survey data.
@@ -502,7 +485,7 @@ class CleanQualtrics:
 
         Attributes
         ----------
-        df_raw : pd.DataFrame
+        _df_raw : pd.DataFrame
             Original qualtrics survey session data
 
         Raises
@@ -516,10 +499,10 @@ class CleanQualtrics:
         visit_raw = (
             "visit_day2"
             if survey_name != "EmoRep_Session_1"
-            else self.qualtrics_dict[survey_name]
+            else self._qualtrics_dict[survey_name]
         )
         raw_file = os.path.join(
-            self.proj_dir,
+            self._proj_dir,
             "data_survey",
             visit_raw,
             "data_raw",
@@ -527,7 +510,7 @@ class CleanQualtrics:
         )
         if not os.path.exists(raw_file):
             raise FileNotFoundError(f"Failed to find {raw_file}.")
-        self.df_raw = pd.read_csv(raw_file)
+        self._df_raw = pd.read_csv(raw_file)
 
         # Get and run cleaning method
         print(f"Cleaning survey : {survey_name}")
@@ -569,12 +552,12 @@ class CleanQualtrics:
 
         # Setup and identify column names
         subj_cols = ["study_id", "datetime"]
-        self.df_raw.rename(
+        self._df_raw.rename(
             {"RecipientLastName": subj_cols[0], "StartDate": subj_cols[1]},
             axis=1,
             inplace=True,
         )
-        col_names = self.df_raw.columns
+        col_names = self._df_raw.columns
 
         # Subset session dataframe by survey
         data_clean = {}
@@ -583,7 +566,7 @@ class CleanQualtrics:
             print(f"\tCleaning survey data : day1, {sur_name}")
             sur_cols = [x for x in col_names if sur_name in x]
             ext_cols = subj_cols + sur_cols
-            df_sur = self.df_raw[ext_cols]
+            df_sur = self._df_raw[ext_cols]
 
             # Clean subset dataframe
             df_sur = df_sur.dropna()
@@ -597,16 +580,16 @@ class CleanQualtrics:
             # Drop first duplicate and withdrawn participant responses
             df_sur = df_sur.drop_duplicates(subset="study_id", keep="last")
             df_sur = df_sur[
-                ~df_sur.study_id.str.contains("|".join(self.withdrew_list))
+                ~df_sur.study_id.str.contains("|".join(self._withdrew_list))
             ]
             df_sur = df_sur.reset_index(drop=True)
 
             # Separate pilot from study data
             idx_pilot = df_sur[
-                df_sur["study_id"].isin(self.pilot_list)
+                df_sur["study_id"].isin(self._pilot_list)
             ].index.tolist()
             idx_study = df_sur[
-                ~df_sur["study_id"].isin(self.pilot_list)
+                ~df_sur["study_id"].isin(self._pilot_list)
             ].index.tolist()
             df_pilot = df_sur.loc[idx_pilot]
             df_clean = df_sur.loc[idx_study]
@@ -644,7 +627,7 @@ class CleanQualtrics:
 
         # Get dataframe and setup output column names
         subj_cols = ["study_id", "visit", "datetime"]
-        self.df_raw.rename(
+        self._df_raw.rename(
             {
                 "SubID": subj_cols[0],
                 "Session_Num": subj_cols[1],
@@ -653,7 +636,7 @@ class CleanQualtrics:
             axis=1,
             inplace=True,
         )
-        col_names = self.df_raw.columns
+        col_names = self._df_raw.columns
 
         # Get relevant info from dataframe for each day
         data_clean = {}
@@ -665,7 +648,7 @@ class CleanQualtrics:
                 print(f"\tCleaning survey data : {day_str}, {sur_key}")
                 sur_cols = [x for x in col_names if sur_key in x]
                 ext_cols = subj_cols + sur_cols
-                df_sub = self.df_raw[ext_cols]
+                df_sub = self._df_raw[ext_cols]
 
                 # Organize rows and columns, get visit-specific responses
                 df_sub = df_sub.dropna()
@@ -685,16 +668,18 @@ class CleanQualtrics:
                 # Drop first duplicate and withdrawn participant responses
                 df_sub = df_sub.drop_duplicates(subset="study_id", keep="last")
                 df_sub = df_sub[
-                    ~df_sub.study_id.str.contains("|".join(self.withdrew_list))
+                    ~df_sub.study_id.str.contains(
+                        "|".join(self._withdrew_list)
+                    )
                 ]
                 df_sub = df_sub.reset_index(drop=True)
 
                 # Separate pilot from study data
                 idx_pilot = df_sub[
-                    df_sub["study_id"].isin(self.pilot_list)
+                    df_sub["study_id"].isin(self._pilot_list)
                 ].index.tolist()
                 idx_study = df_sub[
-                    ~df_sub["study_id"].isin(self.pilot_list)
+                    ~df_sub["study_id"].isin(self._pilot_list)
                 ].index.tolist()
                 df_pilot = df_sub.loc[idx_pilot]
                 df_clean = df_sub.loc[idx_study]
@@ -757,7 +742,7 @@ class CleanQualtrics:
 
         # Remove header rows, test IDs, txtFile NaNs, and restarted
         # sessions (Finished=False).
-        df_clean = self.df_raw
+        df_clean = self._df_raw
         df_clean = df_clean.drop([0, 1])
         df_clean = df_clean[~df_clean["SubID"].str.contains("ER9")]
         df_clean = df_clean[df_clean["txtFile"].notna()]
@@ -884,7 +869,7 @@ class CleanQualtrics:
 
         # Update df_study with each participant's responses
         for sub, sess, stim_list in zip(sub_list, sess_list, stim_unpack):
-            if sub in self.withdrew_list:
+            if sub in self._withdrew_list:
                 continue
             _fill_psr(sub, sess, stim_list)
         df_study = df_study.sort_values(
@@ -916,12 +901,10 @@ class CombineRestRatings:
     ----------
     df_sess : pd.DataFrame
         Aggregated rest ratings for session
-    sess_valid : list
-        Valid session days
 
     Methods
     -------
-    get_rest_ratings
+    get_rest_ratings(sess, rawdata_path)
         Aggregate session rest ratings
 
     """
@@ -936,11 +919,11 @@ class CombineRestRatings:
 
         Attributes
         ----------
-        sess_valid : list
+        _sess_valid : list
             Valid session days
 
         """
-        self.sess_valid = ["day2", "day3"]
+        self._sess_valid = ["day2", "day3"]
 
     def get_rest_ratings(self, sess, rawdata_path):
         """Find and aggregate participant rest ratings for session.
@@ -966,7 +949,7 @@ class CombineRestRatings:
 
         """
         # Check arg
-        if sess not in self.sess_valid:
+        if sess not in self._sess_valid:
             raise ValueError(f"Improper session argument : sess={sess}")
 
         # Setup session dataframe
