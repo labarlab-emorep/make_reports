@@ -281,6 +281,90 @@ def _split_violin_plots(
 
 
 # %%
+def _confusion_matrix(
+    df,
+    emo_list,
+    subj_col,
+    num_exp,
+    out_path,
+    emo_col="emotion",
+    resp_col="response",
+):
+    """Title.
+
+    Desc.
+
+    Parameters
+    ----------
+    df
+    emo_list
+    subj_col
+    num_exp
+    out_path
+    emo_col
+    resp_col
+
+    Returns
+    -------
+    pd.DataFrame
+
+    """
+    # Set denominator for proportion calc
+    max_total = num_exp * len(df[subj_col].unique())
+
+    # Calc proportion each emotion is endorsed as every emotion
+    count_dict = {}
+    for emo in emo_list:
+        count_dict[emo] = {}
+        df_emo = df[df[emo_col] == emo]
+        for sub_emo in emo_list:
+            count_emo = len(df_emo[df_emo[resp_col].str.contains(sub_emo)])
+            count_dict[emo][sub_emo] = round(count_emo / max_total, 2)
+    del df_emo
+    df_corr = pd.DataFrame.from_dict(
+        {i: count_dict[i] for i in count_dict.keys()},
+        orient="index",
+    )
+
+    # Transpose for intuitive stimulus-response axes, write.
+    df_trans = df_corr.transpose()
+    df_trans.to_csv(out_path, index=False)
+    print(f"\t\tWrote dataset : {out_path}")
+    return df_trans
+
+
+# %%
+def _confusion_heatmap(
+    df_conf,
+    title,
+    out_path,
+    x_lab="Stimulus Category",
+    y_lab="Participant Endorsement",
+):
+    """Title.
+
+    Desc.
+
+    Parameters
+    ----------
+    df_conf
+    title
+    out_path
+    x_lab
+    y_lab
+
+    """
+    # Draw and write
+    ax = sns.heatmap(df_conf)
+    ax.set(xlabel=x_lab, ylabel=y_lab)
+    ax.set_title(title)
+    # plt.subplots_adjust(bottom=0.25, left=0.2)
+    plt.savefig(out_path, bbox_inches="tight")
+    plt.close()
+    print(f"\t\tDrew heat-prob plot : {out_path}")
+
+
+# %%
 def descript_rest_ratings(proj_dir):
     """Generate descriptive stats for resting state ratings.
 
@@ -505,48 +589,23 @@ class DescriptStimRatings:
             & (self.df_all["prompt"] == "Endorsement")
         ].copy()
 
-        # Set denominator for proportion calc
-        num_subj = len(df_end["study_id"].unique())
-        max_total = num_subj * 5
-
-        # Calc proportion each emotion is endorsed as every emotion
-        count_dict = {}
-        for emo in self.emo_list:
-            count_dict[emo] = {}
-            df_emo = df_end[df_end["emotion"] == emo]
-            for sub_emo in self.emo_list:
-                count_emo = len(
-                    df_emo[df_emo["response"].str.contains(sub_emo)]
-                )
-                count_dict[emo][sub_emo] = count_emo / max_total
-        del df_end, df_emo
-        df_corr = pd.DataFrame.from_dict(
-            {i: count_dict[i] for i in count_dict.keys()},
-            orient="index",
-        )
-
-        # Transpose for intuitive stimulus-response axes, write.
-        df_trans = df_corr.transpose()
-        out_path = os.path.join(
+        # Generate confusion matrix of endorsement probabilities
+        out_stat = os.path.join(
             self.out_dir,
             f"stats_stim-ratings_endorsement_{stim_type.lower()}.csv",
         )
-        df_trans.to_csv(out_path)
-        print(f"\t\tWrote dataset : {out_path}")
+        df_conf = _confusion_matrix(
+            df_end, self.emo_list, "study_id", 5, out_stat
+        )
 
-        # Draw and write
-        ax = sns.heatmap(df_trans)
-        ax.set(xlabel="Stimulus Category", ylabel="Participant Endorsement")
-        ax.set_title(f"{stim_type[:-1]} Endorsement Proportion")
-        out_path = os.path.join(
+        # Draw heatmap
+        out_plot = os.path.join(
             self.out_dir,
             f"plot_heat-prob_stim-ratings_endorsement_{stim_type.lower()}.png",
         )
-        plt.subplots_adjust(bottom=0.25, left=0.2)
-        plt.savefig(out_path)
-        plt.close()
-        print(f"\t\tDrew heat-prob plot : {out_path}")
-        return df_trans
+        title = f"Post-Scan {stim_type[:-1]} Endorsement Proportion"
+        _confusion_heatmap(df_conf, title, out_plot)
+        return df_conf
 
     def arousal_valence(self, stim_type, prompt_name):
         """Generate descriptive info for emotion valence and arousal ratings.
@@ -649,9 +708,12 @@ class DescriptTask:
         ----------
         out_dir
         _events_all
+        _task_list
 
         """
         #
+        print("\nInitializing DescriptTask")
+        self._task_list = ["movies", "scenarios"]
         self.out_dir = os.path.join(
             proj_dir, "analyses/surveys_stats_descriptive"
         )
@@ -659,7 +721,7 @@ class DescriptTask:
         self._events_all = sorted(
             glob.glob(f"{mri_rawdata}/**/*_events.tsv", recursive=True)
         )
-        if not self.events_all:
+        if not self._events_all:
             raise ValueError(
                 f"Expected to find BIDS events files in : {mri_rawdata}"
             )
@@ -705,30 +767,33 @@ class DescriptTask:
             del df
 
         #
-        df_task = df_all.loc[
+        df_resp = df_all.loc[
             df_all["trial_type"].isin(
                 ["movie", "scenario", "emotion", "intensity"]
             )
         ].reset_index(drop=True)
-        df_task["emotion"] = df_task["emotion"].fillna(method="ffill")
-        df_task = df_task.loc[
-            ~df_task["trial_type"].isin(["movie", "scenario"])
+        df_resp["emotion"] = df_resp["emotion"].fillna(method="ffill")
+        df_resp = df_resp.loc[
+            ~df_resp["trial_type"].isin(["movie", "scenario"])
         ].reset_index(drop=True)
-        df_task = df_task.drop(
+        df_resp = df_resp.drop(
             ["onset", "duration", "accuracy", "stim_info"], axis=1
         )
-        df_task["emotion"] = df_task["emotion"].str.title()
-        df_task["run"] = df_task["run"].astype("Int64")
+        df_resp["emotion"] = df_resp["emotion"].str.title()
+        df_resp["run"] = df_resp["run"].astype("Int64")
 
         #
-        df_intensity = df_task.loc[df_task["trial_type"] == "intensity"].copy()
+        df_intensity = df_resp.loc[df_resp["trial_type"] == "intensity"].copy()
         df_intensity["response"] = df_intensity["response"].replace(
             "NONE", np.nan
         )
+        df_intensity = df_intensity.reset_index(drop=True)
         df_intensity["response"] = df_intensity["response"].astype("Int64")
-        df_emotion = df_task.loc[df_task["trial_type"] == "emotion"].copy()
-        df_emotion["response"] = df_emotion["response"].str.title()
         self.df_intensity = df_intensity
+
+        df_emotion = df_resp.loc[df_resp["trial_type"] == "emotion"].copy()
+        df_emotion["response"] = df_emotion["response"].str.title()
+        df_emotion = df_emotion.reset_index(drop=True)
         self.df_emotion = df_emotion
 
     def desc_intensity(self):
@@ -736,12 +801,16 @@ class DescriptTask:
 
         Desc.
 
+
+        Returns
+        -------
+        pd.DataFrame
+
         """
         #
-        task_list = ["movies", "scenarios"]
         emo_all = self.df_intensity["emotion"].unique().tolist()
         df_avg = pd.DataFrame(columns=["emotion", "mean", "std", "task"])
-        for task in task_list:
+        for task in self._task_list:
             response_dict = {}
             for emo in emo_all:
                 df = self.df_intensity[
@@ -761,7 +830,7 @@ class DescriptTask:
         col_task = df_avg.pop("task")
         df_avg.insert(0, "task", col_task)
         out_csv = os.path.join(self.out_dir, "stats_task-intensity.csv")
-        df_avg.to_csv(out_csv)
+        df_avg.to_csv(out_csv, index=False)
         print(f"\tWrote csv : {out_csv}")
 
         #
@@ -782,6 +851,40 @@ class DescriptTask:
             title="Stimulus Intensity During Scan",
             out_path=out_path,
         )
+        return df_avg
+
+    def desc_emotion(self):
+        """Title.
+
+        Desc.
+
+        Returns
+        -------
+        dict
+            pd.DataFrames for each task
+
+        """
+        emo_all = self.df_emotion["emotion"].unique().tolist()
+        out_dict = {}
+        for task in self._task_list:
+            df_task = self.df_emotion.loc[self.df_emotion["task"] == task]
+            out_data = os.path.join(
+                self.out_dir, f"stats_task-emotion_{task}.csv"
+            )
+            df_conf = _confusion_matrix(
+                df=df_task,
+                emo_list=emo_all,
+                subj_col="subj",
+                num_exp=2,
+                out_path=out_data,
+            )
+            out_dict[task] = df_conf
+            out_plot = os.path.join(
+                self.out_dir, f"plot_heat-prob_task-emotion_{task}.png"
+            )
+            title = f"Scan {task.title()[:-1]} Endorsement Proportion"
+            _confusion_heatmap(df_conf, title, out_plot)
+        return out_dict
 
 
 # %%

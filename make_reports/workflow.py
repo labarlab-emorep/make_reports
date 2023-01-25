@@ -866,7 +866,9 @@ def survey_scan(proj_dir, survey_list):
                 _ = stim_stats.arousal_valence(stim_type, prompt_name)
 
     if "task" in survey_list:
-        pass
+        task_stats = calc_surveys.DescriptTask(proj_dir)
+        _ = task_stats.desc_intensity()
+        _ = task_stats.desc_emotion()
 
 
 # %%
