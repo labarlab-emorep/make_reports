@@ -12,6 +12,7 @@ import os
 import json
 import glob
 import pandas as pd
+from pandas.api.types import is_numeric_dtype, is_string_dtype
 import numpy as np
 import seaborn as sns
 import matplotlib.pyplot as plt
@@ -242,12 +243,61 @@ def _split_violin_plots(
     title,
     out_path,
 ):
-    """Title.
+    """Make violin plots for groups of emotions.
 
-    Desc.
+    Split emo_all into 4 groups and draw violin plots for each. The
+    file name in out_path will have an appended suffix for the plot
+    number (file_name.png -> file_name_1.png).
+
+    Parameters
+    ----------
+    emo_all : list
+        All emotion categories
+    df : pd.DataFrame
+        Long-formatted dataframe
+    sub_col : str
+        df column name for identifying subjects
+    x_col : str
+        df column name to be used as plot x-axis
+    x_lab : str
+        Plot x-axis label
+    y_col : str
+        df column name to be used as plot y-axis
+    y_lab : str
+        Plot y-axis label
+    hue_col : str
+        df column name to be used as group factor
+    hue_order : str
+        Group legend order
+    title : str
+        Plot title
+    out_path : path
+        Output location and name of file
+
+    Raises
+    ------
+    KeyError
+        Missing required keys in df
+    TypeError
+        df columns improper type
+    ValueError
+        Incorrect number of emotions
 
     """
-    # Split plot into 4 subplots
+    # Validate
+    for _col in [sub_col, x_col, y_col, hue_col]:
+        if _col not in df.columns:
+            raise KeyError(f"Missing expected column in df : {_col}")
+    if len(emo_all) != 15:
+        raise ValueError(
+            f"Expected emo_all to have len == 15, found : {len(emo_all)}"
+        )
+    if not is_numeric_dtype(df[y_col]):
+        raise TypeError("df[y_col] should be numeric type")
+    if not is_string_dtype(df[x_col]) or not is_string_dtype(df[hue_col]):
+        raise TypeError("df[x_col] and df[hue_col] should be string type")
+
+    # Divide emotion list
     emo_a = emo_all[:4]
     emo_b = emo_all[4:8]
     emo_c = emo_all[8:12]
@@ -290,25 +340,57 @@ def _confusion_matrix(
     emo_col="emotion",
     resp_col="response",
 ):
-    """Title.
+    """Generate a confusion matrix of emotion endorsements.
 
-    Desc.
+    Determine how likely (proportion) each emotion is endorsed
+    as itself and others.
 
     Parameters
     ----------
-    df
-    emo_list
-    subj_col
-    num_exp
-    out_path
-    emo_col
-    resp_col
+    df : pd.DataFrame
+        Long-formatted dataframe
+    emo_list : list
+        All emotion categories
+    subj_col : str
+        df column name for identifying subjects
+    num_exp : int
+        Number of expected emotion endorsements from each subejct
+    out_path : path
+        Output location and file name
+    emo_col : str, optional
+        df column name for identifying emotion (stimulus)
+    resp_col : str, optional
+        df column name for identifying participant endorsements
 
     Returns
     -------
     pd.DataFrame
+        Confusion matrix
+
+    Raises
+    ------
+    KeyError
+        Missing columns in df
+    TypeError
+        df columns wrong type
+        num_exp wrong type
+    ValueError
+        Unexpected number of emotions
 
     """
+    # Validate
+    for _col in [subj_col, emo_col, resp_col]:
+        if _col not in df.columns:
+            raise KeyError(f"Missing expected column in df : {_col}")
+    if len(emo_list) != 15:
+        raise ValueError(
+            f"Expected emo_list to have len == 15, found : {len(emo_list)}"
+        )
+    if not is_string_dtype(df[emo_col]) or not is_string_dtype(df[resp_col]):
+        raise TypeError("df[y_col] and df[hue_col] should be string type")
+    if not isinstance(num_exp, int):
+        raise TypeError("Expected type int for num_exp")
+
     # Set denominator for proportion calc
     max_total = num_exp * len(df[subj_col].unique())
 
@@ -321,12 +403,12 @@ def _confusion_matrix(
             count_emo = len(df_emo[df_emo[resp_col].str.contains(sub_emo)])
             count_dict[emo][sub_emo] = round(count_emo / max_total, 2)
     del df_emo
+
+    # Generate dataframe and transponse for intuitive stimulus-response axes
     df_corr = pd.DataFrame.from_dict(
         {i: count_dict[i] for i in count_dict.keys()},
         orient="index",
     )
-
-    # Transpose for intuitive stimulus-response axes, write.
     df_trans = df_corr.transpose()
     df_trans.to_csv(out_path, index=False)
     print(f"\t\tWrote dataset : {out_path}")
@@ -341,24 +423,26 @@ def _confusion_heatmap(
     x_lab="Stimulus Category",
     y_lab="Participant Endorsement",
 ):
-    """Title.
-
-    Desc.
+    """Draw a heatmap from a confusion matrix.
 
     Parameters
     ----------
-    df_conf
-    title
-    out_path
-    x_lab
-    y_lab
+    df_conf : pd.DataFrame, from _confusion_matrix
+        Confusion matrix
+    title : str
+        Plot title
+    out_path : path
+        Output location and name
+    x_lab : str, optional
+        Plot label for x-axis
+    y_lab : str, optional
+        Plot label for y-axis
 
     """
     # Draw and write
     ax = sns.heatmap(df_conf)
     ax.set(xlabel=x_lab, ylabel=y_lab)
     ax.set_title(title)
-    # plt.subplots_adjust(bottom=0.25, left=0.2)
     plt.savefig(out_path, bbox_inches="tight")
     plt.close()
     print(f"\t\tDrew heat-prob plot : {out_path}")
@@ -689,34 +773,66 @@ class DescriptStimRatings:
 
 # %%
 class DescriptTask:
-    """Title.
+    """Generate descriptive stats and plots for EmoRep task data.
 
-    Desc.
+    Use all available BIDS events files to generate dataframes of
+    emotion and intensity selection data. Then generate descriptive
+    stats and plots.
+
+    Output plots and dataframes are written to:
+        <out_dir>/[plot*|stats]_task-[emotion|intensity]*
+
+    Attributes
+    ----------
+    df_intensity : pd.DataFrame
+        Long-formatted dataframe of participant intensity selections
+    df_emotion : pd.DataFrame
+        Long-formatted dataframe of participant emotion selections
+    out_dir : path
+        Location of output directory
+
+    Methods
+    -------
+    desc_intensity()
+        Generate descriptive stats and plots for intensity selection trials
+    desc_emotion()
+        Generate descriptive stats and plots for emotion selection trials
 
     """
 
     def __init__(self, proj_dir):
-        """Title.
+        """Initialize.
 
-        Desc.
+        Find all participant BIDS events files, trigger construction
+        of dataframe from events files.
 
         Parameters
         ----------
-        proj_dir
+        proj_dir : path
+            Location of project's experiment directory
 
         Attributes
         ----------
-        out_dir
-        _events_all
-        _task_list
+        out_dir : path
+            Location of output directory
+        _events_all : list
+            All participant events files
+        _task_list : list
+            Session stimulus types
+
+        Raises
+        ------
+        ValueError
+            Events files were not detected
 
         """
-        #
         print("\nInitializing DescriptTask")
         self._task_list = ["movies", "scenarios"]
         self.out_dir = os.path.join(
             proj_dir, "analyses/surveys_stats_descriptive"
         )
+
+        # Find all events files, make dataframe
         mri_rawdata = os.path.join(proj_dir, "data_scanner_BIDS", "rawdata")
         self._events_all = sorted(
             glob.glob(f"{mri_rawdata}/**/*_events.tsv", recursive=True)
@@ -728,18 +844,23 @@ class DescriptTask:
         self._mk_master_df()
 
     def _mk_master_df(self):
-        """Title.
+        """Combine all events files into dataframe.
 
-        Desc.
+        Aggregate all events data info dataframe, then remove trials
+        and columns not pertaining to stimulus responses. Generate
+        dataframes for intensity and emotion selection trials.
 
         Attributes
         ----------
-        df_intensity
-        df_emotion
+        df_intensity : pd.DataFrame
+            Long-formatted dataframe of participant intensity selections
+        df_emotion : pd.DataFrame
+            Long-formatted dataframe of participant emotion selections
 
         """
-        #
         print("\tBuilding dataframe of all participant events.tsv")
+
+        # Build dataframe of all events data
         df_all = pd.DataFrame(
             columns=[
                 "onset",
@@ -766,12 +887,13 @@ class DescriptTask:
             df_all = pd.concat([df_all, df], ignore_index=True)
             del df
 
-        #
+        # Reduce dataframe to relevant rows and columns. Clean dataframe.
         df_resp = df_all.loc[
             df_all["trial_type"].isin(
                 ["movie", "scenario", "emotion", "intensity"]
             )
         ].reset_index(drop=True)
+        del df_all
         df_resp["emotion"] = df_resp["emotion"].fillna(method="ffill")
         df_resp = df_resp.loc[
             ~df_resp["trial_type"].isin(["movie", "scenario"])
@@ -782,7 +904,7 @@ class DescriptTask:
         df_resp["emotion"] = df_resp["emotion"].str.title()
         df_resp["run"] = df_resp["run"].astype("Int64")
 
-        #
+        # Generate and clean dataframe for intensity selection
         df_intensity = df_resp.loc[df_resp["trial_type"] == "intensity"].copy()
         df_intensity["response"] = df_intensity["response"].replace(
             "NONE", np.nan
@@ -791,23 +913,28 @@ class DescriptTask:
         df_intensity["response"] = df_intensity["response"].astype("Int64")
         self.df_intensity = df_intensity
 
+        # Generate and clean dataframe for emotion selection
         df_emotion = df_resp.loc[df_resp["trial_type"] == "emotion"].copy()
         df_emotion["response"] = df_emotion["response"].str.title()
         df_emotion = df_emotion.reset_index(drop=True)
         self.df_emotion = df_emotion
 
     def desc_intensity(self):
-        """Title.
+        """Generate descriptive stats and plots for intensity selection.
 
-        Desc.
+        Output dataframe written to:
+            <out_dir>/stats_task-intensity.csv
 
+        Output plots written to:
+            <out_dir>/plot_violin_task-intensity_*.png
 
         Returns
         -------
         pd.DataFrame
+            Descriptive stats of task, emotion
 
         """
-        #
+        # Populate a dataframe of descriptive stats for each task and emotion
         emo_all = self.df_intensity["emotion"].unique().tolist()
         df_avg = pd.DataFrame(columns=["emotion", "mean", "std", "task"])
         for task in self._task_list:
@@ -827,13 +954,14 @@ class DescriptTask:
             df_tmp["task"] = task
             df_avg = pd.concat([df_avg, df_tmp], ignore_index=True)
 
+        # Organize and save dataframe
         col_task = df_avg.pop("task")
         df_avg.insert(0, "task", col_task)
         out_csv = os.path.join(self.out_dir, "stats_task-intensity.csv")
         df_avg.to_csv(out_csv, index=False)
         print(f"\tWrote csv : {out_csv}")
 
-        #
+        # Make violin plots
         out_path = os.path.join(
             self.out_dir,
             "plot_violin_task-intensity.png",
@@ -848,20 +976,24 @@ class DescriptTask:
             y_lab="Intensity Rating",
             hue_col="task",
             hue_order=["movies", "scenarios"],
-            title="Stimulus Intensity During Scan",
+            title="Scan Stimulus Intensity",
             out_path=out_path,
         )
         return df_avg
 
     def desc_emotion(self):
-        """Title.
+        """Generate descriptive stats and plots for emotion selection.
 
-        Desc.
+        Output dataframe written to:
+            <out_dir>/stats_task-emotion_<task>.csv
+
+        Output plots written to:
+            <out_dir>/plot_heat-prob_task-emotion_<task>.png
 
         Returns
         -------
         dict
-            pd.DataFrames for each task
+            pd.DataFrames of confusion matrices for each task
 
         """
         emo_all = self.df_emotion["emotion"].unique().tolist()
