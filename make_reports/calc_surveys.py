@@ -936,6 +936,7 @@ class DescriptTask:
         """
         # Populate a dataframe of descriptive stats for each task and emotion
         emo_all = self.df_intensity["emotion"].unique().tolist()
+        emo_all.sort()
         df_avg = pd.DataFrame(columns=["emotion", "mean", "std", "task"])
         for task in self._task_list:
             response_dict = {}
@@ -997,6 +998,7 @@ class DescriptTask:
 
         """
         emo_all = self.df_emotion["emotion"].unique().tolist()
+        emo_all.sort()
         out_dict = {}
         for task in self._task_list:
             df_task = self.df_emotion.loc[self.df_emotion["task"] == task]
