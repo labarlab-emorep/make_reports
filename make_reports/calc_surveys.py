@@ -111,12 +111,16 @@ class DescriptRedcapQualtrics:
         """Calculate descriptive stats for entire dataframe."""
         self._mean = round(self.df.stack().mean(), 2)
         self._std = round(self.df.stack().std(), 2)
+        self._skew = round(self.df.stack().skew(), 2)
+        self._kurt = round(self.df.stack().kurt(), 2)
 
     def _calc_row_stats(self):
         """Calculate descriptive stats for participant totals."""
         self.df["total"] = self.df[self.df_col].sum(axis=1)
         self._mean = round(self.df["total"].mean(), 2)
         self._std = round(self.df["total"].std(), 2)
+        self._skew = round(self.df["total"].skew(), 2)
+        self._kurt = round(self.df["total"].kurt(), 2)
 
     def _validate_total_avg(self, total_avg):
         """Check input parameter."""
@@ -162,6 +166,8 @@ class DescriptRedcapQualtrics:
             "n": self.df.shape[0],
             "mean": self._mean,
             "std": self._std,
+            "skew": self._skew,
+            "kurt": self._kurt,
         }
         with open(out_path, "w") as jf:
             json.dump(report, jf)
@@ -734,9 +740,13 @@ class DescriptStimRatings:
         for emo in self.emo_list:
             _mean = df.loc[df["emotion"] == emo, "response"].mean()
             _std = df.loc[df["emotion"] == emo, "response"].std()
+            _skew = df.loc[df["emotion"] == emo, "response"].skew()
+            _kurt = df.loc[df["emotion"] == emo, "response"].kurt()
             response_dict[emo] = {
                 "mean": round(_mean, 2),
                 "std": round(_std, 2),
+                "skew": round(_skew, 2),
+                "kurt": round(_kurt, 2),
             }
         df_stat = pd.DataFrame.from_dict(response_dict).transpose()
 
@@ -948,6 +958,8 @@ class DescriptTask:
                 response_dict[emo] = {
                     "mean": round(df.response.mean(), 2),
                     "std": round(df.response.std(), 2),
+                    "skew": round(df.response.skew(), 2),
+                    "kurt": round(df.response.kurt(), 2),
                 }
             df_tmp = pd.DataFrame.from_dict(response_dict).transpose()
             df_tmp.index = df_tmp.index.set_names(["emotion"])
