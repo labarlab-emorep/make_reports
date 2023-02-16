@@ -655,59 +655,53 @@ class CalcRedcapQualtricsStats:
             if sur not in self.visit1_list and sur not in self.visit23_list:
                 raise ValueError(f"Unexpected survey requested : {sur}")
 
-    def wrap_visits(self):
-        """Wrap desc_plots for each visit's surveys.
+    def match_survey_visits(self):
+        """Title."""
 
-        Identify visit(s) of survey and then execute desc_plots
-        for each visit.
+        def _csv_path(day: str) -> str:
+            """Title."""
+            file_path = os.path.join(
+                self._proj_dir,
+                f"data_survey/visit_{day}/data_clean",
+                f"df_{self._sur_name}.csv",
+            )
+            if os.path.exists(file_path):
+                return file_path
+            else:
+                raise FileNotFoundError(f"File path not found : {file_path}")
 
-        """
         for self._sur_name in self._sur_list:
+            print(f"\tGetting stats for {self._sur_name}")
             if self._sur_name in self.visit1_list:
-
-                # Use visit1 data
-                print(f"\tGetting stats for {self._sur_name}")
-                csv_path = os.path.join(
-                    self._proj_dir,
-                    "data_survey/visit_day1/data_clean",
-                    f"df_{self._sur_name}.csv",
-                )
-
-                # Get info for plotting, generate files
-                self._plot_dict = self._plot_switch()
-                self.desc_plots(csv_path, self._sur_name)
+                self.visit1_stats_plots(_csv_path("day1"))
 
             elif self._sur_name in self.visit23_list:
+                day2_path = _csv_path("day2")
+                day3_path = _csv_path("day3")
+                self.visit23_stats_plots(day2_path, day3_path)
 
-                # Use visit2, 3 data
-                for day in ["day2", "day3"]:
-                    print(f"\tGetting stats for {self._sur_name}, {day}")
-                    csv_path = os.path.join(
-                        self._proj_dir,
-                        f"data_survey/visit_{day}/data_clean",
-                        f"df_{self._sur_name}.csv",
-                    )
-                    out_name = f"{self._sur_name}_{day}"
+            #     # Use visit2, 3 data
+            #     for day in ["day2", "day3"]:
+            #         print(f"\tGetting stats for {self._sur_name}, {day}")
+            #         csv_path = os.path.join(
+            #             self._proj_dir,
+            #             f"data_survey/visit_{day}/data_clean",
+            #             f"df_{self._sur_name}.csv",
+            #         )
+            #         out_name = f"{self._sur_name}_{day}"
 
-                    # Get info for plotting, generate files
-                    self._plot_dict = self._plot_switch(day=day)
-                    self.desc_plots(csv_path, out_name)
+            #         # Get info for plotting, generate files
+            #         self._plot_dict = self._plot_switch(day=day)
+            #         self.desc_plots(csv_path, out_name)
 
-    def desc_plots(self, csv_path, out_name):
-        """Generate descriptive stats and plots.
-
-        Stats files are written to:
-            <out_dir>/stats_<out_name>*.json
-
-        Plots are written to:
-            <out_dir>/plot_violin_<out_name>*.png
+    def visit1_stats_plots(self, csv_path):
+        """Title.
 
         Parameters
         ----------
         csv_path : path
             Location of cleaned survey CSV
-        out_name : str
-            Survey identfier, substring of output filename
+
 
         Raises
         ------
@@ -715,118 +709,94 @@ class CalcRedcapQualtricsStats:
             File missing at csv_path
 
         """
+
+        def _get_title() -> str:
+            """Specify dataframe, plot title."""
+            plot_titles = {
+                "AIM": "Affective Intensity Measure",
+                "ALS": "Affective Lability Scale",
+                "ERQ": "Emotion Regulation Questionnaire",
+                "PSWQ": "Penn State Worry Questionnaire",
+                "RRS": "Ruminative Response Scale",
+                "STAI_Trait": "Spielberg Trait Anxiety Inventory",
+                "TAS": "Toronto Alexithymia Scale",
+            }
+            return plot_titles[self._sur_name]
+
+        def _get_subscale() -> dict:
+            """Specify subscales names and items."""
+            all_dict = {
+                "ALS": {
+                    "Anx-Dep": [f"ALS_{x}" for x in [1, 3, 5, 6, 7]],
+                    "Dep-Ela": [
+                        f"ALS_{x}" for x in [2, 10, 12, 13, 15, 16, 17, 18]
+                    ],
+                    "Anger": [f"ALS_{x}" for x in [4, 8, 9, 11, 14]],
+                },
+                "ERQ": {
+                    "Reappraisal": [f"ERQ_{x}" for x in [1, 3, 5, 7, 8, 10]],
+                    "Suppression": [f"ERQ_{x}" for x in [2, 4, 6, 9]],
+                },
+                "RRS": {
+                    "Depression": [
+                        f"RRS_{x}"
+                        for x in [1, 2, 3, 4, 6, 8, 9, 14, 17, 18, 19, 22]
+                    ],
+                    "Brooding": [f"RRS_{x}" for x in [5, 10, 13, 15, 16]],
+                    "Reflection": [f"RRS_{x}" for x in [7, 11, 12, 20, 21]],
+                },
+            }
+            return all_dict[self._sur_name]
+
         if not os.path.exists(csv_path):
             raise FileNotFoundError(f"Missing file : {csv_path}")
 
         # Generate stats and plots
-        sur_stat = calc_surveys.DescriptRedcapQualtrics(
-            self._proj_dir, csv_path, self._sur_name
+        stat_out = os.path.join(self.out_dir, f"stats_{self._sur_name}.json")
+        plot_out = os.path.join(
+            self.out_dir, f"plot_violin_{self._sur_name}.png"
         )
-        _ = sur_stat.write_mean_std(
-            os.path.join(self.out_dir, f"stats_{out_name}.json"),
-            self._plot_dict["title"],
-        )
-        _ = sur_stat.violin_plot(
-            out_path=os.path.join(self.out_dir, f"plot_violin_{out_name}.png"),
-            title=self._plot_dict["title"],
-        )
+        sur_stat = calc_surveys.Visit1Stats(csv_path, self._sur_name)
+        _ = sur_stat.write_stats(stat_out, _get_title())
+        sur_stat.write_plot(plot_out, _get_title())
+
+        # Generate stats and plots for subscales
         if self._sur_name not in self.has_subscales:
             return
-
-        # Generate stats and plots for subscales, capitalize on
-        # mutability of sur_stat.df, sur_stat.df_col.
         df_work = sur_stat.df.copy()
-        subscale_dict = self._subscale_switch()
+        subscale_dict = _get_subscale()
         for sub_name, sub_cols in subscale_dict.items():
             sur_stat.df = df_work[sub_cols].copy()
             sur_stat.df_col = sub_cols
 
             # Setup file names, make files
-            sub_title = self._plot_dict["title"] + f", {sub_name}"
-            sub_out = os.path.join(
-                self.out_dir, f"plot_violin_{out_name}_{sub_name}.png"
+            sub_title = _get_title() + f", {sub_name}"
+            sub_stat_out = os.path.join(
+                self.out_dir, f"stats_{self._sur_name}_{sub_name}.json"
             )
-            _ = sur_stat.write_mean_std(
-                os.path.join(
-                    self.out_dir, f"stats_{out_name}_{sub_name}.json"
-                ),
-                sub_title,
+            sub_plot_out = os.path.join(
+                self.out_dir, f"plot_violin_{self._sur_name}_{sub_name}.png"
             )
-            _ = sur_stat.violin_plot(
-                out_path=sub_out,
-                title=sub_title,
-            )
+            _ = sur_stat.write_stats(sub_stat_out, sub_title)
+            sur_stat.write_plot(sub_plot_out, sub_title)
 
-    def _plot_switch(self, day: str = "day2") -> dict:
-        """Supply plot variables for survey."""
-        # Get visit name
-        visit_switch = {
-            "day2": "Visit 2",
-            "day3": "Visit 3",
-        }
-        if day not in visit_switch:
-            raise KeyError(f"Unexpected key : {day}")
-        vis = visit_switch[day]
+    def visit23_stats_plots(self, day2_csv_path, day3_csv_path):
+        """Title."""
 
-        # Set plotting values for surveys. Each list item in
-        # _values should have a corresponding key in _keys.
-        _values = {
-            "AIM": ["Affective Intensity Measure"],
-            "ALS": ["Affective Lability Scale"],
-            "ERQ": ["Emotion Regulation Questionnaire"],
-            "PSWQ": ["Penn State Worry Questionnaire"],
-            "RRS": ["Ruminative Response Scale"],
-            "STAI_Trait": ["Spielberg Trait Anxiety Inventory"],
-            "TAS": ["Toronto Alexithymia Scale"],
-            "STAI_State": [f"{vis} Spielberg State Anxiety Inventory"],
-            "PANAS": [f"{vis} Positive and Negative Affect Schedule"],
-            "BDI": [f"{vis} Beck Depression Inventory"],
-        }
-        _keys = ["title"]
+        def _get_title() -> str:
+            """Specify dataframe, plot title."""
+            plot_titles = {
+                "STAI_State": "Spielberg State Anxiety Inventory",
+                "PANAS": "Positive and Negative Affect Schedule",
+                "BDI": "Beck Depression Inventory",
+            }
+            return plot_titles[self._sur_name]
 
-        # Validate survey name
-        if self._sur_name not in _values.keys():
-            raise AttributeError(f"Unexpected survey name : {self._sur_name}")
-
-        # Build dictionary from _keys and _values
-        param_dict = {}
-        for sur_name, sur_list in _values.items():
-            param_dict[sur_name] = {}
-            for c, val in enumerate(_keys):
-                param_dict[sur_name][val] = sur_list[c]
-        return param_dict[self._sur_name]
-
-    def _subscale_switch(self) -> dict:
-        """Align subscale items and names."""
-        # Build specific dicts for matching subscale names to
-        # survey items for each survey.
-        _als_sub = {
-            "Anx-Dep": [f"ALS_{x}" for x in [1, 3, 5, 6, 7]],
-            "Dep-Ela": [f"ALS_{x}" for x in [2, 10, 12, 13, 15, 16, 17, 18]],
-            "Anger": [f"ALS_{x}" for x in [4, 8, 9, 11, 14]],
-        }
-        _erq_sub = {
-            "Reappraisal": [f"ERQ_{x}" for x in [1, 3, 5, 7, 8, 10]],
-            "Suppression": [f"ERQ_{x}" for x in [2, 4, 6, 9]],
-        }
-        _rrs_sub = {
-            "Depression": [
-                f"RRS_{x}" for x in [1, 2, 3, 4, 6, 8, 9, 14, 17, 18, 19, 22]
-            ],
-            "Brooding": [f"RRS_{x}" for x in [5, 10, 13, 15, 16]],
-            "Reflection": [f"RRS_{x}" for x in [7, 11, 12, 20, 21]],
-        }
-
-        # Align subscale dicts and survey names. _sub_names needs to
-        # match values in has_subscales.
-        _sub_names = ["ALS", "ERQ", "RRS"]
-        _sub_dicts = [_als_sub, _erq_sub, _rrs_sub]
-
-        # Construct ombnibus dict, return specific survey subdict
-        all_dict = {}
-        for sub_name, sub_dict in zip(_sub_names, _sub_dicts):
-            all_dict[sub_name] = sub_dict
-        return all_dict[self._sur_name]
+        stat_out = os.path.join(self.out_dir, f"stats_{self._sur_name}.json")
+        sur_stat = calc_surveys.Visit23Stats(
+            day2_csv_path, day3_csv_path, self._sur_name
+        )
+        _ = sur_stat.write_stats(stat_out, _get_title())
 
 
 # %%

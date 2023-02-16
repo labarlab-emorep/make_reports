@@ -19,42 +19,101 @@ import matplotlib.pyplot as plt
 
 
 # %%
-class DescriptRedcapQualtrics:
-    """Describe survey responses.
+class _DescStat:
+    """Title."""
 
-    Generate descriptive stats and plots of
-    REDCap and Qualtrics survey data.
+    def __init__(self, df):
+        """Title."""
+        print("\tInitializing _DescStat")
+        self.df = df
+
+    def calc_total_stats(self, df: pd.DataFrame = None) -> dict:
+        """Title."""
+        df_calc = df.copy() if isinstance(df, pd.DataFrame) else self.df.copy()
+        df_calc["total"] = df_calc[self.col_data].sum(axis=1)
+        mean = round(df_calc["total"].mean(), 2)
+        std = round(df_calc["total"].std(), 2)
+        skew = round(df_calc["total"].skew(), 2)
+        kurt = round(df_calc["total"].kurt(), 2)
+        num = df.shape[0]
+        return {
+            "num": num,
+            "mean": mean,
+            "SD": std,
+            "skewness": skew,
+            "kurtosis": kurt,
+        }
+
+    def calc_factor_stats(
+        self, fac_col: str, fac_a: str, fac_b: str, df: pd.DataFrame = None
+    ) -> dict:
+        """Title."""
+        df_calc = df.copy() if isinstance(df, pd.DataFrame) else self.df.copy()
+        mask_a = df_calc[fac_col] == fac_a
+        mask_b = df_calc[fac_col] == fac_b
+        out_dict = {}
+        out_dict[fac_a] = self.calc_total_stats(df=df_calc[mask_a])
+        out_dict[fac_b] = self.calc_total_stats(df=df_calc[mask_b])
+        return out_dict
+
+    def draw_single_boxplot(self):
+        """Title."""
+        #
+        mean, std, _, _ = self.calc_total_stats()
+
+        fig, ax = plt.subplots()
+        plt.boxplot(self.df["total"])
+        plt.ylabel("Participant Total")
+        # ax.set_xticklabels(["Categorical Label"])
+        # plt.xlabel("X-label")
+        # ax.get_xaxis().tick_bottom()
+        plt.tick_params(
+            axis="x", which="both", bottom=False, top=False, labelbottom=False
+        )
+        _, ub = ax.get_ylim()
+        plt.text(
+            0.55,
+            ub - 0.1 * ub,
+            f"mean={mean}\nSD={std}",
+            horizontalalignment="left",
+        )
+        return fig
+
+
+# %%
+class Visit1Stats(_DescStat):
+    """Title.
 
     Attributes
     ----------
     df : pd.DataFrame
         Survey-specific dataframe
-    df_col : list
+    col_data : list
         Column names of df relevant to survey
 
     Methods
     -------
-    write_mean_std(out_path, title, total_avg="total")
-        Get and write mean, std for survey responses
-    violin_plot(out_path, title, total_avg="total")
-        Generate violin plot of survey responses
+
 
     """
 
-    def __init__(self, proj_dir, csv_path, survey_name):
+    def __init__(self, csv_path, survey_name):
         """Initialize.
 
         Setup and construct dataframe of survey responses.
 
         Parameters
         ----------
-        proj_dir : path
-            Location of project's experiment directory
         csv_path : path
             Location of cleaned survey CSV, requires columns
             "study_id" and "<survey_name>_*".
         survey_name : str
             Short name of survey, found in column names of CSV
+
+        Attributes
+        ----------
+        df : pd.DataFrame
+            Survey-specific dataframe
 
         Raises
         ------
@@ -64,7 +123,7 @@ class DescriptRedcapQualtrics:
             Missing column names
 
         """
-        # Check for file
+        print("Initializing Visit1Stats")
         if not os.path.exists(csv_path):
             raise FileNotFoundError(f"Missing file : {csv_path}")
 
@@ -79,160 +138,114 @@ class DescriptRedcapQualtrics:
                 f"Expected dataframe column that contains : {survey_name}"
             )
         df = df.set_index("study_id")
-        self._prep_df(df, survey_name)
+        super().__init__(df)
+        self._prep_df(survey_name)
 
-    def _prep_df(self, df, name):
-        """Make dataframe of survey responses.
+    def _prep_df(self, name: str):
+        """Title."""
+        self.df = self.df.drop(labels=["datetime"], axis=1)
+        self.col_data = [x for x in self.df.columns if name in x]
+        self.df[self.col_data] = self.df[self.col_data].astype("Int64")
 
-        Extract survey responses from larger, aggregate dataframe.
-
-        Parameters
-        ----------
-        df : pd.DataFrame
-            Survey dataset
-        name : str
-            Column substring, for subsetting dataframe
-
-        Attributes
-        ----------
-        df : pd.DataFrame
-            Survey-specific dataframe
-        df_col : list
-            Column names of df relevant to survey
-
-        """
-        df = df.drop(labels=["datetime"], axis=1)
-        col_list = [x for x in df.columns if name in x]
-        df[col_list] = df[col_list].astype("Int64")
-        self.df = df
-        self.df_col = col_list
-
-    def _calc_df_stats(self):
-        """Calculate descriptive stats for entire dataframe."""
-        self._mean = round(self.df.stack().mean(), 2)
-        self._std = round(self.df.stack().std(), 2)
-        self._skew = round(self.df.stack().skew(), 2)
-        self._kurt = round(self.df.stack().kurt(), 2)
-
-    def _calc_row_stats(self):
-        """Calculate descriptive stats for participant totals."""
-        self.df["total"] = self.df[self.df_col].sum(axis=1)
-        self._mean = round(self.df["total"].mean(), 2)
-        self._std = round(self.df["total"].std(), 2)
-        self._skew = round(self.df["total"].skew(), 2)
-        self._kurt = round(self.df["total"].kurt(), 2)
-
-    def _validate_total_avg(self, total_avg):
-        """Check input parameter."""
-        if total_avg not in ["total", "avg"]:
-            raise ValueError(f"Unexpected total_avg values : {total_avg}")
-
-    def write_mean_std(self, out_path, title, total_avg="total"):
-        """Write mean and std to json.
+    def write_stats(self, out_path, title):
+        """Title.
 
         Parameters
         ----------
-        out_path : path
-            Output path, including file name
-        title : str
-            Survey name
-        total_avg : str, optional
-            [total | avg]
-            Toggle reporting metrics of group average or
-            participant totals.
-
-        Returns
-        -------
-        dict
-            Descriptive stats
-
-        Raises
-        ------
-        ValueError
-            Unexpected total_avg parameter
 
         """
-        self._validate_total_avg(total_avg)
+        out_ext = out_path.split(".")[-1]
+        if out_ext != "json":
+            raise ValueError("Expected output file extension json")
 
         # Get desired mean/std
-        if total_avg == "total":
-            self._calc_row_stats()
-        elif total_avg == "avg":
-            self._calc_df_stats()
-
-        # Setup json content, write
-        report = {
-            "Title": title,
-            "n": self.df.shape[0],
-            "mean": self._mean,
-            "std": self._std,
-            "skew": self._skew,
-            "kurt": self._kurt,
-        }
+        stats = self.calc_total_stats()
+        report_dict = {"Title": title}
+        report_dict.update(stats)
+        # report = {
+        #     "Title": title,
+        #     "n": stats["num"],
+        #     "mean": stats["mean"],
+        #     "std": stats["SD"],
+        #     "skew": stats["skewness"],
+        #     "kurt": stats["kurtosis"],
+        # }
         with open(out_path, "w") as jf:
-            json.dump(report, jf)
+            json.dump(report_dict, jf)
         print(f"\t\tSaved descriptive stats : {out_path}")
-        return report
+        return report_dict
 
-    def violin_plot(self, out_path, title, total_avg="total"):
+    def write_plot(self, out_path, title):
         """Make violin plot of survey responses.
 
         Parameters
         ----------
-        out_path : path
-            Output path, including file name
-        title : str
-            Survey name
-        total_avg : str, optional
-            [total | avg]
-            Toggle reporting metrics of group average or
-            participant totals.
-
-        Returns
-        -------
-        path
-            Location and name of violin plot
 
         """
-        self._validate_total_avg(total_avg)
-
-        # Get required metrics
-        if total_avg == "total":
-            self._calc_row_stats()
-            x_label = "Total"
-        elif total_avg == "avg":
-            self._calc_df_stats()
-            x_label = "Average"
-
-        # Setup plotting column
-        df_work = self.df.copy()
-        if total_avg == "total":
-            df_work["plot"] = df_work["total"]
-        elif total_avg == "avg":
-            df_work["plot"] = df_work[self.df_col].mean(axis=1)
-
-        # Draw violin
-        lb = self._mean - (3 * self._std)
-        ub = self._mean + (3 * self._std)
-        fig, ax = plt.subplots()
-        sns.violinplot(x=df_work["plot"])
-        ax.collections[0].set_alpha(0.5)
-        ax.set_xlim(lb, ub)
-        plt.title(title)
-        plt.ylabel("Response Density")
-        plt.xlabel(f"Participant {x_label}")
-        plt.text(
-            lb + (0.2 * self._std),
-            -0.42,
-            f"mean(sd) = {self._mean}({self._std})",
-            horizontalalignment="left",
-        )
-
         # Save and return
+        fig = self.draw_single_boxplot()
+        plt.title(title)
         plt.savefig(out_path)
         plt.close(fig)
-        print(f"\t\tDrew violin plot : {out_path}")
-        return out_path
+        print(f"\t\tDrew boxplot : {out_path}")
+
+
+# %%
+class Visit23Stats(_DescStat):
+    """Title."""
+
+    def __init__(self, day2_csv_path, day3_csv_path, survey_name):
+        """Title."""
+        #
+        self.survey_name = survey_name
+        df2 = pd.read_csv(day2_csv_path)
+        df3 = pd.read_csv(day3_csv_path)
+        if not self._valid_df(df2) or not self._valid_df(df3):
+            raise ValueError("Missing expected columns in dataframes")
+
+        # TODO Check that column names are equal between df2, df3
+        self.col_data = [x for x in df2.columns if self.survey_name in x]
+        df_day2 = self._prep_df(df2, "day2")
+        df_day3 = self._prep_df(df3, "day3")
+        df = pd.concat([df_day2, df_day3], ignore_index=True)
+        super().__init__(df)
+        del df2, df3, df_day2, df_day3
+
+    def _valid_df(self, df: pd.DataFrame) -> bool:
+        """Title."""
+        col = df.columns
+        comb = "\t".join(col)
+        out_bool = (
+            True if "study_id" in col and self.survey_name in comb else False
+        )
+        return out_bool
+
+    def _prep_df(self, df: pd.DataFrame, day: str) -> pd.DataFrame:
+        """Title."""
+        df = df.drop(labels=["datetime"], axis=1)
+        df[self.col_data] = df[self.col_data].astype("Int64")
+        df["visit"] = day
+        return df
+
+    def write_stats(self, out_path, title):
+        """Title.
+
+        Parameters
+        ----------
+
+        """
+        out_ext = out_path.split(".")[-1]
+        if out_ext != "json":
+            raise ValueError("Expected output file extension json")
+
+        # Get desired mean/std
+        stats = self.calc_factor_stats("visit", "day2", "day3")
+        report_dict = {"Title": title}
+        report_dict.update(stats)
+        with open(out_path, "w") as jf:
+            json.dump(report_dict, jf)
+        print(f"\t\tSaved descriptive stats : {out_path}")
+        return report_dict
 
 
 # %%

@@ -119,7 +119,7 @@ def main():
 
     if sur_online:
         sur_stat = workflow.CalcRedcapQualtricsStats(proj_dir, sur_online)
-        sur_stat.wrap_visits()
+        sur_stat.match_survey_visits()
 
     if sur_scanner:
         workflow.survey_scan(proj_dir, sur_scanner)
