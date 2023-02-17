@@ -35,7 +35,7 @@ class _DescStat:
         std = round(df_calc["total"].std(), 2)
         skew = round(df_calc["total"].skew(), 2)
         kurt = round(df_calc["total"].kurt(), 2)
-        num = df.shape[0]
+        num = df_calc.shape[0]
         return {
             "num": num,
             "mean": mean,
@@ -56,17 +56,16 @@ class _DescStat:
         out_dict[fac_b] = self.calc_total_stats(df=df_calc[mask_b])
         return out_dict
 
-    def draw_single_boxplot(self):
+    def draw_single_boxplot(self) -> plt.Figure:
         """Title."""
         #
-        mean, std, _, _ = self.calc_total_stats()
+        stat_dict = self.calc_total_stats()
+        df_plot = self.df.copy()
+        df_plot["total"] = df_plot[self.col_data].sum(axis=1)
 
         fig, ax = plt.subplots()
-        plt.boxplot(self.df["total"])
+        plt.boxplot(df_plot["total"])
         plt.ylabel("Participant Total")
-        # ax.set_xticklabels(["Categorical Label"])
-        # plt.xlabel("X-label")
-        # ax.get_xaxis().tick_bottom()
         plt.tick_params(
             axis="x", which="both", bottom=False, top=False, labelbottom=False
         )
@@ -74,7 +73,39 @@ class _DescStat:
         plt.text(
             0.55,
             ub - 0.1 * ub,
-            f"mean={mean}\nSD={std}",
+            f"mean={stat_dict['mean']}\nSD={stat_dict['SD']}",
+            horizontalalignment="left",
+        )
+        return fig
+
+    def draw_double_boxplot(
+        self, fac_col: str, fac_a: str, fac_b: str
+    ) -> plt.Figure:
+        """Title."""
+        stat_dict = self.calc_factor_stats(fac_col, fac_a, fac_b)
+        df_plot = self.df.copy()
+        df_plot["total"] = df_plot[self.col_data].sum(axis=1)
+
+        #
+        df_a = df_plot.loc[df_plot["visit"] == fac_a, "total"]
+        df_b = df_plot.loc[df_plot["visit"] == fac_b, "total"]
+        fig, ax = plt.subplots()
+        plt.boxplot([df_a, df_b])
+        plt.ylabel("Participant Total")
+        ax.set_xticklabels([fac_a, fac_b])
+        ax.get_xaxis().tick_bottom()
+        # plt.xlabel("X-label")
+        _, ub = ax.get_ylim()
+        plt.text(
+            0.55,
+            ub - 0.1 * ub,
+            f"mean={stat_dict[fac_a]['mean']}\nSD={stat_dict[fac_a]['SD']}",
+            horizontalalignment="left",
+        )
+        plt.text(
+            2.15,
+            ub - 0.1 * ub,
+            f"mean={stat_dict[fac_b]['mean']}\nSD={stat_dict[fac_b]['SD']}",
             horizontalalignment="left",
         )
         return fig
@@ -162,21 +193,13 @@ class Visit1Stats(_DescStat):
         stats = self.calc_total_stats()
         report_dict = {"Title": title}
         report_dict.update(stats)
-        # report = {
-        #     "Title": title,
-        #     "n": stats["num"],
-        #     "mean": stats["mean"],
-        #     "std": stats["SD"],
-        #     "skew": stats["skewness"],
-        #     "kurt": stats["kurtosis"],
-        # }
         with open(out_path, "w") as jf:
             json.dump(report_dict, jf)
         print(f"\t\tSaved descriptive stats : {out_path}")
         return report_dict
 
     def write_plot(self, out_path, title):
-        """Make violin plot of survey responses.
+        """Make boxplot of survey responses.
 
         Parameters
         ----------
@@ -197,6 +220,7 @@ class Visit23Stats(_DescStat):
     def __init__(self, day2_csv_path, day3_csv_path, survey_name):
         """Title."""
         #
+        print("Initializing Visit23Stats")
         self.survey_name = survey_name
         df2 = pd.read_csv(day2_csv_path)
         df3 = pd.read_csv(day3_csv_path)
@@ -205,8 +229,8 @@ class Visit23Stats(_DescStat):
 
         # TODO Check that column names are equal between df2, df3
         self.col_data = [x for x in df2.columns if self.survey_name in x]
-        df_day2 = self._prep_df(df2, "day2")
-        df_day3 = self._prep_df(df3, "day3")
+        df_day2 = self._prep_df(df2, "Visit 2")
+        df_day3 = self._prep_df(df3, "Visit 3")
         df = pd.concat([df_day2, df_day3], ignore_index=True)
         super().__init__(df)
         del df2, df3, df_day2, df_day3
@@ -220,11 +244,11 @@ class Visit23Stats(_DescStat):
         )
         return out_bool
 
-    def _prep_df(self, df: pd.DataFrame, day: str) -> pd.DataFrame:
+    def _prep_df(self, df: pd.DataFrame, fac: str) -> pd.DataFrame:
         """Title."""
         df = df.drop(labels=["datetime"], axis=1)
         df[self.col_data] = df[self.col_data].astype("Int64")
-        df["visit"] = day
+        df["visit"] = fac
         return df
 
     def write_stats(self, out_path, title):
@@ -239,13 +263,27 @@ class Visit23Stats(_DescStat):
             raise ValueError("Expected output file extension json")
 
         # Get desired mean/std
-        stats = self.calc_factor_stats("visit", "day2", "day3")
+        stats = self.calc_factor_stats("visit", "Visit 2", "Visit 3")
         report_dict = {"Title": title}
         report_dict.update(stats)
         with open(out_path, "w") as jf:
             json.dump(report_dict, jf)
         print(f"\t\tSaved descriptive stats : {out_path}")
         return report_dict
+
+    def write_plot(self, out_path, title):
+        """Title.
+
+        Parameters
+        ----------
+
+        """
+        # Save and return
+        fig = self.draw_double_boxplot("visit", "Visit 2", "Visit 3")
+        plt.title(title)
+        plt.savefig(out_path)
+        plt.close(fig)
+        print(f"\t\tDrew boxplot : {out_path}")
 
 
 # %%

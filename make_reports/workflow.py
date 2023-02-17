@@ -674,25 +674,10 @@ class CalcRedcapQualtricsStats:
             print(f"\tGetting stats for {self._sur_name}")
             if self._sur_name in self.visit1_list:
                 self.visit1_stats_plots(_csv_path("day1"))
-
             elif self._sur_name in self.visit23_list:
                 day2_path = _csv_path("day2")
                 day3_path = _csv_path("day3")
                 self.visit23_stats_plots(day2_path, day3_path)
-
-            #     # Use visit2, 3 data
-            #     for day in ["day2", "day3"]:
-            #         print(f"\tGetting stats for {self._sur_name}, {day}")
-            #         csv_path = os.path.join(
-            #             self._proj_dir,
-            #             f"data_survey/visit_{day}/data_clean",
-            #             f"df_{self._sur_name}.csv",
-            #         )
-            #         out_name = f"{self._sur_name}_{day}"
-
-            #         # Get info for plotting, generate files
-            #         self._plot_dict = self._plot_switch(day=day)
-            #         self.desc_plots(csv_path, out_name)
 
     def visit1_stats_plots(self, csv_path):
         """Title.
@@ -709,19 +694,6 @@ class CalcRedcapQualtricsStats:
             File missing at csv_path
 
         """
-
-        def _get_title() -> str:
-            """Specify dataframe, plot title."""
-            plot_titles = {
-                "AIM": "Affective Intensity Measure",
-                "ALS": "Affective Lability Scale",
-                "ERQ": "Emotion Regulation Questionnaire",
-                "PSWQ": "Penn State Worry Questionnaire",
-                "RRS": "Ruminative Response Scale",
-                "STAI_Trait": "Spielberg Trait Anxiety Inventory",
-                "TAS": "Toronto Alexithymia Scale",
-            }
-            return plot_titles[self._sur_name]
 
         def _get_subscale() -> dict:
             """Specify subscales names and items."""
@@ -754,11 +726,11 @@ class CalcRedcapQualtricsStats:
         # Generate stats and plots
         stat_out = os.path.join(self.out_dir, f"stats_{self._sur_name}.json")
         plot_out = os.path.join(
-            self.out_dir, f"plot_violin_{self._sur_name}.png"
+            self.out_dir, f"plot_boxplot_{self._sur_name}.png"
         )
         sur_stat = calc_surveys.Visit1Stats(csv_path, self._sur_name)
-        _ = sur_stat.write_stats(stat_out, _get_title())
-        sur_stat.write_plot(plot_out, _get_title())
+        _ = sur_stat.write_stats(stat_out, self._get_title())
+        sur_stat.write_plot(plot_out, self._get_title())
 
         # Generate stats and plots for subscales
         if self._sur_name not in self.has_subscales:
@@ -770,7 +742,7 @@ class CalcRedcapQualtricsStats:
             sur_stat.df_col = sub_cols
 
             # Setup file names, make files
-            sub_title = _get_title() + f", {sub_name}"
+            sub_title = self._get_title() + f", {sub_name}"
             sub_stat_out = os.path.join(
                 self.out_dir, f"stats_{self._sur_name}_{sub_name}.json"
             )
@@ -783,20 +755,31 @@ class CalcRedcapQualtricsStats:
     def visit23_stats_plots(self, day2_csv_path, day3_csv_path):
         """Title."""
 
-        def _get_title() -> str:
-            """Specify dataframe, plot title."""
-            plot_titles = {
-                "STAI_State": "Spielberg State Anxiety Inventory",
-                "PANAS": "Positive and Negative Affect Schedule",
-                "BDI": "Beck Depression Inventory",
-            }
-            return plot_titles[self._sur_name]
-
         stat_out = os.path.join(self.out_dir, f"stats_{self._sur_name}.json")
+        plot_out = os.path.join(
+            self.out_dir, f"plot_boxplot_{self._sur_name}.png"
+        )
         sur_stat = calc_surveys.Visit23Stats(
             day2_csv_path, day3_csv_path, self._sur_name
         )
-        _ = sur_stat.write_stats(stat_out, _get_title())
+        _ = sur_stat.write_stats(stat_out, self._get_title())
+        sur_stat.write_plot(plot_out, self._get_title())
+
+    def _get_title(self) -> str:
+        """Switch survey abbreviation for name."""
+        plot_titles = {
+            "AIM": "Affective Intensity Measure",
+            "ALS": "Affective Lability Scale",
+            "ERQ": "Emotion Regulation Questionnaire",
+            "PSWQ": "Penn State Worry Questionnaire",
+            "RRS": "Ruminative Response Scale",
+            "STAI_Trait": "Spielberg Trait Anxiety Inventory",
+            "TAS": "Toronto Alexithymia Scale",
+            "STAI_State": "Spielberg State Anxiety Inventory",
+            "PANAS": "Positive and Negative Affect Schedule",
+            "BDI": "Beck Depression Inventory",
+        }
+        return plot_titles[self._sur_name]
 
 
 # %%
