@@ -784,10 +784,7 @@ class CalcRedcapQualtricsStats:
 
 # %%
 def survey_scan(proj_dir, survey_list):
-    """Calculate descriptives for survey responses.
-
-    Calculate descriptive statistics and generate plots for
-    rest-rating and stimulus-rating surveys.
+    """Title.
 
     Parameters
     ----------

@@ -110,6 +110,71 @@ class _DescStat:
         )
         return fig
 
+    def calc_long_stats(self, grp_a: str, grp_b: str) -> pd.DataFrame:
+        """Title."""
+
+        def col_update(df: pd.DataFrame, col_name) -> pd.DataFrame:
+            """Title."""
+            df = df.rename(columns={"rating": col_name})
+            df[col_name] = round(df[col_name], 2)
+            return df
+
+        df_mean = self.df.groupby([grp_a, grp_b]).mean()
+        df_std = self.df.groupby([grp_a, grp_b]).std()
+        df_skew = self.df.groupby([grp_a, grp_b]).skew(numeric_only=True)
+        df_kurt = self.df.groupby([grp_a, grp_b]).apply(
+            pd.DataFrame.kurt
+        )  # Throws the FutureWarning
+
+        df_mean = col_update(df_mean, "mean")
+        df_std = col_update(df_std, "std")
+        df_skew = col_update(df_skew, "skew")
+        df_kurt = col_update(df_kurt, "kurt")
+
+        df_mean["std"] = df_std["std"]
+        df_mean["skew"] = df_skew["skew"]
+        df_mean["kurt"] = df_kurt["kurt"]
+        return df_mean
+
+    def draw_long_boxplot(
+        self,
+        x_col: str,
+        x_lab: str,
+        y_col: str,
+        y_lab: str,
+        hue_order: list,
+        hue_col: str,
+    ) -> plt.Figure:
+        """Title."""
+        for _col in [x_col, y_col, hue_col]:
+            if _col not in self.df.columns:
+                raise KeyError(f"Missing expected column in df : {_col}")
+        if not is_numeric_dtype(self.df[y_col]):
+            raise TypeError("df[y_col] should be numeric type")
+        if not is_string_dtype(self.df[x_col]) or not is_string_dtype(
+            self.df[hue_col]
+        ):
+            raise TypeError("df[x_col] and df[hue_col] should be string type")
+
+        #
+        df_plot = self.df.copy()
+        df_plot[y_col] = df_plot[y_col].astype(float)
+        fig, ax = plt.subplots()
+        plt.figure().set_figwidth(10)
+        sns.boxplot(
+            x=x_col,
+            y=y_col,
+            hue=hue_col,
+            data=df_plot,
+            hue_order=hue_order,
+        )
+        plt.legend(bbox_to_anchor=(1.02, 1), loc="upper left", borderaxespad=0)
+
+        plt.ylabel(y_lab)
+        plt.xlabel(x_lab)
+        plt.xticks(rotation=45, ha="right")
+        return fig
+
 
 # %%
 class Visit1Stats(_DescStat):
@@ -571,43 +636,36 @@ def descript_rest_ratings(proj_dir):
     )
     df_long["emotion"] = df_long["emotion"].str.title()
     df_long["rating"] = df_long["rating"].astype("Int64")
+    for str_col in ["emotion", "visit", "task"]:
+        df_long[str_col] = df_long[str_col].astype(pd.StringDtype())
     df_long = df_long.dropna(axis=0)
-    emo_title = [x.title() for x in emo_list]
 
     # Make dataframe of descriptives for reporting, write out
-    df_mean = df_long.groupby(["task", "emotion"]).mean()
-    df_mean = df_mean.rename(columns={"rating": "mean"})
-    df_mean["mean"] = round(df_mean["mean"], 2)
-
-    df_std = df_long.groupby(["task", "emotion"]).std()
-    df_std = df_std.rename(columns={"rating": "std"})
-    df_std["std"] = round(df_std["std"], 2)
-    df_mean["std"] = df_std["std"]
-
+    stat_obj = _DescStat(df_long)
+    df_stats = stat_obj.calc_long_stats("task", "emotion")
     out_dir = os.path.join(proj_dir, "analyses/surveys_stats_descriptive")
     out_csv = os.path.join(out_dir, "stats_rest-ratings.csv")
-    df_mean.to_csv(out_csv)
+    df_stats.to_csv(out_csv)
     print(f"\tWrote csv : {out_csv}")
 
     # Draw plots
     out_path = os.path.join(
         out_dir,
-        "plot_violin_rest-ratings.png",
+        "plot_boxplot_rest-ratings.png",
     )
-    _split_violin_plots(
-        emo_title,
-        df=df_long,
-        sub_col="emotion",
+    fig = stat_obj.draw_long_boxplot(
         x_col="emotion",
-        x_lab="Emotion",
+        x_lab="Emotion Category",
         y_col="rating",
         y_lab="Frequency",
-        hue_col="task",
         hue_order=["movies", "scenarios"],
-        title="Emotion Frequence During Rest",
-        out_path=out_path,
+        hue_col="task",
     )
-    return df_mean
+    plt.title("Emotion Frequency During Rest")
+    plt.savefig(out_path, bbox_inches="tight")
+    plt.close(fig)
+    print(f"\tDrew boxplot : {out_path}")
+    return df_stats
 
 
 class DescriptStimRatings:
