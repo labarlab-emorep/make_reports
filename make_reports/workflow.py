@@ -812,8 +812,7 @@ def survey_scan(proj_dir, survey_list):
         stim_stats = calc_surveys.DescriptStimRatings(proj_dir)
         for stim_type in ["Videos", "Scenarios"]:
             _ = stim_stats.endorsement(stim_type)
-            for prompt_name in ["Arousal", "Valence"]:
-                _ = stim_stats.arousal_valence(stim_type, prompt_name)
+            _ = stim_stats.arousal_valence(stim_type)
 
     if "task" in survey_list:
         task_stats = calc_surveys.DescriptTask(proj_dir)
