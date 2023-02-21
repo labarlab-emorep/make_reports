@@ -726,11 +726,11 @@ class CalcRedcapQualtricsStats:
         # Generate stats and plots
         stat_out = os.path.join(self.out_dir, f"stats_{self._sur_name}.json")
         plot_out = os.path.join(
-            self.out_dir, f"plot_boxplot_{self._sur_name}.png"
+            self.out_dir, f"plot_boxplot-single_{self._sur_name}.png"
         )
         sur_stat = calc_surveys.Visit1Stats(csv_path, self._sur_name)
         _ = sur_stat.write_stats(stat_out, self._get_title())
-        sur_stat.write_plot(plot_out, self._get_title())
+        sur_stat.draw_single_boxplot(self._get_title(), plot_out)
 
         # Generate stats and plots for subscales
         if self._sur_name not in self.has_subscales:
@@ -739,7 +739,7 @@ class CalcRedcapQualtricsStats:
         subscale_dict = _get_subscale()
         for sub_name, sub_cols in subscale_dict.items():
             sur_stat.df = df_work[sub_cols].copy()
-            sur_stat.df_col = sub_cols
+            sur_stat.col_data = sub_cols
 
             # Setup file names, make files
             sub_title = self._get_title() + f", {sub_name}"
@@ -747,23 +747,30 @@ class CalcRedcapQualtricsStats:
                 self.out_dir, f"stats_{self._sur_name}_{sub_name}.json"
             )
             sub_plot_out = os.path.join(
-                self.out_dir, f"plot_violin_{self._sur_name}_{sub_name}.png"
+                self.out_dir,
+                f"plot_boxplot-single_{self._sur_name}_{sub_name}.png",
             )
             _ = sur_stat.write_stats(sub_stat_out, sub_title)
-            sur_stat.write_plot(sub_plot_out, sub_title)
+            sur_stat.draw_single_boxplot(sub_title, sub_plot_out)
 
     def visit23_stats_plots(self, day2_csv_path, day3_csv_path):
         """Title."""
 
         stat_out = os.path.join(self.out_dir, f"stats_{self._sur_name}.json")
         plot_out = os.path.join(
-            self.out_dir, f"plot_boxplot_{self._sur_name}.png"
+            self.out_dir, f"plot_boxplot-double_{self._sur_name}.png"
         )
         sur_stat = calc_surveys.Visit23Stats(
             day2_csv_path, day3_csv_path, self._sur_name
         )
         _ = sur_stat.write_stats(stat_out, self._get_title())
-        sur_stat.write_plot(plot_out, self._get_title())
+        sur_stat.draw_double_boxplot(
+            fac_col="visit",
+            fac_a="Visit 2",
+            fac_b="Visit 3",
+            main_title=self._get_title(),
+            out_path=plot_out,
+        )
 
     def _get_title(self) -> str:
         """Switch survey abbreviation for name."""
@@ -783,7 +790,7 @@ class CalcRedcapQualtricsStats:
 
 
 # %%
-def survey_scan(proj_dir, survey_list):
+def calc_task_stats(proj_dir, survey_list):
     """Title.
 
     Parameters
@@ -806,16 +813,32 @@ def survey_scan(proj_dir, survey_list):
 
     if "rest" in survey_list:
         print("\nWorking on rest-ratings data")
-        _ = calc_surveys.descript_rest_ratings(proj_dir)
+        rest_stats = calc_surveys.RestRatings(proj_dir)
+        _ = rest_stats.write_stats()
+        out_plot = os.path.join(
+            proj_dir,
+            "analyses/surveys_stats_descriptive",
+            "plot_boxplot-long_rest-ratings.png",
+        )
+        rest_stats.draw_long_boxplot(
+            x_col="emotion",
+            x_lab="Emotion Category",
+            y_col="rating",
+            y_lab="Frequency",
+            hue_order=["Scenarios", "Videos"],
+            hue_col="task",
+            main_title="In-Scan Resting Emotion Frequency",
+            out_path=out_plot,
+        )
 
     if "stim" in survey_list:
-        stim_stats = calc_surveys.DescriptStimRatings(proj_dir)
+        stim_stats = calc_surveys.StimRatings(proj_dir)
         for stim_type in ["Videos", "Scenarios"]:
             _ = stim_stats.endorsement(stim_type)
             _ = stim_stats.arousal_valence(stim_type)
 
     if "task" in survey_list:
-        task_stats = calc_surveys.DescriptTask(proj_dir)
+        task_stats = calc_surveys.EmorepTask(proj_dir)
         _ = task_stats.desc_intensity()
         for task in ["Videos", "Scenarios"]:
             _ = task_stats.desc_emotion(task)

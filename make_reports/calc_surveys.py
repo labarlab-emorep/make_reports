@@ -337,16 +337,6 @@ class Visit1Stats(_DescStat):
         print(f"\t\tSaved descriptive stats : {out_path}")
         return report_dict
 
-    def write_plot(self, out_path, title):
-        """Make boxplot of survey responses.
-
-        Parameters
-        ----------
-
-        """
-        # Save and return
-        self.draw_single_boxplot(main_title=title, out_path=out_path)
-
 
 # %%
 class Visit23Stats(_DescStat):
@@ -406,116 +396,83 @@ class Visit23Stats(_DescStat):
         print(f"\t\tSaved descriptive stats : {out_path}")
         return report_dict
 
-    def write_plot(self, out_path, title):
-        """Title.
-
-        Parameters
-        ----------
-
-        """
-        # Save and return
-        self.draw_double_boxplot(
-            "visit", "Visit 2", "Visit 3", main_title=title, out_path=out_path
-        )
-
 
 # %%
-def descript_rest_ratings(proj_dir):
-    """Generate descriptive stats for resting state ratings.
+class RestRatings(_DescStat):
+    """Title."""
 
-    Calculate average responses for each emotion by day, then
-    produce violin plots.
+    def __init__(self, proj_dir):
+        """Title."""
+        self._proj_dir = proj_dir
+        df_long = self._get_data()
+        super().__init__(df_long)
 
-    Stats are written to:
-        <proj_dir>/analyses/surveys_stats_descriptive/stats_rest-ratings.csv
+    def _get_data(self):
+        """Title."""
+        # Identify rest-ratings dataframes
+        day2_path = os.path.join(
+            self._proj_dir,
+            "data_survey/visit_day2/data_clean",
+            "df_rest-ratings.csv",
+        )
+        day3_path = os.path.join(
+            self._proj_dir,
+            "data_survey/visit_day3/data_clean",
+            "df_rest-ratings.csv",
+        )
+        for day in [day2_path, day3_path]:
+            if not os.path.exists(day):
+                raise FileNotFoundError(f"Expected to find file : {day}")
 
-    Plots are written to:
-        <proj_dir>/analyses/surveys_stats_descriptive/plot_violin_rest-ratings_*.png
+        # Make master dataframe
+        df_day2 = pd.read_csv(day2_path, na_values=88)
+        df_day3 = pd.read_csv(day3_path, na_values=88)
+        df_rest_all = pd.concat([df_day2, df_day3], ignore_index=True)
+        df_rest_all = df_rest_all.sort_values(
+            by=["study_id", "visit", "resp_type"]
+        ).reset_index(drop=True)
+        df_rest_all["task"] = df_rest_all["task"].str.title()
+        df_rest_all["task"] = df_rest_all["task"].replace("Movies", "Videos")
+        del df_day2, df_day3
 
-    Parameters
-    ----------
-    proj_dir : path
-        Location of project's experiment directory
+        # Subset df for integer responses
+        df_rest_int = df_rest_all[
+            df_rest_all["resp_type"] == "resp_int"
+        ].copy()
+        df_rest_int = df_rest_int.drop(["datetime", "resp_type"], axis=1)
+        excl_list = ["study_id", "visit", "task"]
+        emo_list = [x for x in df_rest_int.columns if x not in excl_list]
+        df_rest_int[emo_list] = df_rest_int[emo_list].astype("Int64")
 
-    Returns
-    -------
-    pd.DataFrame
-        Descriptive stats organized by day and emotion
+        # Convert to long form, organize columns
+        df_long = pd.melt(
+            df_rest_int,
+            id_vars=["study_id", "visit", "task"],
+            value_vars=emo_list,
+            var_name="emotion",
+            value_name="rating",
+        )
+        df_long["emotion"] = df_long["emotion"].str.title()
+        df_long["rating"] = df_long["rating"].astype("Int64")
+        for str_col in ["emotion", "visit", "task"]:
+            df_long[str_col] = df_long[str_col].astype(pd.StringDtype())
+        df_long = df_long.dropna(axis=0)
+        return df_long
 
-    Raises
-    ------
-    FileNotFoundError
-        Missing cleaned rest-rating dataframe
-
-    """
-    # Identify rest-ratings dataframes
-    day2_path = os.path.join(
-        proj_dir, "data_survey/visit_day2/data_clean", "df_rest-ratings.csv"
-    )
-    day3_path = os.path.join(
-        proj_dir, "data_survey/visit_day3/data_clean", "df_rest-ratings.csv"
-    )
-    for day in [day2_path, day3_path]:
-        if not os.path.exists(day):
-            raise FileNotFoundError(f"Expected to find file : {day}")
-
-    # Make master dataframe
-    df_day2 = pd.read_csv(day2_path, na_values=88)
-    df_day3 = pd.read_csv(day3_path, na_values=88)
-    df_rest_all = pd.concat([df_day2, df_day3], ignore_index=True)
-    df_rest_all = df_rest_all.sort_values(
-        by=["study_id", "visit", "resp_type"]
-    ).reset_index(drop=True)
-    del df_day2, df_day3
-
-    # Get integer responses
-    df_rest_int = df_rest_all[df_rest_all["resp_type"] == "resp_int"].copy()
-    df_rest_int = df_rest_int.drop(["datetime", "resp_type"], axis=1)
-    excl_list = ["study_id", "visit", "task"]
-    emo_list = [x for x in df_rest_int.columns if x not in excl_list]
-    df_rest_int[emo_list] = df_rest_int[emo_list].astype("Int64")
-
-    # Convert to long form, organize columns
-    df_long = pd.melt(
-        df_rest_int,
-        id_vars=["study_id", "visit", "task"],
-        value_vars=emo_list,
-        var_name="emotion",
-        value_name="rating",
-    )
-    df_long["emotion"] = df_long["emotion"].str.title()
-    df_long["rating"] = df_long["rating"].astype("Int64")
-    for str_col in ["emotion", "visit", "task"]:
-        df_long[str_col] = df_long[str_col].astype(pd.StringDtype())
-    df_long = df_long.dropna(axis=0)
-
-    # Make dataframe of descriptives for reporting, write out
-    stat_obj = _DescStat(df_long)
-    df_stats = stat_obj.calc_long_stats("task", "emotion")
-    out_dir = os.path.join(proj_dir, "analyses/surveys_stats_descriptive")
-    out_csv = os.path.join(out_dir, "stats_rest-ratings.csv")
-    df_stats.to_csv(out_csv)
-    print(f"\tWrote csv : {out_csv}")
-
-    # Draw plots
-    out_plot = os.path.join(
-        out_dir,
-        "plot_boxplot_rest-ratings.png",
-    )
-    stat_obj.draw_long_boxplot(
-        x_col="emotion",
-        x_lab="Emotion Category",
-        y_col="rating",
-        y_lab="Frequency",
-        hue_order=["movies", "scenarios"],
-        hue_col="task",
-        main_title="In-Scan Resting Emotion Frequency",
-        out_path=out_plot,
-    )
-    return df_stats
+    def write_stats(self):
+        """Title."""
+        df_stats = self.calc_long_stats("task", "emotion")
+        out_stats = os.path.join(
+            self._proj_dir,
+            "analyses/surveys_stats_descriptive",
+            "stats_rest-ratings.csv",
+        )
+        df_stats.to_csv(out_stats)
+        print(f"\tWrote csv : {out_stats}")
+        return df_stats
 
 
-class DescriptStimRatings(_DescStat):
+class StimRatings(_DescStat):
     """Generate descriptives for stimulus ratings survey.
 
     Calculate descriptive statistics and draw plots for
@@ -702,7 +659,7 @@ class DescriptStimRatings(_DescStat):
         #
         out_plot = os.path.join(
             self.out_dir,
-            f"plot_boxplot_stim-ratings_{stim_type.lower()}.png",
+            f"plot_boxplot-long_stim-ratings_{stim_type.lower()}.png",
         )
         self.draw_long_boxplot(
             x_col="emotion",
@@ -718,7 +675,7 @@ class DescriptStimRatings(_DescStat):
 
 
 # %%
-class DescriptTask(_DescStat):
+class EmorepTask(_DescStat):
     """Generate descriptive stats and plots for EmoRep task data.
 
     Use all available BIDS events files to generate dataframes of
@@ -893,14 +850,14 @@ class DescriptTask(_DescStat):
         # Make violin plots
         out_plot = os.path.join(
             self.out_dir,
-            "plot_boxplot_task-intensity.png",
+            "plot_boxplot-long_task-intensity.png",
         )
         self.draw_long_boxplot(
             x_col="emotion",
             x_lab="Emotion",
             y_col="response",
             y_lab="Intensity",
-            hue_order=["Videos", "Scenarios"],
+            hue_order=["Scenarios", "Videos"],
             hue_col="task",
             main_title="In-Scan Stimulus Ratings",
             out_path=out_plot,

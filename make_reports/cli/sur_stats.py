@@ -122,7 +122,7 @@ def main():
         sur_stat.match_survey_visits()
 
     if sur_scanner:
-        workflow.survey_scan(proj_dir, sur_scanner)
+        workflow.calc_task_stats(proj_dir, sur_scanner)
 
 
 if __name__ == "__main__":
