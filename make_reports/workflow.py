@@ -817,7 +817,8 @@ def survey_scan(proj_dir, survey_list):
     if "task" in survey_list:
         task_stats = calc_surveys.DescriptTask(proj_dir)
         _ = task_stats.desc_intensity()
-        _ = task_stats.desc_emotion()
+        for task in ["Videos", "Scenarios"]:
+            _ = task_stats.desc_emotion(task)
 
 
 # %%

@@ -56,7 +56,7 @@ class _DescStat:
         out_dict[fac_b] = self.calc_total_stats(df=df_calc[mask_b])
         return out_dict
 
-    def draw_single_boxplot(self) -> plt.Figure:
+    def draw_single_boxplot(self, main_title: str, out_path: str):
         """Title."""
         #
         stat_dict = self.calc_total_stats()
@@ -76,11 +76,19 @@ class _DescStat:
             f"mean={stat_dict['mean']}\nSD={stat_dict['SD']}",
             horizontalalignment="left",
         )
-        return fig
+        plt.title(main_title)
+        plt.savefig(out_path)
+        plt.close()
+        print(f"\t\tDrew boxplot : {out_path}")
 
     def draw_double_boxplot(
-        self, fac_col: str, fac_a: str, fac_b: str
-    ) -> plt.Figure:
+        self,
+        fac_col: str,
+        fac_a: str,
+        fac_b: str,
+        main_title: str,
+        out_path: str,
+    ):
         """Title."""
         stat_dict = self.calc_factor_stats(fac_col, fac_a, fac_b)
         df_plot = self.df.copy()
@@ -108,17 +116,13 @@ class _DescStat:
             f"mean={stat_dict[fac_b]['mean']}\nSD={stat_dict[fac_b]['SD']}",
             horizontalalignment="left",
         )
-        return fig
+        plt.title(main_title)
+        plt.savefig(out_path)
+        print(f"\t\tDrew boxplot : {out_path}")
+        plt.close()
 
     def calc_long_stats(self, grp_a: str, grp_b: str) -> pd.DataFrame:
         """Title."""
-
-        # def col_update(df: pd.DataFrame, col_name) -> pd.DataFrame:
-        #     """Title."""
-        #     df = df.rename(columns={"rating": col_name})
-        #     df[col_name] = round(df[col_name], 2)
-        #     return df
-
         df_mean = self.df.groupby([grp_a, grp_b]).mean()
         df_mean.columns = [*df_mean.columns[:-1], "mean"]
         df_std = self.df.groupby([grp_a, grp_b]).std()
@@ -126,11 +130,6 @@ class _DescStat:
         df_kurt = self.df.groupby([grp_a, grp_b]).apply(
             pd.DataFrame.kurt
         )  # Throws the FutureWarning
-
-        # df_mean = col_update(df_mean, "mean")
-        # df_std = col_update(df_std, "std")
-        # df_skew = col_update(df_skew, "skew")
-        # df_kurt = col_update(df_kurt, "kurt")
 
         df_mean["std"] = df_std.iloc[:, -1:]
         df_mean["skew"] = df_skew.iloc[:, -1:]
@@ -146,7 +145,9 @@ class _DescStat:
         y_lab: str,
         hue_order: list,
         hue_col: str,
-    ) -> plt.Figure:
+        main_title: str,
+        out_path: str,
+    ):
         """Title."""
         for _col in [x_col, y_col, hue_col]:
             if _col not in self.df.columns:
@@ -175,7 +176,10 @@ class _DescStat:
         plt.ylabel(y_lab)
         plt.xlabel(x_lab)
         plt.xticks(rotation=45, ha="right")
-        return fig
+        plt.title(main_title)
+        plt.savefig(out_path, bbox_inches="tight")
+        print(f"\tDrew boxplot : {out_path}")
+        plt.close()
 
     def confusion_matrix(
         self,
@@ -225,9 +229,11 @@ class _DescStat:
     def confusion_heatmap(
         self,
         df_conf: pd.DataFrame,
-        x_lab="Stimulus Category",
-        y_lab="Participant Endorsement",
-    ) -> plt.Figure:
+        main_title: str,
+        out_path: str,
+        x_lab: str = "Stimulus Category",
+        y_lab: str = "Participant Endorsement",
+    ):
         """Draw a heatmap from a confusion matrix.
 
         Parameters
@@ -238,11 +244,10 @@ class _DescStat:
         # Draw and write
         ax = sns.heatmap(df_conf)
         ax.set(xlabel=x_lab, ylabel=y_lab)
-        return ax
-        # ax.set_title(title)
-        # plt.savefig(out_path, bbox_inches="tight")
-        # plt.close()
-        # print(f"\t\tDrew heat-prob plot : {out_path}")
+        ax.set_title(main_title)
+        plt.savefig(out_path, bbox_inches="tight")
+        print(f"\t\tDrew heat-prob plot : {out_path}")
+        plt.close()
 
 
 # %%
@@ -340,11 +345,7 @@ class Visit1Stats(_DescStat):
 
         """
         # Save and return
-        fig = self.draw_single_boxplot()
-        plt.title(title)
-        plt.savefig(out_path)
-        plt.close(fig)
-        print(f"\t\tDrew boxplot : {out_path}")
+        self.draw_single_boxplot(main_title=title, out_path=out_path)
 
 
 # %%
@@ -413,230 +414,9 @@ class Visit23Stats(_DescStat):
 
         """
         # Save and return
-        fig = self.draw_double_boxplot("visit", "Visit 2", "Visit 3")
-        plt.title(title)
-        plt.savefig(out_path)
-        plt.close(fig)
-        print(f"\t\tDrew boxplot : {out_path}")
-
-
-# %%
-# def _split_violin_plots(
-#     emo_all,
-#     df,
-#     sub_col,
-#     x_col,
-#     x_lab,
-#     y_col,
-#     y_lab,
-#     hue_col,
-#     hue_order,
-#     title,
-#     out_path,
-# ):
-#     """Make violin plots for groups of emotions.
-
-#     Split emo_all into 4 groups and draw violin plots for each. The
-#     file name in out_path will have an appended suffix for the plot
-#     number (file_name.png -> file_name_1.png).
-
-#     Parameters
-#     ----------
-#     emo_all : list
-#         All emotion categories
-#     df : pd.DataFrame
-#         Long-formatted dataframe
-#     sub_col : str
-#         df column name for identifying subjects
-#     x_col : str
-#         df column name to be used as plot x-axis
-#     x_lab : str
-#         Plot x-axis label
-#     y_col : str
-#         df column name to be used as plot y-axis
-#     y_lab : str
-#         Plot y-axis label
-#     hue_col : str
-#         df column name to be used as group factor
-#     hue_order : str
-#         Group legend order
-#     title : str
-#         Plot title
-#     out_path : path
-#         Output location and name of file
-
-#     Raises
-#     ------
-#     KeyError
-#         Missing required keys in df
-#     TypeError
-#         df columns improper type
-#     ValueError
-#         Incorrect number of emotions
-
-#     """
-#     # Validate
-#     for _col in [sub_col, x_col, y_col, hue_col]:
-#         if _col not in df.columns:
-#             raise KeyError(f"Missing expected column in df : {_col}")
-#     if len(emo_all) != 15:
-#         raise ValueError(
-#             f"Expected emo_all to have len == 15, found : {len(emo_all)}"
-#         )
-#     if not is_numeric_dtype(df[y_col]):
-#         raise TypeError("df[y_col] should be numeric type")
-#     if not is_string_dtype(df[x_col]) or not is_string_dtype(df[hue_col]):
-#         raise TypeError("df[x_col] and df[hue_col] should be string type")
-
-#     # Divide emotion list
-#     emo_a = emo_all[:4]
-#     emo_b = emo_all[4:8]
-#     emo_c = emo_all[8:12]
-#     emo_d = emo_all[12:]
-
-#     # Make each subplot
-#     for cnt, emo in enumerate([emo_a, emo_b, emo_c, emo_d]):
-#         df_plot = df[df[sub_col].isin(emo)].copy()
-#         df_plot[y_col] = df_plot[y_col].astype(float)
-
-#         # Draw violin plots
-#         fix, ax = plt.subplots()
-#         sns.violinplot(
-#             x=x_col,
-#             y=y_col,
-#             hue=hue_col,
-#             data=df_plot,
-#             hue_order=hue_order,
-#         )
-#         plt.legend(bbox_to_anchor=(1.02, 1), loc="upper left", borderaxespad=0)
-#         plt.title(title)
-#         plt.ylabel(y_lab)
-#         plt.xlabel(x_lab)
-#         plt.xticks(rotation=45, ha="right")
-
-#         # Save and close
-#         out_plot = out_path.replace(".png", f"_{cnt+1}.png")
-#         plt.savefig(out_plot, bbox_inches="tight")
-#         plt.close()
-#         print(f"\tDrew violin plot : {out_plot}")
-
-
-# %%
-# def _confusion_matrix(
-#     df,
-#     emo_list,
-#     subj_col,
-#     num_exp,
-#     out_path,
-#     emo_col="emotion",
-#     resp_col="response",
-# ):
-#     """Generate a confusion matrix of emotion endorsements.
-
-#     Determine how likely (proportion) each emotion is endorsed
-#     as itself and others.
-
-#     Parameters
-#     ----------
-#     df : pd.DataFrame
-#         Long-formatted dataframe
-#     emo_list : list
-#         All emotion categories
-#     subj_col : str
-#         df column name for identifying subjects
-#     num_exp : int
-#         Number of expected emotion endorsements from each subejct
-#     out_path : path
-#         Output location and file name
-#     emo_col : str, optional
-#         df column name for identifying emotion (stimulus)
-#     resp_col : str, optional
-#         df column name for identifying participant endorsements
-
-#     Returns
-#     -------
-#     pd.DataFrame
-#         Confusion matrix
-
-#     Raises
-#     ------
-#     KeyError
-#         Missing columns in df
-#     TypeError
-#         df columns wrong type
-#         num_exp wrong type
-#     ValueError
-#         Unexpected number of emotions
-
-#     """
-#     # Validate
-#     for _col in [subj_col, emo_col, resp_col]:
-#         if _col not in df.columns:
-#             raise KeyError(f"Missing expected column in df : {_col}")
-#     if len(emo_list) != 15:
-#         raise ValueError(
-#             f"Expected emo_list to have len == 15, found : {len(emo_list)}"
-#         )
-#     if not is_string_dtype(df[emo_col]) or not is_string_dtype(df[resp_col]):
-#         raise TypeError("df[y_col] and df[hue_col] should be string type")
-#     if not isinstance(num_exp, int):
-#         raise TypeError("Expected type int for num_exp")
-
-#     # Set denominator for proportion calc
-#     max_total = num_exp * len(df[subj_col].unique())
-
-#     # Calc proportion each emotion is endorsed as every emotion
-#     count_dict = {}
-#     for emo in emo_list:
-#         count_dict[emo] = {}
-#         df_emo = df[df[emo_col] == emo]
-#         for sub_emo in emo_list:
-#             count_emo = len(df_emo[df_emo[resp_col].str.contains(sub_emo)])
-#             count_dict[emo][sub_emo] = round(count_emo / max_total, 2)
-#     del df_emo
-
-#     # Generate dataframe and transponse for intuitive stimulus-response axes
-#     df_corr = pd.DataFrame.from_dict(
-#         {i: count_dict[i] for i in count_dict.keys()},
-#         orient="index",
-#     )
-#     df_trans = df_corr.transpose()
-#     df_trans.to_csv(out_path, index=False)
-#     print(f"\t\tWrote dataset : {out_path}")
-#     return df_trans
-
-
-# %%
-# def _confusion_heatmap(
-#     df_conf,
-#     title,
-#     out_path,
-#     x_lab="Stimulus Category",
-#     y_lab="Participant Endorsement",
-# ):
-#     """Draw a heatmap from a confusion matrix.
-
-#     Parameters
-#     ----------
-#     df_conf : pd.DataFrame, from _confusion_matrix
-#         Confusion matrix
-#     title : str
-#         Plot title
-#     out_path : path
-#         Output location and name
-#     x_lab : str, optional
-#         Plot label for x-axis
-#     y_lab : str, optional
-#         Plot label for y-axis
-
-#     """
-#     # Draw and write
-#     ax = sns.heatmap(df_conf)
-#     ax.set(xlabel=x_lab, ylabel=y_lab)
-#     ax.set_title(title)
-#     plt.savefig(out_path, bbox_inches="tight")
-#     plt.close()
-#     print(f"\t\tDrew heat-prob plot : {out_path}")
+        self.draw_double_boxplot(
+            "visit", "Visit 2", "Visit 3", main_title=title, out_path=out_path
+        )
 
 
 # %%
@@ -718,22 +498,20 @@ def descript_rest_ratings(proj_dir):
     print(f"\tWrote csv : {out_csv}")
 
     # Draw plots
-    out_path = os.path.join(
+    out_plot = os.path.join(
         out_dir,
         "plot_boxplot_rest-ratings.png",
     )
-    fig = stat_obj.draw_long_boxplot(
+    stat_obj.draw_long_boxplot(
         x_col="emotion",
         x_lab="Emotion Category",
         y_col="rating",
         y_lab="Frequency",
         hue_order=["movies", "scenarios"],
         hue_col="task",
+        main_title="In-Scan Resting Emotion Frequency",
+        out_path=out_plot,
     )
-    plt.title("Emotion Frequency During Rest")
-    plt.savefig(out_path, bbox_inches="tight")
-    plt.close(fig)
-    print(f"\tDrew boxplot : {out_path}")
     return df_stats
 
 
@@ -869,11 +647,11 @@ class DescriptStimRatings(_DescStat):
             self.out_dir,
             f"plot_heatmap_stim-ratings_endorsement_{stim_type.lower()}.png",
         )
-        ax = self.confusion_heatmap(df_conf)
-        ax.set_title(f"Post-Scan {stim_type[:-1]} Endorsement Proportion")
-        plt.savefig(out_plot, bbox_inches="tight")
-        plt.close()
-        print(f"\t\tDrew heat-prob plot : {out_plot}")
+        self.confusion_heatmap(
+            df_conf,
+            main_title=f"Post-Scan {stim_type[:-1]} Endorsement Proportion",
+            out_path=out_plot,
+        )
         return df_conf
 
     def arousal_valence(self, stim_type):
@@ -922,55 +700,25 @@ class DescriptStimRatings(_DescStat):
         print(f"\t\tWrote dataset : {out_path}")
 
         #
-        fig = self.draw_long_boxplot(
+        out_plot = os.path.join(
+            self.out_dir,
+            f"plot_boxplot_stim-ratings_{stim_type.lower()}.png",
+        )
+        self.draw_long_boxplot(
             x_col="emotion",
             x_lab="Emotion Category",
             y_col="response",
             y_lab="Rating",
             hue_order=["Arousal", "Valence"],
             hue_col="prompt",
+            main_title=f"Post-Scan {stim_type[:-1]} Ratings",
+            out_path=out_plot,
         )
-
-        # out_path = os.path.join(
-        #     out_dir,
-        #     "plot_boxplot_rest-ratings.png",
-        # )
-        # fig = stat_obj.draw_long_boxplot(
-        #     x_col="emotion",
-        #     x_lab="Emotion Category",
-        #     y_col="rating",
-        #     y_lab="Frequency",
-        #     hue_order=["movies", "scenarios"],
-        #     hue_col="task",
-        # )
-        # plt.title("Emotion Frequency During Rest")
-        # plt.savefig(out_path, bbox_inches="tight")
-        # plt.close(fig)
-
-        # # Draw violin plot
-        # df["response"] = df["response"].astype("float")
-        # fig, ax = plt.subplots()
-        # sns.violinplot(x="emotion", y="response", data=df)
-        # plt.title(f"{stim_type[:-1]} {prompt_name} Ratings")
-        # plt.ylabel(f"{prompt_name} Rating")
-        # plt.xlabel("Emotion")
-        # plt.xticks(rotation=45, horizontalalignment="right")
-
-        # # Write violin plot
-        # out_path = os.path.join(
-        #     self.out_dir,
-        #     "plot_violin_stim-ratings_"
-        #     + f"{prompt_name.lower()}_{stim_type.lower()}.png",
-        # )
-        # plt.subplots_adjust(bottom=0.25, left=0.1)
-        # plt.savefig(out_path)
-        # plt.close(fig)
-        # print(f"\t\tDrew violin plot : {out_path}")
         return df_stats
 
 
 # %%
-class DescriptTask:
+class DescriptTask(_DescStat):
     """Generate descriptive stats and plots for EmoRep task data.
 
     Use all available BIDS events files to generate dataframes of
@@ -982,9 +730,9 @@ class DescriptTask:
 
     Attributes
     ----------
-    df_intensity : pd.DataFrame
+    df_int : pd.DataFrame
         Long-formatted dataframe of participant intensity selections
-    df_emotion : pd.DataFrame
+    df_emo : pd.DataFrame
         Long-formatted dataframe of participant emotion selections
     out_dir : path
         Location of output directory
@@ -1050,9 +798,9 @@ class DescriptTask:
 
         Attributes
         ----------
-        df_intensity : pd.DataFrame
+        df_int : pd.DataFrame
             Long-formatted dataframe of participant intensity selections
-        df_emotion : pd.DataFrame
+        df_emo : pd.DataFrame
             Long-formatted dataframe of participant emotion selections
 
         """
@@ -1100,22 +848,11 @@ class DescriptTask:
             ["onset", "duration", "accuracy", "stim_info"], axis=1
         )
         df_resp["emotion"] = df_resp["emotion"].str.title()
+        df_resp["task"] = df_resp["task"].str.title()
+        df_resp["task"] = df_resp["task"].replace("Movies", "Videos")
         df_resp["run"] = df_resp["run"].astype("Int64")
-
-        # Generate and clean dataframe for intensity selection
-        df_intensity = df_resp.loc[df_resp["trial_type"] == "intensity"].copy()
-        df_intensity["response"] = df_intensity["response"].replace(
-            "NONE", np.nan
-        )
-        df_intensity = df_intensity.reset_index(drop=True)
-        df_intensity["response"] = df_intensity["response"].astype("Int64")
-        self.df_intensity = df_intensity
-
-        # Generate and clean dataframe for emotion selection
-        df_emotion = df_resp.loc[df_resp["trial_type"] == "emotion"].copy()
-        df_emotion["response"] = df_emotion["response"].str.title()
-        df_emotion = df_emotion.reset_index(drop=True)
-        self.df_emotion = df_emotion
+        super().__init__(df_resp)
+        self.df_all = df_resp
 
     def desc_intensity(self):
         """Generate descriptive stats and plots for intensity selection.
@@ -1132,57 +869,45 @@ class DescriptTask:
             Descriptive stats of task, emotion
 
         """
-        # Populate a dataframe of descriptive stats for each task and emotion
-        emo_all = self.df_intensity["emotion"].unique().tolist()
-        emo_all.sort()
-        df_avg = pd.DataFrame(columns=["emotion", "mean", "std", "task"])
-        for task in self._task_list:
-            response_dict = {}
-            for emo in emo_all:
-                df = self.df_intensity[
-                    (self.df_intensity["emotion"] == emo)
-                    & (self.df_intensity["task"] == task)
-                ]
-                response_dict[emo] = {
-                    "mean": round(df.response.mean(), 2),
-                    "std": round(df.response.std(), 2),
-                    "skew": round(df.response.skew(), 2),
-                    "kurt": round(df.response.kurt(), 2),
-                }
-            df_tmp = pd.DataFrame.from_dict(response_dict).transpose()
-            df_tmp.index = df_tmp.index.set_names(["emotion"])
-            df_tmp = df_tmp.reset_index()
-            df_tmp["task"] = task
-            df_avg = pd.concat([df_avg, df_tmp], ignore_index=True)
+        # Generate and clean dataframe for intensity selection
+        df_int = self.df_all.loc[
+            self.df_all["trial_type"] == "intensity"
+        ].copy()
+        df_int["response"] = df_int["response"].replace("NONE", np.nan)
+        df_int = df_int.reset_index(drop=True)
+        df_int = df_int.drop(
+            ["response_time", "run", "trial_type", "sess"], axis=1
+        )
+        df_int["task"] = df_int["task"].str.title()
+        df_int["response"] = df_int["response"].astype("Int64")
+        for str_col in ["emotion", "task"]:
+            df_int[str_col] = df_int[str_col].astype(pd.StringDtype())
 
-        # Organize and save dataframe
-        col_task = df_avg.pop("task")
-        df_avg.insert(0, "task", col_task)
+        #
+        self.df = df_int
+        df_stats = self.calc_long_stats(grp_a="task", grp_b="emotion")
         out_csv = os.path.join(self.out_dir, "stats_task-intensity.csv")
-        df_avg.to_csv(out_csv, index=False)
+        df_stats.to_csv(out_csv)
         print(f"\tWrote csv : {out_csv}")
 
         # Make violin plots
-        out_path = os.path.join(
+        out_plot = os.path.join(
             self.out_dir,
-            "plot_violin_task-intensity.png",
+            "plot_boxplot_task-intensity.png",
         )
-        _split_violin_plots(
-            emo_all,
-            df=self.df_intensity,
-            sub_col="emotion",
+        self.draw_long_boxplot(
             x_col="emotion",
             x_lab="Emotion",
             y_col="response",
-            y_lab="Intensity Rating",
+            y_lab="Intensity",
+            hue_order=["Videos", "Scenarios"],
             hue_col="task",
-            hue_order=["movies", "scenarios"],
-            title="Scan Stimulus Intensity",
-            out_path=out_path,
+            main_title="In-Scan Stimulus Ratings",
+            out_path=out_plot,
         )
-        return df_avg
+        return df_stats
 
-    def desc_emotion(self):
+    def desc_emotion(self, task):
         """Generate descriptive stats and plots for emotion selection.
 
         Output dataframe written to:
@@ -1191,34 +916,46 @@ class DescriptTask:
         Output plots written to:
             <out_dir>/plot_heat-prob_task-emotion_<task>.png
 
+        Parameters
+        ----------
+        task
+
         Returns
         -------
         dict
             pd.DataFrames of confusion matrices for each task
 
         """
-        emo_all = self.df_emotion["emotion"].unique().tolist()
+        # Generate and clean dataframe for emotion selection
+        df_emo = self.df_all.loc[
+            (self.df_all["trial_type"] == "emotion")
+            & (self.df_all["task"] == task)
+        ].copy()
+        df_emo["response"] = df_emo["response"].str.title()
+        df_emo = df_emo.reset_index(drop=True)
+
+        #
+        emo_all = df_emo["emotion"].unique().tolist()
         emo_all.sort()
-        out_dict = {}
-        for task in self._task_list:
-            df_task = self.df_emotion.loc[self.df_emotion["task"] == task]
-            out_data = os.path.join(
-                self.out_dir, f"stats_task-emotion_{task}.csv"
-            )
-            df_conf = _confusion_matrix(
-                df=df_task,
-                emo_list=emo_all,
-                subj_col="subj",
-                num_exp=2,
-                out_path=out_data,
-            )
-            out_dict[task] = df_conf
-            out_plot = os.path.join(
-                self.out_dir, f"plot_heat-prob_task-emotion_{task}.png"
-            )
-            title = f"Scan {task.title()[:-1]} Endorsement Proportion"
-            _confusion_heatmap(df_conf, title, out_plot)
-        return out_dict
+        out_data = os.path.join(
+            self.out_dir, f"stats_task-emotion_{task.lower()}.csv"
+        )
+        self.df = df_emo
+        df_conf = self.confusion_matrix(emo_all, "subj", 2)
+        df_conf.to_csv(out_data, index=False)
+        print(f"\t\tWrote dataset : {out_data}")
+
+        # Draw heatmap
+        out_plot = os.path.join(
+            self.out_dir,
+            f"plot_heatmap_task-emotion_{task.lower()}.png",
+        )
+        self.confusion_heatmap(
+            df_conf,
+            main_title=f"In-Scan {task[:-1]} Endorsement Proportion",
+            out_path=out_plot,
+        )
+        return df_conf
 
 
 # %%
