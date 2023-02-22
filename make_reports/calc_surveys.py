@@ -839,6 +839,7 @@ class EmorepTask(_DescStat):
         df_int["response"] = df_int["response"].astype("Int64")
         for str_col in ["emotion", "task"]:
             df_int[str_col] = df_int[str_col].astype(pd.StringDtype())
+        df_int = df_int.sort_values(by=["subj", "emotion", "task"])
 
         #
         self.df = df_int
