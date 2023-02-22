@@ -7,7 +7,9 @@ and data needed.
 # %%
 import os
 import glob
+import json
 from datetime import datetime
+import pandas as pd
 from make_reports import survey_download, survey_clean
 from make_reports import build_reports, report_helper
 from make_reports import calc_metrics, calc_surveys
@@ -607,7 +609,7 @@ class CalcRedcapQualtricsStats:
 
     """
 
-    def __init__(self, proj_dir, sur_list):
+    def __init__(self, proj_dir, sur_list, draw_plot, write_json=True):
         """Initialize.
 
         Parameters
@@ -634,12 +636,19 @@ class CalcRedcapQualtricsStats:
             Unexpected survey name
 
         """
+        if not isinstance(draw_plot, bool):
+            raise TypeError("Expected draw_plot type bool")
+        if not isinstance(write_json, bool):
+            raise TypeError("Expected type bool for write_json")
         print("\nInitializing CalcRedcapQualtricsStats")
+        self._draw_plot = draw_plot
+        self._write_json = write_json
         self._proj_dir = proj_dir
         self._sur_list = sur_list
         self.out_dir = os.path.join(
             proj_dir, "analyses/surveys_stats_descriptive"
         )
+        self.survey_dataframe = {}
         self.has_subscales = ["ALS", "ERQ", "RRS"]
         self.visit1_list = [
             "AIM",
@@ -694,83 +703,126 @@ class CalcRedcapQualtricsStats:
             File missing at csv_path
 
         """
-
-        def _get_subscale() -> dict:
-            """Specify subscales names and items."""
-            all_dict = {
-                "ALS": {
-                    "Anx-Dep": [f"ALS_{x}" for x in [1, 3, 5, 6, 7]],
-                    "Dep-Ela": [
-                        f"ALS_{x}" for x in [2, 10, 12, 13, 15, 16, 17, 18]
-                    ],
-                    "Anger": [f"ALS_{x}" for x in [4, 8, 9, 11, 14]],
-                },
-                "ERQ": {
-                    "Reappraisal": [f"ERQ_{x}" for x in [1, 3, 5, 7, 8, 10]],
-                    "Suppression": [f"ERQ_{x}" for x in [2, 4, 6, 9]],
-                },
-                "RRS": {
-                    "Depression": [
-                        f"RRS_{x}"
-                        for x in [1, 2, 3, 4, 6, 8, 9, 14, 17, 18, 19, 22]
-                    ],
-                    "Brooding": [f"RRS_{x}" for x in [5, 10, 13, 15, 16]],
-                    "Reflection": [f"RRS_{x}" for x in [7, 11, 12, 20, 21]],
-                },
-            }
-            return all_dict[self._sur_name]
-
         if not os.path.exists(csv_path):
             raise FileNotFoundError(f"Missing file : {csv_path}")
 
         # Generate stats and plots
-        stat_out = os.path.join(self.out_dir, f"stats_{self._sur_name}.json")
-        plot_out = os.path.join(
-            self.out_dir, f"plot_boxplot-single_{self._sur_name}.png"
-        )
+        self.survey_dataframe[self._sur_name] = {}
         sur_stat = calc_surveys.Visit1Stats(csv_path, self._sur_name)
-        _ = sur_stat.write_stats(stat_out, self._get_title())
-        sur_stat.draw_single_boxplot(self._get_title(), plot_out)
+        _stat_dict = sur_stat.calc_total_stats()
+        report_dict = {"Title": self._get_title()}
+        report_dict.update(_stat_dict)
+        self.survey_dataframe[self._sur_name]["full"] = report_dict
 
-        # Generate stats and plots for subscales
-        if self._sur_name not in self.has_subscales:
-            return
+        #
+        if self._write_json:
+            stat_out = os.path.join(
+                self.out_dir, f"stats_{self._sur_name}.json"
+            )
+            with open(stat_out, "w") as jf:
+                json.dump(report_dict, jf)
+                print(f"\tSaved descriptive stats : {stat_out}")
+        if self._draw_plot:
+            plot_out = os.path.join(
+                self.out_dir, f"plot_boxplot-single_{self._sur_name}.png"
+            )
+            sur_stat.draw_single_boxplot(self._get_title(), plot_out)
+
+        #
+        if self._sur_name in self.has_subscales:
+            self._visit1_subscale(sur_stat)
+
+    def _visit1_subscale(self, sur_stat):
+        """Title."""
+        subscale_dict = {
+            "ALS": {
+                "Anx-Dep": [f"ALS_{x}" for x in [1, 3, 5, 6, 7]],
+                "Dep-Ela": [
+                    f"ALS_{x}" for x in [2, 10, 12, 13, 15, 16, 17, 18]
+                ],
+                "Anger": [f"ALS_{x}" for x in [4, 8, 9, 11, 14]],
+            },
+            "ERQ": {
+                "Reappraisal": [f"ERQ_{x}" for x in [1, 3, 5, 7, 8, 10]],
+                "Suppression": [f"ERQ_{x}" for x in [2, 4, 6, 9]],
+            },
+            "RRS": {
+                "Depression": [
+                    f"RRS_{x}"
+                    for x in [1, 2, 3, 4, 6, 8, 9, 14, 17, 18, 19, 22]
+                ],
+                "Brooding": [f"RRS_{x}" for x in [5, 10, 13, 15, 16]],
+                "Reflection": [f"RRS_{x}" for x in [7, 11, 12, 20, 21]],
+            },
+        }
+
         df_work = sur_stat.df.copy()
-        subscale_dict = _get_subscale()
-        for sub_name, sub_cols in subscale_dict.items():
+        for sub_name, sub_cols in subscale_dict[self._sur_name].items():
             sur_stat.df = df_work[sub_cols].copy()
             sur_stat.col_data = sub_cols
 
             # Setup file names, make files
             sub_title = self._get_title() + f", {sub_name}"
-            sub_stat_out = os.path.join(
-                self.out_dir, f"stats_{self._sur_name}_{sub_name}.json"
-            )
-            sub_plot_out = os.path.join(
-                self.out_dir,
-                f"plot_boxplot-single_{self._sur_name}_{sub_name}.png",
-            )
-            _ = sur_stat.write_stats(sub_stat_out, sub_title)
-            sur_stat.draw_single_boxplot(sub_title, sub_plot_out)
+            _stat_dict = sur_stat.calc_total_stats()
+            report_dict = {"Title": sub_title}
+            report_dict.update(_stat_dict)
+            self.survey_dataframe[self._sur_name][sub_name] = report_dict
+
+            #
+            if self._write_json:
+                sub_stat_out = os.path.join(
+                    self.out_dir, f"stats_{self._sur_name}_{sub_name}.json"
+                )
+                with open(sub_stat_out, "w") as jf:
+                    json.dump(report_dict, jf)
+                    print(f"\tSaved descriptive stats : {sub_stat_out}")
+            if self._draw_plot:
+                sub_plot_out = os.path.join(
+                    self.out_dir,
+                    f"plot_boxplot-single_{self._sur_name}_{sub_name}.png",
+                )
+                sur_stat.draw_single_boxplot(sub_title, sub_plot_out)
 
     def visit23_stats_plots(self, day2_csv_path, day3_csv_path):
         """Title."""
 
-        stat_out = os.path.join(self.out_dir, f"stats_{self._sur_name}.json")
-        plot_out = os.path.join(
-            self.out_dir, f"plot_boxplot-double_{self._sur_name}.png"
-        )
+        def _flatten(in_dict: dict):
+            """Title."""
+            _title = in_dict["Title"]
+            for visit in ["Visit 2", "Visit 3"]:
+                _dict = in_dict[visit]
+                _dict["Title"] = _title + ", " + visit
+                self.survey_dataframe[self._sur_name][visit] = _dict
+
+        #
+        self.survey_dataframe[self._sur_name] = {}
         sur_stat = calc_surveys.Visit23Stats(
             day2_csv_path, day3_csv_path, self._sur_name
         )
-        _ = sur_stat.write_stats(stat_out, self._get_title())
-        sur_stat.draw_double_boxplot(
-            fac_col="visit",
-            fac_a="Visit 2",
-            fac_b="Visit 3",
-            main_title=self._get_title(),
-            out_path=plot_out,
-        )
+        _stat_dict = sur_stat.calc_factor_stats("visit", "Visit 2", "Visit 3")
+        report_dict = {"Title": self._get_title()}
+        report_dict.update(_stat_dict)
+        _flatten(report_dict)
+
+        #
+        if self._write_json:
+            stat_out = os.path.join(
+                self.out_dir, f"stats_{self._sur_name}.json"
+            )
+            with open(stat_out, "w") as jf:
+                json.dump(report_dict, jf)
+                print(f"\tSaved descriptive stats : {stat_out}")
+        if self._draw_plot:
+            plot_out = os.path.join(
+                self.out_dir, f"plot_boxplot-double_{self._sur_name}.png"
+            )
+            sur_stat.draw_double_boxplot(
+                fac_col="visit",
+                fac_a="Visit 2",
+                fac_b="Visit 3",
+                main_title=self._get_title(),
+                out_path=plot_out,
+            )
 
     def _get_title(self) -> str:
         """Switch survey abbreviation for name."""
@@ -790,7 +842,7 @@ class CalcRedcapQualtricsStats:
 
 
 # %%
-def calc_task_stats(proj_dir, survey_list):
+def calc_task_stats(proj_dir, survey_list, draw_plot):
     """Title.
 
     Parameters
@@ -801,47 +853,87 @@ def calc_task_stats(proj_dir, survey_list):
         [rest | stim | task]
         Survey names, for triggering different workflows
 
+    Returns
+    -------
+
     Raises
     ------
     ValueError
         Unexpected item in survey_list
 
     """
+    if not isinstance(draw_plot, bool):
+        raise TypeError("Expected draw_plot type bool")
     for sur in survey_list:
         if sur not in ["rest", "stim", "task"]:
             raise ValueError(f"Unexpected survey name : {sur}")
 
+    survey_dataframe = {}
     if "rest" in survey_list:
         print("\nWorking on rest-ratings data")
         rest_stats = calc_surveys.RestRatings(proj_dir)
-        _ = rest_stats.write_stats()
-        out_plot = os.path.join(
-            proj_dir,
-            "analyses/surveys_stats_descriptive",
-            "plot_boxplot-long_rest-ratings.png",
-        )
-        rest_stats.draw_long_boxplot(
-            x_col="emotion",
-            x_lab="Emotion Category",
-            y_col="rating",
-            y_lab="Frequency",
-            hue_order=["Scenarios", "Videos"],
-            hue_col="task",
-            main_title="In-Scan Resting Emotion Frequency",
-            out_path=out_plot,
-        )
+        survey_dataframe["rest"] = rest_stats.write_stats()
+        if draw_plot:
+            out_plot = os.path.join(
+                proj_dir,
+                "analyses/surveys_stats_descriptive",
+                "plot_boxplot-long_rest-ratings.png",
+            )
+            rest_stats.draw_long_boxplot(
+                x_col="emotion",
+                x_lab="Emotion Category",
+                y_col="rating",
+                y_lab="Frequency",
+                hue_order=["Scenarios", "Videos"],
+                hue_col="task",
+                main_title="In-Scan Resting Emotion Frequency",
+                out_path=out_plot,
+            )
 
     if "stim" in survey_list:
-        stim_stats = calc_surveys.StimRatings(proj_dir)
+        stim_stats = calc_surveys.StimRatings(proj_dir, draw_plot)
         for stim_type in ["Videos", "Scenarios"]:
             _ = stim_stats.endorsement(stim_type)
-            _ = stim_stats.arousal_valence(stim_type)
+            survey_dataframe["stim"] = stim_stats.arousal_valence(stim_type)
 
     if "task" in survey_list:
-        task_stats = calc_surveys.EmorepTask(proj_dir)
-        _ = task_stats.desc_intensity()
+        task_stats = calc_surveys.EmorepTask(proj_dir, draw_plot)
+        survey_dataframe["task"] = task_stats.desc_intensity()
         for task in ["Videos", "Scenarios"]:
             _ = task_stats.desc_emotion(task)
+
+    return survey_dataframe
+
+
+# %%
+def make_survey_table(proj_dir, sur_online, sur_scanner, draw_plot):
+    """Title."""
+    #
+    calc_rcq = CalcRedcapQualtricsStats(
+        proj_dir, sur_online, draw_plot, write_json=False
+    )
+    calc_rcq.match_survey_visits()
+    data_rcq = calc_rcq.survey_dataframe
+
+    #
+    df_all = pd.DataFrame(
+        columns=["Title", "num", "mean", "SD", "skewness", "kurtosis"]
+    )
+    for main_key in data_rcq:
+        for sub_key in data_rcq[main_key]:
+            df_all = pd.concat(
+                [df_all, pd.DataFrame(data_rcq[main_key][sub_key], index=[0])],
+                ignore_index=True,
+            )
+    out_stats = os.path.join(
+        proj_dir,
+        "analyses/surveys_stats_descriptive",
+        "table_redcap_qualtrics.csv",
+    )
+    df_all.to_csv(out_stats)
+
+    #
+    data_scan = calc_task_stats(proj_dir, sur_scanner, draw_plot)
 
 
 # %%

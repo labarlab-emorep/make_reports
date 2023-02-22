@@ -317,26 +317,6 @@ class Visit1Stats(_DescStat):
         self.col_data = [x for x in self.df.columns if name in x]
         self.df[self.col_data] = self.df[self.col_data].astype("Int64")
 
-    def write_stats(self, out_path, title):
-        """Title.
-
-        Parameters
-        ----------
-
-        """
-        out_ext = out_path.split(".")[-1]
-        if out_ext != "json":
-            raise ValueError("Expected output file extension json")
-
-        # Get desired mean/std
-        stats = self.calc_total_stats()
-        report_dict = {"Title": title}
-        report_dict.update(stats)
-        with open(out_path, "w") as jf:
-            json.dump(report_dict, jf)
-        print(f"\t\tSaved descriptive stats : {out_path}")
-        return report_dict
-
 
 # %%
 class Visit23Stats(_DescStat):
@@ -375,26 +355,6 @@ class Visit23Stats(_DescStat):
         df[self.col_data] = df[self.col_data].astype("Int64")
         df["visit"] = fac
         return df
-
-    def write_stats(self, out_path, title):
-        """Title.
-
-        Parameters
-        ----------
-
-        """
-        out_ext = out_path.split(".")[-1]
-        if out_ext != "json":
-            raise ValueError("Expected output file extension json")
-
-        # Get desired mean/std
-        stats = self.calc_factor_stats("visit", "Visit 2", "Visit 3")
-        report_dict = {"Title": title}
-        report_dict.update(stats)
-        with open(out_path, "w") as jf:
-            json.dump(report_dict, jf)
-        print(f"\t\tSaved descriptive stats : {out_path}")
-        return report_dict
 
 
 # %%
@@ -496,7 +456,7 @@ class StimRatings(_DescStat):
 
     """
 
-    def __init__(self, proj_dir):
+    def __init__(self, proj_dir, draw_plot):
         """Initialize.
 
         Parameters
@@ -509,8 +469,14 @@ class StimRatings(_DescStat):
         out_dir : path
             Output destination for generated files
 
+        Raises
+        ------
+
         """
+        if not isinstance(draw_plot, bool):
+            raise TypeError("Expected draw_plot type bool")
         print("\nInitializing DescriptStimRatings")
+        self._draw_plot = draw_plot
         self._proj_dir = proj_dir
         self.out_dir = os.path.join(
             proj_dir, "analyses/surveys_stats_descriptive"
@@ -600,15 +566,18 @@ class StimRatings(_DescStat):
         print(f"\t\tWrote dataset : {out_stat}")
 
         # Draw heatmap
-        out_plot = os.path.join(
-            self.out_dir,
-            f"plot_heatmap_stim-ratings_endorsement_{stim_type.lower()}.png",
-        )
-        self.confusion_heatmap(
-            df_conf,
-            main_title=f"Post-Scan {stim_type[:-1]} Endorsement Proportion",
-            out_path=out_plot,
-        )
+        if self._draw_plot:
+            out_plot = os.path.join(
+                self.out_dir,
+                "plot_heatmap_stim-ratings_endorsement_"
+                + f"{stim_type.lower()}.png",
+            )
+            self.confusion_heatmap(
+                df_conf,
+                main_title=f"Post-Scan {stim_type[:-1]} "
+                + "Endorsement Proportion",
+                out_path=out_plot,
+            )
         return df_conf
 
     def arousal_valence(self, stim_type):
@@ -657,20 +626,21 @@ class StimRatings(_DescStat):
         print(f"\t\tWrote dataset : {out_path}")
 
         #
-        out_plot = os.path.join(
-            self.out_dir,
-            f"plot_boxplot-long_stim-ratings_{stim_type.lower()}.png",
-        )
-        self.draw_long_boxplot(
-            x_col="emotion",
-            x_lab="Emotion Category",
-            y_col="response",
-            y_lab="Rating",
-            hue_order=["Arousal", "Valence"],
-            hue_col="prompt",
-            main_title=f"Post-Scan {stim_type[:-1]} Ratings",
-            out_path=out_plot,
-        )
+        if self._draw_plot:
+            out_plot = os.path.join(
+                self.out_dir,
+                f"plot_boxplot-long_stim-ratings_{stim_type.lower()}.png",
+            )
+            self.draw_long_boxplot(
+                x_col="emotion",
+                x_lab="Emotion Category",
+                y_col="response",
+                y_lab="Rating",
+                hue_order=["Arousal", "Valence"],
+                hue_col="prompt",
+                main_title=f"Post-Scan {stim_type[:-1]} Ratings",
+                out_path=out_plot,
+            )
         return df_stats
 
 
@@ -703,7 +673,7 @@ class EmorepTask(_DescStat):
 
     """
 
-    def __init__(self, proj_dir):
+    def __init__(self, proj_dir, draw_plot):
         """Initialize.
 
         Find all participant BIDS events files, trigger construction
@@ -729,7 +699,10 @@ class EmorepTask(_DescStat):
             Events files were not detected
 
         """
+        if not isinstance(draw_plot, bool):
+            raise TypeError("Expected draw_plot type bool")
         print("\nInitializing DescriptTask")
+        self._draw_plot = draw_plot
         self._task_list = ["movies", "scenarios"]
         self.out_dir = os.path.join(
             proj_dir, "analyses/surveys_stats_descriptive"
@@ -849,20 +822,21 @@ class EmorepTask(_DescStat):
         print(f"\tWrote csv : {out_csv}")
 
         # Make violin plots
-        out_plot = os.path.join(
-            self.out_dir,
-            "plot_boxplot-long_task-intensity.png",
-        )
-        self.draw_long_boxplot(
-            x_col="emotion",
-            x_lab="Emotion",
-            y_col="response",
-            y_lab="Intensity",
-            hue_order=["Scenarios", "Videos"],
-            hue_col="task",
-            main_title="In-Scan Stimulus Ratings",
-            out_path=out_plot,
-        )
+        if self._draw_plot:
+            out_plot = os.path.join(
+                self.out_dir,
+                "plot_boxplot-long_task-intensity.png",
+            )
+            self.draw_long_boxplot(
+                x_col="emotion",
+                x_lab="Emotion",
+                y_col="response",
+                y_lab="Intensity",
+                hue_order=["Scenarios", "Videos"],
+                hue_col="task",
+                main_title="In-Scan Stimulus Ratings",
+                out_path=out_plot,
+            )
         return df_stats
 
     def desc_emotion(self, task):
@@ -904,15 +878,16 @@ class EmorepTask(_DescStat):
         print(f"\t\tWrote dataset : {out_data}")
 
         # Draw heatmap
-        out_plot = os.path.join(
-            self.out_dir,
-            f"plot_heatmap_task-emotion_{task.lower()}.png",
-        )
-        self.confusion_heatmap(
-            df_conf,
-            main_title=f"In-Scan {task[:-1]} Endorsement Proportion",
-            out_path=out_plot,
-        )
+        if self._draw_plot:
+            out_plot = os.path.join(
+                self.out_dir,
+                f"plot_heatmap_task-emotion_{task.lower()}.png",
+            )
+            self.confusion_heatmap(
+                df_conf,
+                main_title=f"In-Scan {task[:-1]} Endorsement Proportion",
+                out_path=out_plot,
+            )
         return df_conf
 
 
