@@ -1,12 +1,19 @@
-"""Setup workflows for specific types of reports."""
+"""Sub-package workflows.
+
+Each workflow function or class will coordinate the methods
+and data needed.
+
+"""
+# %%
 import os
 import glob
 from datetime import datetime
 from make_reports import survey_download, survey_clean
 from make_reports import build_reports, report_helper
-from make_reports import calc_descriptives
+from make_reports import calc_metrics, calc_surveys
 
 
+# %%
 def download_surveys(
     proj_dir,
     redcap_token=None,
@@ -45,13 +52,19 @@ def download_surveys(
 class CleanSurveys:
     """Coordinate cleaning of survey data.
 
+    Each class method will read in raw data from their respective
+    sources and then corrdinate cleaning methods from survey_clean.
+
+    Cleaned dataframes are written to:
+        <proj_dir>/data_survey/<visit>/data_clean
+
     Methods
     -------
-    clean_redcap
+    clean_redcap()
         Clean all RedCap surveys
-    clean_rest
+    clean_rest()
         Clean ratings of resting state experiences
-    clean_qualtrics
+    clean_qualtrics()
         Clean all Qualtrics surveys
 
     """
@@ -66,11 +79,12 @@ class CleanSurveys:
 
         Attributes
         ----------
-        proj_dir : path
+        _proj_dir : path
             Project's experiment directory
 
         """
-        self.proj_dir = proj_dir
+        print("Initializing CleanSurveys")
+        self._proj_dir = proj_dir
 
     def clean_redcap(self):
         """Coordinate cleaning of RedCap surveys.
@@ -87,7 +101,7 @@ class CleanSurveys:
         """
         # Check for data
         redcap_raw = glob.glob(
-            f"{self.proj_dir}/data_survey/redcap*/data_raw/*latest.csv"
+            f"{self._proj_dir}/data_survey/redcap*/data_raw/*latest.csv"
         )
         if len(redcap_raw) != 4:
             raise FileNotFoundError(
@@ -96,20 +110,22 @@ class CleanSurveys:
             )
 
         # Get cleaning obj
+        print("\tRunning CleanSurveys.clean_redcap")
         redcap_dict = report_helper.redcap_dict()
-        clean_redcap = survey_clean.CleanRedcap(self.proj_dir)
+        clean_redcap = survey_clean.CleanRedcap(self._proj_dir)
 
         # Clean each planned survey, write out
         for sur_name, dir_name in redcap_dict.items():
             clean_redcap.clean_surveys(sur_name)
 
             # Write study data
+            out_name = "BDI" if "bdi" in sur_name else sur_name
             clean_file = os.path.join(
-                self.proj_dir,
+                self._proj_dir,
                 "data_survey",
                 dir_name,
                 "data_clean",
-                f"df_{sur_name}.csv",
+                f"df_{out_name}.csv",
             )
             out_dir = os.path.dirname(clean_file)
             if not os.path.exists(out_dir):
@@ -118,11 +134,11 @@ class CleanSurveys:
 
             # Write pilot data
             pilot_file = os.path.join(
-                self.proj_dir,
+                self._proj_dir,
                 "data_pilot/data_survey",
                 dir_name,
                 "data_clean",
-                f"df_{sur_name}.csv",
+                f"df_{out_name}.csv",
             )
             out_dir = os.path.dirname(pilot_file)
             if not os.path.exists(out_dir):
@@ -143,12 +159,14 @@ class CleanSurveys:
 
         """
 
-        def _write_clean_qualtrics(clean_dict, pilot_dict, dir_name):
+        def _write_clean_qualtrics(
+            clean_dict: dict, pilot_dict: dict, dir_name: str
+        ) -> None:
             """Write cleaned dataframes for RedCap surveys."""
             # Unpack study clean data
             for h_name, h_df in clean_dict.items():
                 out_file = os.path.join(
-                    self.proj_dir,
+                    self._proj_dir,
                     "data_survey",
                     dir_name,
                     "data_clean",
@@ -163,7 +181,7 @@ class CleanSurveys:
             # Unpack pilot clean data
             for h_name, h_df in pilot_dict.items():
                 out_file = os.path.join(
-                    self.proj_dir,
+                    self._proj_dir,
                     "data_pilot/data_survey",
                     dir_name,
                     "data_clean",
@@ -177,7 +195,7 @@ class CleanSurveys:
 
         # Check for data
         visit_raw = glob.glob(
-            f"{self.proj_dir}/data_survey/visit*/data_raw/*latest.csv"
+            f"{self._proj_dir}/data_survey/visit*/data_raw/*latest.csv"
         )
         if len(visit_raw) != 7:
             raise FileNotFoundError(
@@ -186,8 +204,9 @@ class CleanSurveys:
             )
 
         # Get cleaning obj
+        print("\tRunning CleanSurveys.clean_qualtrics")
         qualtrics_dict = report_helper.qualtrics_dict()
-        clean_qualtrics = survey_clean.CleanQualtrics(self.proj_dir)
+        clean_qualtrics = survey_clean.CleanQualtrics(self._proj_dir)
 
         # Clean each planned survey and write out
         for sur_name, dir_name in qualtrics_dict.items():
@@ -221,7 +240,7 @@ class CleanSurveys:
 
         # Check for data
         raw_path = os.path.join(
-            self.proj_dir,
+            self._proj_dir,
             "data_scanner_BIDS",
             "rawdata",
         )
@@ -232,13 +251,14 @@ class CleanSurveys:
             )
 
         # Aggregate rest ratings, for each session day
-        agg_rest = survey_clean.CombineRestRatings(self.proj_dir)
+        print("\tRunning CleanSurveys.clean_rest")
+        agg_rest = survey_clean.CombineRestRatings(self._proj_dir)
         for day in ["day2", "day3"]:
 
             # Get, write out study data
             agg_rest.get_rest_ratings(day, raw_path)
             out_file = os.path.join(
-                self.proj_dir,
+                self._proj_dir,
                 "data_survey",
                 f"visit_{day}",
                 "data_clean",
@@ -252,11 +272,11 @@ class CleanSurveys:
 
             # Get, write out pilot data
             rawdata_pilot = os.path.join(
-                self.proj_dir, "data_pilot/data_scanner_BIDS", "rawdata"
+                self._proj_dir, "data_pilot/data_scanner_BIDS", "rawdata"
             )
             agg_rest.get_rest_ratings(day, rawdata_pilot)
             out_file = os.path.join(
-                self.proj_dir,
+                self._proj_dir,
                 "data_pilot/data_survey",
                 f"visit_{day}",
                 "data_clean",
@@ -394,9 +414,10 @@ def make_ndar_reports(ndar_reports, proj_dir, close_date):
         cl_data.clean_qualtrics()
         print("\tDone.")
 
-    # Set switch to find appropriate class: key = user-specified
-    # report name, value = relevant class.
-    mod_build = "make_reports.build_reports"
+    # Set switch to find appropriate class in make_reports.build_ndar:
+    #   key = user-specified report name
+    #   value = relevant class
+    mod_build = "make_reports.build_ndar"
     nda_switch = {
         "demo_info01": f"{mod_build}.NdarDemoInfo01",
         "affim01": f"{mod_build}.NdarAffim01",
@@ -437,7 +458,7 @@ def make_ndar_reports(ndar_reports, proj_dir, close_date):
     # Make requested reports
     for report in ndar_reports:
 
-        # Get appropriate class
+        # Get appropriate class from make_reports.build_ndar
         h_pkg, h_mod, h_class = nda_switch[report].split(".")
         mod = __import__(f"{h_pkg}.{h_mod}", fromlist=[h_class])
         rep_class = getattr(mod, h_class)
@@ -466,6 +487,9 @@ def make_ndar_reports(ndar_reports, proj_dir, close_date):
 def generate_guids(proj_dir, user_name, user_pass, find_mismatch):
     """Compile needed demographic info and make GUIDs.
 
+    Also supports checking newly generated GUIDs against those entered
+    into RedCap to help detect clerical errors.
+
     Generated GUIDs are written to:
         <proj_dir>/data_survey/redcap_demographics/data_clean/output_guid_*.txt
 
@@ -480,6 +504,11 @@ def generate_guids(proj_dir, user_name, user_pass, find_mismatch):
     find_mismatch : bool
         Whether to check for mismatches between REDCap
         and generated GUIDs
+
+    Notes
+    -----
+    Attempts to trigger CleanSurveys.clean_redcap if a cleaned dataframe for
+    demographic info is not detected.
 
     """
     # Check for clean RedCap data, generate if needed
@@ -507,7 +536,7 @@ def generate_guids(proj_dir, user_name, user_pass, find_mismatch):
             print("No mismatches found!")
 
 
-def calc_metrics(proj_dir, recruit_demo, pending_scans, redcap_token):
+def get_metrics(proj_dir, recruit_demo, pending_scans, redcap_token):
     """Title.
 
     Desc.
@@ -538,13 +567,281 @@ def calc_metrics(proj_dir, recruit_demo, pending_scans, redcap_token):
         redcap_demo.remove_withdrawn()
 
         print("\nComparing planned vs. actual recruitment demographics ...")
-        _ = calc_descriptives.demographics(proj_dir, redcap_demo.final_demo)
+        _ = calc_metrics.demographics(proj_dir, redcap_demo.final_demo)
 
     #
     if pending_scans:
         print("\nFinding participants missing day3 scan ...\n")
-        pend_dict = calc_descriptives.calc_pending(redcap_token)
+        pend_dict = calc_metrics.calc_pending(redcap_token)
         print("\tSubj \t Time since day2 scan")
         for subid, days in pend_dict.items():
             print(f"\t{subid} \t {days}")
         print("")
+
+
+# %%
+class CalcRedcapQualtricsStats:
+    """Generate descriptive stats and plots for REDCap, Qualtrics surveys.
+
+    Matched items in input survey list to respective visits, then generate
+    descriptive stats and plots for each visit. Also generates stats/plots
+    for survey subscales, when relevant.
+
+    Attributes
+    ----------
+    has_subscales : list
+        Surveys containing subscales
+    out_dir : path
+        Output destination for generated files
+    visit1_list : list
+        Visit 1 survey names
+    visit23_list : list
+        Visit 2, 3 survey names
+
+    Methods
+    -------
+    wrap_visits()
+        Align requested surveys with visits, submit desc_plots
+    desc_plots()
+        Generate descriptive stats and plots for survey
+
+    """
+
+    def __init__(self, proj_dir, sur_list):
+        """Initialize.
+
+        Parameters
+        ----------
+        proj_dir : path
+            Location of project's experiment directory
+        sur_list : list
+            REDCap or Qualtrics survey names
+
+        Attributes
+        ----------
+        has_subscales : list
+            Surveys containing subscales
+        out_dir : path
+            Output destination for generated files
+        visit1_list : list
+            Visit 1 survey names
+        visit23_list : list
+            Visit 2, 3 survey names
+
+        Raises
+        ------
+        ValueError
+            Unexpected survey name
+
+        """
+        print("\nInitializing CalcRedcapQualtricsStats")
+        self._proj_dir = proj_dir
+        self._sur_list = sur_list
+        self.out_dir = os.path.join(
+            proj_dir, "analyses/surveys_stats_descriptive"
+        )
+        self.has_subscales = ["ALS", "ERQ", "RRS"]
+        self.visit1_list = [
+            "AIM",
+            "ALS",
+            "ERQ",
+            "PSWQ",
+            "RRS",
+            "STAI_Trait",
+            "TAS",
+        ]
+        self.visit23_list = ["STAI_State", "PANAS", "BDI"]
+        for sur in sur_list:
+            if sur not in self.visit1_list and sur not in self.visit23_list:
+                raise ValueError(f"Unexpected survey requested : {sur}")
+
+    def match_survey_visits(self):
+        """Title."""
+
+        def _csv_path(day: str) -> str:
+            """Title."""
+            file_path = os.path.join(
+                self._proj_dir,
+                f"data_survey/visit_{day}/data_clean",
+                f"df_{self._sur_name}.csv",
+            )
+            if os.path.exists(file_path):
+                return file_path
+            else:
+                raise FileNotFoundError(f"File path not found : {file_path}")
+
+        for self._sur_name in self._sur_list:
+            print(f"\tGetting stats for {self._sur_name}")
+            if self._sur_name in self.visit1_list:
+                self.visit1_stats_plots(_csv_path("day1"))
+            elif self._sur_name in self.visit23_list:
+                day2_path = _csv_path("day2")
+                day3_path = _csv_path("day3")
+                self.visit23_stats_plots(day2_path, day3_path)
+
+    def visit1_stats_plots(self, csv_path):
+        """Title.
+
+        Parameters
+        ----------
+        csv_path : path
+            Location of cleaned survey CSV
+
+
+        Raises
+        ------
+        FileNotFoundError
+            File missing at csv_path
+
+        """
+
+        def _get_subscale() -> dict:
+            """Specify subscales names and items."""
+            all_dict = {
+                "ALS": {
+                    "Anx-Dep": [f"ALS_{x}" for x in [1, 3, 5, 6, 7]],
+                    "Dep-Ela": [
+                        f"ALS_{x}" for x in [2, 10, 12, 13, 15, 16, 17, 18]
+                    ],
+                    "Anger": [f"ALS_{x}" for x in [4, 8, 9, 11, 14]],
+                },
+                "ERQ": {
+                    "Reappraisal": [f"ERQ_{x}" for x in [1, 3, 5, 7, 8, 10]],
+                    "Suppression": [f"ERQ_{x}" for x in [2, 4, 6, 9]],
+                },
+                "RRS": {
+                    "Depression": [
+                        f"RRS_{x}"
+                        for x in [1, 2, 3, 4, 6, 8, 9, 14, 17, 18, 19, 22]
+                    ],
+                    "Brooding": [f"RRS_{x}" for x in [5, 10, 13, 15, 16]],
+                    "Reflection": [f"RRS_{x}" for x in [7, 11, 12, 20, 21]],
+                },
+            }
+            return all_dict[self._sur_name]
+
+        if not os.path.exists(csv_path):
+            raise FileNotFoundError(f"Missing file : {csv_path}")
+
+        # Generate stats and plots
+        stat_out = os.path.join(self.out_dir, f"stats_{self._sur_name}.json")
+        plot_out = os.path.join(
+            self.out_dir, f"plot_boxplot-single_{self._sur_name}.png"
+        )
+        sur_stat = calc_surveys.Visit1Stats(csv_path, self._sur_name)
+        _ = sur_stat.write_stats(stat_out, self._get_title())
+        sur_stat.draw_single_boxplot(self._get_title(), plot_out)
+
+        # Generate stats and plots for subscales
+        if self._sur_name not in self.has_subscales:
+            return
+        df_work = sur_stat.df.copy()
+        subscale_dict = _get_subscale()
+        for sub_name, sub_cols in subscale_dict.items():
+            sur_stat.df = df_work[sub_cols].copy()
+            sur_stat.col_data = sub_cols
+
+            # Setup file names, make files
+            sub_title = self._get_title() + f", {sub_name}"
+            sub_stat_out = os.path.join(
+                self.out_dir, f"stats_{self._sur_name}_{sub_name}.json"
+            )
+            sub_plot_out = os.path.join(
+                self.out_dir,
+                f"plot_boxplot-single_{self._sur_name}_{sub_name}.png",
+            )
+            _ = sur_stat.write_stats(sub_stat_out, sub_title)
+            sur_stat.draw_single_boxplot(sub_title, sub_plot_out)
+
+    def visit23_stats_plots(self, day2_csv_path, day3_csv_path):
+        """Title."""
+
+        stat_out = os.path.join(self.out_dir, f"stats_{self._sur_name}.json")
+        plot_out = os.path.join(
+            self.out_dir, f"plot_boxplot-double_{self._sur_name}.png"
+        )
+        sur_stat = calc_surveys.Visit23Stats(
+            day2_csv_path, day3_csv_path, self._sur_name
+        )
+        _ = sur_stat.write_stats(stat_out, self._get_title())
+        sur_stat.draw_double_boxplot(
+            fac_col="visit",
+            fac_a="Visit 2",
+            fac_b="Visit 3",
+            main_title=self._get_title(),
+            out_path=plot_out,
+        )
+
+    def _get_title(self) -> str:
+        """Switch survey abbreviation for name."""
+        plot_titles = {
+            "AIM": "Affective Intensity Measure",
+            "ALS": "Affective Lability Scale",
+            "ERQ": "Emotion Regulation Questionnaire",
+            "PSWQ": "Penn State Worry Questionnaire",
+            "RRS": "Ruminative Response Scale",
+            "STAI_Trait": "Spielberg Trait Anxiety Inventory",
+            "TAS": "Toronto Alexithymia Scale",
+            "STAI_State": "Spielberg State Anxiety Inventory",
+            "PANAS": "Positive and Negative Affect Schedule",
+            "BDI": "Beck Depression Inventory",
+        }
+        return plot_titles[self._sur_name]
+
+
+# %%
+def calc_task_stats(proj_dir, survey_list):
+    """Title.
+
+    Parameters
+    ----------
+    proj_dir : path
+        Location of project's experiment directory
+    survey_list : list
+        [rest | stim | task]
+        Survey names, for triggering different workflows
+
+    Raises
+    ------
+    ValueError
+        Unexpected item in survey_list
+
+    """
+    for sur in survey_list:
+        if sur not in ["rest", "stim", "task"]:
+            raise ValueError(f"Unexpected survey name : {sur}")
+
+    if "rest" in survey_list:
+        print("\nWorking on rest-ratings data")
+        rest_stats = calc_surveys.RestRatings(proj_dir)
+        _ = rest_stats.write_stats()
+        out_plot = os.path.join(
+            proj_dir,
+            "analyses/surveys_stats_descriptive",
+            "plot_boxplot-long_rest-ratings.png",
+        )
+        rest_stats.draw_long_boxplot(
+            x_col="emotion",
+            x_lab="Emotion Category",
+            y_col="rating",
+            y_lab="Frequency",
+            hue_order=["Scenarios", "Videos"],
+            hue_col="task",
+            main_title="In-Scan Resting Emotion Frequency",
+            out_path=out_plot,
+        )
+
+    if "stim" in survey_list:
+        stim_stats = calc_surveys.StimRatings(proj_dir)
+        for stim_type in ["Videos", "Scenarios"]:
+            _ = stim_stats.endorsement(stim_type)
+            _ = stim_stats.arousal_valence(stim_type)
+
+    if "task" in survey_list:
+        task_stats = calc_surveys.EmorepTask(proj_dir)
+        _ = task_stats.desc_intensity()
+        for task in ["Videos", "Scenarios"]:
+            _ = task_stats.desc_emotion(task)
+
+
+# %%

@@ -24,8 +24,8 @@ def _get_args():
         action="store_true",
         help=textwrap.dedent(
             """\
-            Determine which participants need a second scan, requires
-            --redcap-token.
+            Requires --redcap-token.
+            Determine which participants need a second scan,
             True if "--pending-scans" else False.
             """
         ),
@@ -73,7 +73,10 @@ def main():
     pending_scans = args.pending_scans
     redcap_token = args.redcap_token
 
-    workflow.calc_metrics(proj_dir, recruit_demo, pending_scans, redcap_token)
+    if pending_scans and not redcap_token:
+        raise ValueError("Option --pending-scans requires --redcap_token.")
+
+    workflow.get_metrics(proj_dir, recruit_demo, pending_scans, redcap_token)
 
 
 if __name__ == "__main__":
