@@ -1,16 +1,12 @@
-"""Methods for describing survey responses.
+"""Title.
 
-Generate descriptive statistics and plots for REDCap, Qualtrics,
-and rest-rating surveys.
-
-Output files are written to:
-    experiment2/EmoRep/Exp2_Compute_Emotion/analyses/surveys_stats_descriptive
+Desc.
 
 """
 # %%
 import os
-import json
 import glob
+from typing import Tuple
 import pandas as pd
 from pandas.api.types import is_numeric_dtype, is_string_dtype
 import numpy as np
@@ -20,17 +16,75 @@ import matplotlib.pyplot as plt
 
 # %%
 class _DescStat:
-    """Title."""
+    """Supply statistic and plotting methods.
 
-    def __init__(self, df):
-        """Title."""
+    Attributes
+    ----------
+    col_data : list
+        List of df columns containing numeric type data
+    df : pd.DataFrame
+        Wide- or long-formatted survey dataframe
+
+    Methods
+    -------
+    calc_row_stats()
+        Generate descriptive stats for df rows i.e. subjects.
+    calc_factor_stats(fac_col, fac_a, fac_b)
+        Wrap calc_row_stats for multiple factors e.g. visit
+    draw_single_boxplot(main_title, out_path)
+        Generate and write a boxplot of row totals
+    draw_double_boxplot(fac_col, fac_a, fac_b, main_title, out_path)
+        Generate and write a boxplot with two factors
+
+    """
+
+    def __init__(self, df: pd.DataFrame, col_data: list = None):
+        """Initialize."""
         print("\tInitializing _DescStat")
         self.df = df
+        if col_data:
+            self.col_data = col_data
 
-    def calc_total_stats(self, df: pd.DataFrame = None) -> dict:
-        """Title."""
-        df_calc = df.copy() if isinstance(df, pd.DataFrame) else self.df.copy()
+    def calc_row_stats(self):
+        """Calculate descriptive stats for dataframe rows.
+
+        Returns
+        -------
+        dict
+            key, value pairs for number of participants, mean,
+            standard deviation, skewness, kurtosis.
+
+        Raises
+        ------
+        AttributeError
+            col_data not set
+        KeyError
+            Columns from col_data not found in df
+
+        Examples
+        --------
+        stat_obj = _DescStat(
+            pd.DataFrame, col_data=["col_a", "col_b", "col_c"]
+        )
+        stat_dict = stat_obj.calc_row_stats()
+
+        stat_obj.df = df_new
+        stat_obj.col_data = ["col_x", "col_y"]
+        stat_dict_new = stat_obj.calc_row_stats()
+
+        """
+        # Validate attrs
+        if not hasattr(self, "col_data"):
+            raise AttributeError("Missing required col_data attr.")
+        for col in self.col_data:
+            if col not in self.df.columns:
+                raise KeyError(f"Missing expected column in df : {col}")
+
+        # Total row values, avoid editing original df
+        df_calc = self.df.copy()
         df_calc["total"] = df_calc[self.col_data].sum(axis=1)
+
+        # Calc, return stats
         mean = round(df_calc["total"].mean(), 2)
         std = round(df_calc["total"].std(), 2)
         skew = round(df_calc["total"].skew(), 2)
@@ -44,25 +98,78 @@ class _DescStat:
             "kurtosis": kurt,
         }
 
-    def calc_factor_stats(
-        self, fac_col: str, fac_a: str, fac_b: str, df: pd.DataFrame = None
-    ) -> dict:
-        """Title."""
-        df_calc = df.copy() if isinstance(df, pd.DataFrame) else self.df.copy()
+    def calc_factor_stats(self, fac_col, fac_a, fac_b):
+        """Calculate descriptive stats for dataframe rows, by factor column.
+
+        Subset dataframe by fac_col, for rows matching fac_a|b, and then
+        generate row descriptive stats for subset df.
+
+        Parameters
+        ----------
+        fac_col : str
+            Column name of pd.DataFrame containing fac_a, fac_b.
+        fac_a : str
+            Factor A name, e.g. "Visit 2"
+        fac_b : str
+            Factor B name, e.g. "Visit 3"
+
+        Returns
+        -------
+        dict
+            key = fac_a|b
+            value = dict of descriptive stats
+
+        Example
+        -------
+        stat_obj = _DescStat(
+            pd.DataFrame, col_data=["col_a", "col_b", "col_c"]
+        )
+        stat_dict = stat_obj.calc_factor_stats("visit", "Visit 2", "Visit 3")
+
+        """
+        # Make bool masks for factors
+        df_calc = self.df.copy()
         mask_a = df_calc[fac_col] == fac_a
         mask_b = df_calc[fac_col] == fac_b
+
+        # Get subset descriptive stats
         out_dict = {}
-        out_dict[fac_a] = self.calc_total_stats(df=df_calc[mask_a])
-        out_dict[fac_b] = self.calc_total_stats(df=df_calc[mask_b])
+        for fac, mask in zip([fac_a, fac_b], [mask_a, mask_b]):
+            self.df = df_calc[mask]
+            out_dict[fac] = self.calc_row_stats()
+        self.df = df_calc
         return out_dict
 
-    def draw_single_boxplot(self, main_title: str, out_path: str):
-        """Title."""
-        #
-        stat_dict = self.calc_total_stats()
+    def draw_single_boxplot(self, main_title, out_path):
+        """Draw boxplot for single factor.
+
+        Parameters
+        ----------
+        main_title : str
+            Main title of boxplot
+        out_path : path
+            Output location and file name of figure
+
+        Examples
+        --------
+        stat_obj = _DescStat(
+            pd.DataFrame, col_data=["col_a", "col_b", "col_c"]
+        )
+        stat_obj.draw_single_boxplot("Title", "/path/to/output/fig.png")
+
+        stat_obj.df = df_subscale
+        stat_obj.col_data = ["col_x", "col_y"]
+        stat_obj.draw_single_boxplot(
+            "Sub title", "/path/to/output/fig_sub.png"
+        )
+
+        """
+        # Get needed data and setup dataframe
+        stat_dict = self.calc_row_stats()
         df_plot = self.df.copy()
         df_plot["total"] = df_plot[self.col_data].sum(axis=1)
 
+        # Draw plot
         fig, ax = plt.subplots()
         plt.boxplot(df_plot["total"])
         plt.ylabel("Participant Total")
@@ -77,6 +184,8 @@ class _DescStat:
             horizontalalignment="left",
         )
         plt.title(main_title)
+
+        # Write and close plot
         plt.savefig(out_path)
         plt.close()
         print(f"\t\tDrew boxplot : {out_path}")
@@ -89,14 +198,39 @@ class _DescStat:
         main_title: str,
         out_path: str,
     ):
-        """Title."""
+        """Draw a boxplot with two factors.
+
+        Parameters
+        ----------
+        fac_col : str
+            Column name of pd.DataFrame containing fac_a, fac_b.
+        fac_a : str
+            Factor A name, e.g. "Visit 2"
+        fac_b : str
+            Factor B name, e.g. "Visit 3"
+        main_title : str
+            Main title of boxplot
+        out_path : path
+            Output location and file name of figure
+
+        Example
+        -------
+        stat_obj = _DescStat(
+            pd.DataFrame, col_data=["col_a", "col_b", "col_c"]
+        )
+        stat_obj.draw_double_boxplot(
+            "visit", "Visit 2", "Visit 3", "Title", "/path/to/output/fig.png"
+        )
+
+        """
+        # Get needed data and setup dataframes
         stat_dict = self.calc_factor_stats(fac_col, fac_a, fac_b)
         df_plot = self.df.copy()
         df_plot["total"] = df_plot[self.col_data].sum(axis=1)
+        df_a = df_plot.loc[df_plot[fac_col] == fac_a, "total"]
+        df_b = df_plot.loc[df_plot[fac_col] == fac_b, "total"]
 
-        #
-        df_a = df_plot.loc[df_plot["visit"] == fac_a, "total"]
-        df_b = df_plot.loc[df_plot["visit"] == fac_b, "total"]
+        # Draw boxplots
         fig, ax = plt.subplots()
         plt.boxplot([df_a, df_b])
         plt.ylabel("Participant Total")
@@ -117,12 +251,50 @@ class _DescStat:
             horizontalalignment="left",
         )
         plt.title(main_title)
+
+        # Write and close
         plt.savefig(out_path)
         print(f"\t\tDrew boxplot : {out_path}")
         plt.close()
 
-    def calc_long_stats(self, grp_a: str, grp_b: str) -> pd.DataFrame:
-        """Title."""
+    def calc_long_stats(self, grp_a, grp_b):
+        """Caculate descriptive stats from long-formatted dataframe.
+
+        Subset calculation by two grouping columns, e.g. "task", "emotion"
+        if self.df.columns contains "task" and "emotion". Grouping columns
+        can have multiple values i.e. movies, scenarios for "task" or
+        all 15 emotions for "emotion".
+
+        Parameters
+        ----------
+        grp_a : str
+            Grouping column name
+        grp_b : str
+            Grouping column name
+
+        Returns
+        -------
+        pd.DataFrame
+            Long-formatted dataframe with stats for each combination
+            of grp_a * grp_b.
+
+        Raises
+        ------
+        KeyError
+            Column name grp_a|b not found in df
+
+        Example
+        -------
+        stat_obj = _DescStat(pd.DataFrame)
+        stat_dict = stat_obj.calc_long_stats("task", "emotion")
+
+        """
+        # Check df for columns
+        for col in [grp_a, grp_b]:
+            if col not in self.df.columns:
+                raise KeyError(f"Missing expected column in df : {col}")
+
+        # Calc stats
         df_mean = self.df.groupby([grp_a, grp_b]).mean()
         df_mean.columns = [*df_mean.columns[:-1], "mean"]
         df_std = self.df.groupby([grp_a, grp_b]).std()
@@ -131,6 +303,7 @@ class _DescStat:
             pd.DataFrame.kurt
         )  # Throws the FutureWarning
 
+        # Combine relevant values, round
         df_mean["std"] = df_std.iloc[:, -1:]
         df_mean["skew"] = df_skew.iloc[:, -1:]
         df_mean["kurt"] = df_kurt.iloc[:, -1:]
@@ -139,16 +312,62 @@ class _DescStat:
 
     def draw_long_boxplot(
         self,
-        x_col: str,
-        x_lab: str,
-        y_col: str,
-        y_lab: str,
-        hue_order: list,
-        hue_col: str,
-        main_title: str,
-        out_path: str,
+        x_col,
+        x_lab,
+        y_col,
+        y_lab,
+        hue_order,
+        hue_col,
+        main_title,
+        out_path,
     ):
-        """Title."""
+        """Generate a wide plot with multiple boxplots.
+
+        Using a long-formatted dataframe, generate a figure with
+        multiple boxplots organized by two factors (x_col, hue_col).
+
+        Parameters
+        ----------
+        x_col : str
+            Column name for x-axis, values should by string dtype
+        x_lab : str
+            X-axis label
+        y_col : str
+            Column name for y-axis, values should by numeric dtype
+        y_lab : str
+            Y-axis label
+        hue_order : list
+            Order of factors
+        hue_col : str
+            Column for hue ordering, values should by string dtype
+        main_title : str
+            Main title of plot
+        out_path : path
+            Output location and file name
+
+        Raises
+        ------
+        KeyError
+            Specified columns (x|y|hue_col) not found in df
+        TypeError
+            Incorrect dtype of columns
+
+        Example
+        -------
+        stat_obj = _DescStat(pd.DataFrame)
+        stat_obj.draw_long_boxplot(
+            x_col="emotion",
+            x_lab="Emotion Category",
+            y_col="rating",
+            y_lab="Frequency",
+            hue_order=["Scenarios", "Videos"],
+            hue_col="task",
+            main_title="In-Scan Resting Emotion Frequency",
+            out_path="/some/path/file.png",
+        )
+
+        """
+        # Validate arguments and types
         for _col in [x_col, y_col, hue_col]:
             if _col not in self.df.columns:
                 raise KeyError(f"Missing expected column in df : {_col}")
@@ -159,7 +378,7 @@ class _DescStat:
         ):
             raise TypeError("df[x_col] and df[hue_col] should be string type")
 
-        #
+        # Draw and write plot
         df_plot = self.df.copy()
         df_plot[y_col] = df_plot[y_col].astype(float)
         fig, ax = plt.subplots()
@@ -172,7 +391,6 @@ class _DescStat:
             hue_order=hue_order,
         )
         plt.legend(bbox_to_anchor=(1.02, 1), loc="upper left", borderaxespad=0)
-
         plt.ylabel(y_lab)
         plt.xlabel(x_lab)
         plt.xticks(rotation=45, ha="right")
@@ -252,25 +470,26 @@ class _DescStat:
 
 # %%
 class Visit1Stats(_DescStat):
-    """Title.
+    """Get data and supply statistic, plotting methods.
 
-    Attributes
-    ----------
-    df : pd.DataFrame
-        Survey-specific dataframe
-    col_data : list
-        Column names of df relevant to survey
+    Construct pd.DataFrame from cleaned Visit 1 survey data for a specific
+    survey (e.g. AIM, TAS), and supply methods for generating descriptive
+    statistics and figures.
 
-    Methods
+    Inherits _DescStat.
+
+    Example
     -------
-
+    stat_obj = Visit1Stats("/path/to/AIM.csv", "AIM")
+    stat_dict = stat_obj.calc_row_stats()
+    stat_obj.draw_single_boxplot("Title", "/path/to/output/fig.png")
 
     """
 
     def __init__(self, csv_path, survey_name):
         """Initialize.
 
-        Setup and construct dataframe of survey responses.
+        Triggers construction of survey dataframe.
 
         Parameters
         ----------
@@ -280,96 +499,188 @@ class Visit1Stats(_DescStat):
         survey_name : str
             Short name of survey, found in column names of CSV
 
-        Attributes
-        ----------
-        df : pd.DataFrame
-            Survey-specific dataframe
-
         Raises
         ------
         FileNotFoundError
             File missing at csv_path
-        KeyError
-            Missing column names
 
         """
         print("Initializing Visit1Stats")
         if not os.path.exists(csv_path):
             raise FileNotFoundError(f"Missing file : {csv_path}")
+        df, col_data = self._make_df(csv_path, survey_name)
+        super().__init__(df, col_data)
 
-        # Validate, make dataframe
+    def _make_df(
+        self, csv_path: str, survey_name: str
+    ) -> Tuple[pd.DataFrame, list]:
+        """Return survey data as dataframe and data column names."""
+        # Read in data, check column names
         df = pd.read_csv(csv_path)
-        col_names = df.columns
-        if "study_id" not in col_names:
+        if "study_id" not in df.columns:
             raise KeyError("Expected dataframe to have column : study_id")
-        comb_names = "\t".join(col_names)
-        if survey_name not in comb_names:
+        col_str = "\t".join(df.columns)
+        if survey_name not in col_str:
             raise KeyError(
-                f"Expected dataframe column that contains : {survey_name}"
+                f"Expected dataframe column name that contains {survey_name}"
             )
-        df = df.set_index("study_id")
-        super().__init__(df)
-        self._prep_df(survey_name)
 
-    def _prep_df(self, name: str):
-        """Title."""
-        self.df = self.df.drop(labels=["datetime"], axis=1)
-        self.col_data = [x for x in self.df.columns if name in x]
-        self.df[self.col_data] = self.df[self.col_data].astype("Int64")
+        # Organize df for use by _DescStat
+        df = df.set_index("study_id")
+        df = df.drop(labels=["datetime"], axis=1)
+        col_data = [x for x in df.columns if survey_name in x]
+        df[col_data] = df[col_data].astype("Int64")
+        return (df, col_data)
 
 
 # %%
 class Visit23Stats(_DescStat):
-    """Title."""
+    """Get data and supply statistic, plotting methods.
 
-    def __init__(self, day2_csv_path, day3_csv_path, survey_name):
-        """Title."""
-        #
+    Construct pd.DataFrame from cleaned Visit 2 and 3 survey data
+    for a specific survey (e.g. BDI), and supply methods for
+    generating descriptive statistics and figures.
+
+    Inherits _DescStat.
+
+    Example
+    -------
+    fac_col = "visit"
+    fac_a = "Visit 2"
+    fac_b = "Visit 3"
+    stat_obj = Visit23Stats(
+        "/path/to/day2/BDI.csv",
+        "/path/to/day3/BDI.csv",
+        "BDI",
+        fac_col,
+        fac_a,
+        fac_b,
+    )
+    stat_dict = stat_obj.calc_factor_stats(fac_col, fac_a, fac_b)
+    stat_obj.draw_double_boxplot(
+        fac_col, fac_a, fac_b, "Title", "/path/to/output/fig.png"
+    )
+
+    """
+
+    def __init__(
+        self, day2_csv_path, day3_csv_path, survey_name, fac_col, fac_a, fac_b
+    ):
+        """Initialize.
+
+        Triggers construction of concatenated survey dataframe, with
+        added "visit" column.
+
+        Parameters
+        ----------
+        day2_csv_path : path
+            Location of cleaned visit 2 survey CSV, requires columns
+            "study_id" and "<survey_name>_*".
+        day3_csv_path : path
+            Location of cleaned visit 3 survey CSV, requires columns
+            "study_id" and "<survey_name>_*".
+        survey_name : str
+            Short name of survey, found in column names of CSV
+        fac_col : str
+            Column name for writing fac_a|b
+        fac_a : str
+            Value for identifying day2 data
+        fac_b : str
+            Value for identifying day3 data
+
+        Raises
+        ------
+        FileNotFoundError
+            File missing at csv_path
+
+        """
         print("Initializing Visit23Stats")
-        self.survey_name = survey_name
-        df2 = pd.read_csv(day2_csv_path)
-        df3 = pd.read_csv(day3_csv_path)
-        if not self._valid_df(df2) or not self._valid_df(df3):
-            raise ValueError("Missing expected columns in dataframes")
 
-        # TODO Check that column names are equal between df2, df3
-        self.col_data = [x for x in df2.columns if self.survey_name in x]
-        df_day2 = self._prep_df(df2, "Visit 2")
-        df_day3 = self._prep_df(df3, "Visit 3")
-        df = pd.concat([df_day2, df_day3], ignore_index=True)
-        super().__init__(df)
-        del df2, df3, df_day2, df_day3
+        # Validate
+        for chk_path in [day2_csv_path, day3_csv_path]:
+            if not os.path.exists(chk_path):
+                raise FileNotFoundError(
+                    f"Missing expected CSV file : {chk_path}"
+                )
 
-    def _valid_df(self, df: pd.DataFrame) -> bool:
-        """Title."""
-        col = df.columns
-        comb = "\t".join(col)
-        out_bool = (
-            True if "study_id" in col and self.survey_name in comb else False
+        # Get visit data and check column names
+        df_day2, col_day2 = self._make_df(
+            day2_csv_path, survey_name, fac_a, fac_col
         )
-        return out_bool
+        df_day3, col_day3 = self._make_df(
+            day3_csv_path, survey_name, fac_b, fac_col
+        )
+        if col_day2 != col_day3:
+            raise ValueError("Dataframes do not have identical column names.")
 
-    def _prep_df(self, df: pd.DataFrame, fac: str) -> pd.DataFrame:
-        """Title."""
+        # Make single df
+        df = pd.concat([df_day2, df_day3], ignore_index=True)
+        super().__init__(df, col_day2)
+
+    def _make_df(
+        self, csv_path: str, survey_name: str, fac: str, fac_col: str
+    ) -> Tuple[pd.DataFrame, list]:
+        """Return survey data as dataframe and data column names."""
+        # Read in data, check column names
+        df = pd.read_csv(csv_path)
+        if "study_id" not in df.columns:
+            raise KeyError("Expected dataframe to have column : study_id")
+        col_str = "\t".join(df.columns)
+        if survey_name not in col_str:
+            raise KeyError(
+                f"Expected dataframe column name that contains {survey_name}"
+            )
+
+        # Organize df for use by _DescStat
         df = df.drop(labels=["datetime"], axis=1)
-        df[self.col_data] = df[self.col_data].astype("Int64")
-        df["visit"] = fac
-        return df
+        col_data = [x for x in df.columns if survey_name in x]
+        df[col_data] = df[col_data].astype("Int64")
+        df[fac_col] = fac
+        return (df, col_data)
 
 
 # %%
 class RestRatings(_DescStat):
-    """Title."""
+    """Get data and supply statistic, plotting methods.
+
+    Construct pd.DataFrame from cleaned Visit 2 and 3 resting-state
+    emotion frequency responses and supply methods for generating
+    descriptive statistics and figures.
+
+    Inherits _DescStat.
+
+    Methods
+    -------
+    write_stats(out_path)
+        Calculate descriptive stats and save as CSV table
+
+    Example
+    -------
+    rest_stats = RestRatings("/path/to/project/dir")
+    df_long = rest_stats.write_stats("/path/to/output/file.csv")
+    rest_stats.draw_long_boxplot(**args)
+
+    """
 
     def __init__(self, proj_dir):
-        """Title."""
+        """Initialize.
+
+        Trigger construction of long-formatted dataframe of
+        resting state emotion frequency responses.
+
+        Parameters
+        ----------
+        proj_dir : path
+            Location of project's experiment directory
+
+        """
         self._proj_dir = proj_dir
         df_long = self._get_data()
         super().__init__(df_long)
 
-    def _get_data(self):
-        """Title."""
-        # Identify rest-ratings dataframes
+    def _get_data(self) -> pd.DataFrame:
+        """Construct dataframe from clean visit 2, 3 data."""
+        # Identify rest-ratings files
         day2_path = os.path.join(
             self._proj_dir,
             "data_survey/visit_day2/data_clean",
@@ -404,7 +715,7 @@ class RestRatings(_DescStat):
         emo_list = [x for x in df_rest_int.columns if x not in excl_list]
         df_rest_int[emo_list] = df_rest_int[emo_list].astype("Int64")
 
-        # Convert to long form, organize columns
+        # Convert to long format, organize columns
         df_long = pd.melt(
             df_rest_int,
             id_vars=["study_id", "visit", "task"],
@@ -419,16 +730,23 @@ class RestRatings(_DescStat):
         df_long = df_long.dropna(axis=0)
         return df_long
 
-    def write_stats(self):
-        """Title."""
+    def write_stats(self, out_path):
+        """Calculate and write descriptive statistics.
+
+        Parameters
+        ----------
+        out_path : path
+            Output location and name of statistic table
+
+        Returns
+        -------
+        pd.DataFrame
+            Long-formatted descriptive stats
+
+        """
         df_stats = self.calc_long_stats("task", "emotion")
-        out_stats = os.path.join(
-            self._proj_dir,
-            "analyses/surveys_stats_descriptive",
-            "stats_rest-ratings.csv",
-        )
-        df_stats.to_csv(out_stats)
-        print(f"\tWrote csv : {out_stats}")
+        df_stats.to_csv(out_path)
+        print(f"\tWrote csv : {out_path}")
         return df_stats
 
 
@@ -821,7 +1139,7 @@ class EmorepTask(_DescStat):
         df_stats.to_csv(out_csv)
         print(f"\tWrote csv : {out_csv}")
 
-        # Make violin plots
+        #
         if self._draw_plot:
             out_plot = os.path.join(
                 self.out_dir,
