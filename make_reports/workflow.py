@@ -931,26 +931,38 @@ def calc_task_stats(proj_dir, survey_list, draw_plot):
     # Process in-scan emorep task responses
     if "task" in survey_list:
         task_stats = calc_surveys.EmorepTask(proj_dir, draw_plot)
-        survey_descriptives["task"] = task_stats.desc_intensity()
+        survey_descriptives["task"] = task_stats.select_intensity()
         for task in ["Videos", "Scenarios"]:
-            _ = task_stats.desc_emotion(task)
+            _ = task_stats.select_emotion(task)
 
     return survey_descriptives
 
 
 # %%
-def make_survey_table(
-    proj_dir, sur_online, sur_scanner, draw_plot, write_json
-):
-    """Title."""
-    #
+def make_survey_table(proj_dir, sur_online, sur_scanner):
+    """Generate tables from REDCap, Qualtrics, and task survey data.
+
+    Trigger workflow.CalcRedcapQualtricsStats and workflow.calc_task_stats
+    to generate tables of survey responses. Figures are also drawn.
+
+    Parameters
+    ----------
+    proj_dir : path
+        Location of project's experiment directory
+    sur_online : list
+        All abbreviations for surveys done remotely
+    sur_scanner : list
+        All abbreviations for task responses
+
+    """
+    # Trigger Visit 1-2 methods
     calc_rcq = CalcRedcapQualtricsStats(
-        proj_dir, sur_online, draw_plot, write_json
+        proj_dir, sur_online, draw_plot=True, write_json=False
     )
     calc_rcq.match_survey_visits()
     data_rcq = calc_rcq.survey_descriptives
 
-    #
+    # Organize generated dataframe into table, write out
     df_all = pd.DataFrame(
         columns=["Title", "num", "mean", "SD", "skewness", "kurtosis"]
     )
@@ -965,10 +977,10 @@ def make_survey_table(
         "analyses/surveys_stats_descriptive",
         "table_redcap_qualtrics.csv",
     )
-    df_all.to_csv(out_stats)
+    df_all.to_csv(out_stats, index=False)
 
-    #
-    data_scan = calc_task_stats(proj_dir, sur_scanner, draw_plot)
+    # Trigger task methods
+    _ = calc_task_stats(proj_dir, sur_scanner, draw_plot=True)
 
 
 # %%

@@ -125,7 +125,7 @@ def main():
     # Validate input
     if survey_list and (not draw_plot and not write_json):
         raise ValueError(
-            "Option --survey-names requires --draw_plot or --write_json."
+            "Option --survey-names requires --draw-plot or --write-json."
         )
 
     # Set redcap/qualtircs and scan lists
@@ -164,10 +164,9 @@ def main():
     sur_online = [x for x in survey_list if x in sur_rc_qual]
     sur_scanner = [x for x in survey_list if x in sur_scan]
 
+    # Trigger workflows based on user input
     if make_tables:
-        workflow.make_survey_table(
-            proj_dir, sur_online, sur_scanner, draw_plot, write_json
-        )
+        workflow.make_survey_table(proj_dir, sur_online, sur_scanner)
         sys.exit(0)
 
     if sur_online:

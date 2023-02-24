@@ -1002,7 +1002,7 @@ class StimRatings(_DescStat):
         ----------
         stim_type : str
             [Videos | Scenarios]
-            Stimulus modality of session
+            Stimulus modality of task
 
         Returns
         -------
@@ -1063,28 +1063,29 @@ class StimRatings(_DescStat):
 class EmorepTask(_DescStat):
     """Generate descriptive stats and plots for EmoRep task data.
 
-    Use all available BIDS events files to generate dataframes of
-    emotion and intensity selection data. Then generate descriptive
-    stats and plots.
+    Concatenate all data from all participants' events files into
+    a long-formatted dataframe, and then generate descriptive
+    statistics and plots for emotion and intensity selection trials.
 
-    Output plots and dataframes are written to:
-        <out_dir>/[plot*|stats]_task-[emotion|intensity]*
+    Inherits _DescStat.
 
     Attributes
     ----------
-    df_int : pd.DataFrame
-        Long-formatted dataframe of participant intensity selections
-    df_emo : pd.DataFrame
-        Long-formatted dataframe of participant emotion selections
     out_dir : path
-        Location of output directory
+        Output destination for generated files
 
     Methods
     -------
-    desc_intensity()
-        Generate descriptive stats and plots for intensity selection trials
-    desc_emotion()
+    select_emotion()
         Generate descriptive stats and plots for emotion selection trials
+    select_intensity()
+        Generate descriptive stats and plots for intensity selection trials
+
+    Example
+    -------
+    stim_stats = EmorepTask("/path/to/project/dir", True)
+    stim_stats.select_intensity()
+    stim_stats.select_emotion("Videos")
 
     """
 
@@ -1098,60 +1099,44 @@ class EmorepTask(_DescStat):
         ----------
         proj_dir : path
             Location of project's experiment directory
+        draw_plot : bool
+            Whether to draw figures
 
         Attributes
         ----------
-        out_dir : path
-            Location of output directory
-        _events_all : list
-            All participant events files
-        _task_list : list
-            Session stimulus types
+
 
         Raises
         ------
+        TypeError
         ValueError
             Events files were not detected
 
         """
         if not isinstance(draw_plot, bool):
             raise TypeError("Expected draw_plot type bool")
+
         print("\nInitializing DescriptTask")
         self._draw_plot = draw_plot
-        self._task_list = ["movies", "scenarios"]
         self.out_dir = os.path.join(
             proj_dir, "analyses/surveys_stats_descriptive"
         )
 
-        # Find all events files, make dataframe
+        # Find all events files, make and initialize dataframe
         mri_rawdata = os.path.join(proj_dir, "data_scanner_BIDS", "rawdata")
-        self._events_all = sorted(
+        events_all = sorted(
             glob.glob(f"{mri_rawdata}/**/*_events.tsv", recursive=True)
         )
-        if not self._events_all:
+        if not events_all:
             raise ValueError(
                 f"Expected to find BIDS events files in : {mri_rawdata}"
             )
-        self._mk_master_df()
+        df = self._get_data(events_all)
+        super().__init__(df)
 
-    def _mk_master_df(self):
-        """Combine all events files into dataframe.
-
-        Aggregate all events data info dataframe, then remove trials
-        and columns not pertaining to stimulus responses. Generate
-        dataframes for intensity and emotion selection trials.
-
-        Attributes
-        ----------
-        df_int : pd.DataFrame
-            Long-formatted dataframe of participant intensity selections
-        df_emo : pd.DataFrame
-            Long-formatted dataframe of participant emotion selections
-
-        """
+    def _get_data(self, events_all: list) -> pd.DataFrame:
+        """Combine all events files into dataframe."""
         print("\tBuilding dataframe of all participant events.tsv")
-
-        # Build dataframe of all events data
         df_all = pd.DataFrame(
             columns=[
                 "onset",
@@ -1168,7 +1153,7 @@ class EmorepTask(_DescStat):
                 "run",
             ]
         )
-        for event_path in self._events_all:
+        for event_path in events_all:
             subj, sess, task, run, _ = os.path.basename(event_path).split("_")
             df = pd.read_csv(event_path, sep="\t")
             df["subj"] = subj.split("-")[-1]
@@ -1178,13 +1163,15 @@ class EmorepTask(_DescStat):
             df_all = pd.concat([df_all, df], ignore_index=True)
             del df
 
-        # Reduce dataframe to relevant rows and columns. Clean dataframe.
+        # Extract participant response rows
         df_resp = df_all.loc[
             df_all["trial_type"].isin(
                 ["movie", "scenario", "emotion", "intensity"]
             )
         ].reset_index(drop=True)
         del df_all
+
+        # Organize dataframe
         df_resp["emotion"] = df_resp["emotion"].fillna(method="ffill")
         df_resp = df_resp.loc[
             ~df_resp["trial_type"].isin(["movie", "scenario"])
@@ -1192,21 +1179,19 @@ class EmorepTask(_DescStat):
         df_resp = df_resp.drop(
             ["onset", "duration", "accuracy", "stim_info"], axis=1
         )
+
+        # Clean up column values and types
         df_resp["emotion"] = df_resp["emotion"].str.title()
         df_resp["task"] = df_resp["task"].str.title()
         df_resp["task"] = df_resp["task"].replace("Movies", "Videos")
         df_resp["run"] = df_resp["run"].astype("Int64")
-        super().__init__(df_resp)
-        self.df_all = df_resp
+        return df_resp
 
-    def desc_intensity(self):
+    def select_intensity(self):
         """Generate descriptive stats and plots for intensity selection.
 
-        Output dataframe written to:
-            <out_dir>/stats_task-intensity.csv
-
-        Output plots written to:
-            <out_dir>/plot_violin_task-intensity_*.png
+        Caculate descriptive stats for each emotion category and
+        task type, save dataframe and draw boxplots.
 
         Returns
         -------
@@ -1214,29 +1199,30 @@ class EmorepTask(_DescStat):
             Descriptive stats of task, emotion
 
         """
-        # Generate and clean dataframe for intensity selection
-        df_int = self.df_all.loc[
-            self.df_all["trial_type"] == "intensity"
-        ].copy()
+        # Subset dataframe for intensity selection
+        df_all = self.df.copy()
+        df_int = df_all.loc[df_all["trial_type"] == "intensity"].copy()
         df_int["response"] = df_int["response"].replace("NONE", np.nan)
         df_int = df_int.reset_index(drop=True)
         df_int = df_int.drop(
             ["response_time", "run", "trial_type", "sess"], axis=1
         )
+
+        # Organize dataframe for _DescStat.calc_long_stats
         df_int["task"] = df_int["task"].str.title()
         df_int["response"] = df_int["response"].astype("Int64")
         for str_col in ["emotion", "task"]:
             df_int[str_col] = df_int[str_col].astype(pd.StringDtype())
         df_int = df_int.sort_values(by=["subj", "emotion", "task"])
 
-        #
+        # Calculate and write stats
         self.df = df_int
         df_stats = self.calc_long_stats(grp_a="task", grp_b="emotion")
-        out_csv = os.path.join(self.out_dir, "stats_task-intensity.csv")
+        out_csv = os.path.join(self.out_dir, "table_task-intensity.csv")
         df_stats.to_csv(out_csv)
         print(f"\tWrote csv : {out_csv}")
 
-        #
+        # Draw boxplot
         if self._draw_plot:
             out_plot = os.path.join(
                 self.out_dir,
@@ -1252,44 +1238,54 @@ class EmorepTask(_DescStat):
                 main_title="In-Scan Stimulus Ratings",
                 out_path=out_plot,
             )
+        self.df = df_all.copy()
         return df_stats
 
-    def desc_emotion(self, task):
+    def select_emotion(self, task):
         """Generate descriptive stats and plots for emotion selection.
 
-        Output dataframe written to:
-            <out_dir>/stats_task-emotion_<task>.csv
-
-        Output plots written to:
-            <out_dir>/plot_heat-prob_task-emotion_<task>.png
+        Caculate proportion of ratings for each emotion category, save
+        dataframe and draw confusion matrix.
 
         Parameters
         ----------
-        task
+        task : str
+            [Videos | Scenarios]
+            Stimulus modality of task
 
         Returns
         -------
         dict
             pd.DataFrames of confusion matrices for each task
 
+        Raises
+        ------
+        ValueError
+            Unexpected input parameter
+
         """
-        # Generate and clean dataframe for emotion selection
-        df_emo = self.df_all.loc[
-            (self.df_all["trial_type"] == "emotion")
-            & (self.df_all["task"] == task)
+        if task not in ["Videos", "Scenarios"]:
+            raise ValueError(f"Unexpected task value : {task}")
+
+        # Subset dataframe for emotion selection
+        df_all = self.df.copy()
+        df_emo = df_all.loc[
+            (df_all["trial_type"] == "emotion") & (df_all["task"] == task)
         ].copy()
         df_emo["response"] = df_emo["response"].str.title()
         df_emo = df_emo.reset_index(drop=True)
 
-        #
+        # Determine emotions
         emo_all = df_emo["emotion"].unique().tolist()
         emo_all.sort()
-        out_data = os.path.join(
-            self.out_dir, f"stats_task-emotion_{task.lower()}.csv"
-        )
+
+        # Calculate confusion matrix, write out
         self.df = df_emo
         df_conf = self.confusion_matrix(emo_all, "subj", 2)
-        df_conf.to_csv(out_data, index=False)
+        out_data = os.path.join(
+            self.out_dir, f"table_task-emotion_{task.lower()}.csv"
+        )
+        df_conf.to_csv(out_data)
         print(f"\t\tWrote dataset : {out_data}")
 
         # Draw heatmap
@@ -1303,6 +1299,7 @@ class EmorepTask(_DescStat):
                 main_title=f"In-Scan {task[:-1]} Endorsement Proportion",
                 out_path=out_plot,
             )
+        self.df = df_all.copy()
         return df_conf
 
 
