@@ -18,6 +18,8 @@ import matplotlib.pyplot as plt
 class _DescStat:
     """Supply statistic and plotting methods.
 
+    Each method supplies their own examples.
+
     Attributes
     ----------
     col_data : list
@@ -27,14 +29,25 @@ class _DescStat:
 
     Methods
     -------
-    calc_row_stats()
-        Generate descriptive stats for df rows i.e. subjects.
     calc_factor_stats(fac_col, fac_a, fac_b)
         Wrap calc_row_stats for multiple factors e.g. visit
-    draw_single_boxplot(main_title, out_path)
-        Generate and write a boxplot of row totals
+    calc_long_stats(grp_a, grp_b)
+        Calculate descriptive stats from long-formatted dataframe
+        that has two grouping factors
+    calc_row_stats()
+        Generate descriptive stats for df rows i.e. subjects
+    confusion_heatmap(**args)
+        Generate heatmap from confusion matrix
+    confusion_matrix(emo_list, subj_col, num_exp)
+        Generate confusion matrix of participant stimulus
+        endorsement proportions
     draw_double_boxplot(fac_col, fac_a, fac_b, main_title, out_path)
         Generate and write a boxplot with two factors
+    draw_long_boxplot(**args)
+        Generate wide boxplot for long-formatted dataframe using
+        two grouping factors
+    draw_single_boxplot(main_title, out_path)
+        Generate and write a boxplot of row totals
 
     """
 
@@ -137,7 +150,7 @@ class _DescStat:
         for fac, mask in zip([fac_a, fac_b], [mask_a, mask_b]):
             self.df = df_calc[mask]
             out_dict[fac] = self.calc_row_stats()
-        self.df = df_calc
+        self.df = df_calc.copy()
         return out_dict
 
     def draw_single_boxplot(self, main_title, out_path):
@@ -396,18 +409,64 @@ class _DescStat:
         plt.xticks(rotation=45, ha="right")
         plt.title(main_title)
         plt.savefig(out_path, bbox_inches="tight")
-        print(f"\tDrew boxplot : {out_path}")
+        print(f"\t\tDrew boxplot : {out_path}")
         plt.close()
 
     def confusion_matrix(
         self,
-        emo_list: list,
-        subj_col: str,
-        num_exp: int,
-        emo_col: str = "emotion",
-        resp_col: str = "response",
-    ) -> pd.DataFrame:
-        """Generate a confusion matrix of emotion endorsements."""
+        emo_list,
+        subj_col,
+        num_exp,
+        emo_col="emotion",
+        resp_col="response",
+    ):
+        """Generate a confusion matrix of emotion endorsements.
+
+        Calculate the proportion of emotion endorsements for each emotion,
+        and supply data as a confusion matrix. Dataframe should be
+        long-formatted.
+
+        Parameters
+        ----------
+        emo_list : list
+            All emotions presented,
+            len == 15
+        subj_col : str
+            Dataframe column identifer for subject IDs,
+            dtype = string
+        num_exp : int
+            Number of possible endorsements each subject
+            could have given an emotion.
+        emo_col : str, optional
+            Dataframe column identifier for emotion stimulus
+        resp_col : str, optional
+            Dataframe column identifier for participant endorsement,
+            dtype = string
+
+        Returns
+        -------
+        pd.DataFrame
+            Confusion matrix
+            column = stimulus, row = participant response
+
+        Raises
+        ------
+        KeyError
+            Specified column string missing in df.columns
+        TypeError
+            Incorrect df dtypes or parameter types
+        ValueError
+            Unexpected number of emotions
+
+        Example
+        -------
+        stat_obj = _DescStat(pd.DataFrame)
+        df_confusion = stat_obj.confusion_matrix(
+            ["emo1", ... "emo15"], "subj_id", 5
+        )
+
+        """
+        # Validate user input, dataframe types
         for _col in [subj_col, emo_col, resp_col]:
             if _col not in self.df.columns:
                 raise KeyError(f"Missing expected column in df : {_col}")
@@ -446,17 +505,36 @@ class _DescStat:
 
     def confusion_heatmap(
         self,
-        df_conf: pd.DataFrame,
-        main_title: str,
-        out_path: str,
-        x_lab: str = "Stimulus Category",
-        y_lab: str = "Participant Endorsement",
+        df_conf,
+        main_title,
+        out_path,
+        x_lab="Stimulus Category",
+        y_lab="Participant Endorsement",
     ):
         """Draw a heatmap from a confusion matrix.
 
         Parameters
         ----------
         df_conf : pd.DataFrame, _DescStat.confusion_matrix
+            Dataframe of confusion matrix
+        main_title : str
+            Main title of plot
+        out_path : path
+            Output location and file name
+        x_lab : str, optional
+            X-axis label
+        y_lab : str, optional
+            Y-axis label
+
+        Example
+        -------
+        stat_obj = _DescStat(pd.DataFrame)
+        df_confusion = stat_obj.confusion_matrix(
+            ["emo1", ... "emo15"], "subj_id", 5
+        )
+        stat_obj.confusion_heatmap(
+            df_confusion, "Title", "/some/path/file.png"
+        )
 
         """
         # Draw and write
@@ -464,13 +542,13 @@ class _DescStat:
         ax.set(xlabel=x_lab, ylabel=y_lab)
         ax.set_title(main_title)
         plt.savefig(out_path, bbox_inches="tight")
-        print(f"\t\tDrew heat-prob plot : {out_path}")
+        print(f"\t\tDrew heatmap plot : {out_path}")
         plt.close()
 
 
 # %%
 class Visit1Stats(_DescStat):
-    """Get data and supply statistic, plotting methods.
+    """Get Visit 1 data and supply statistic, plotting methods.
 
     Construct pd.DataFrame from cleaned Visit 1 survey data for a specific
     survey (e.g. AIM, TAS), and supply methods for generating descriptive
@@ -535,7 +613,7 @@ class Visit1Stats(_DescStat):
 
 # %%
 class Visit23Stats(_DescStat):
-    """Get data and supply statistic, plotting methods.
+    """Get Visit 2, 3 data and supply statistic, plotting methods.
 
     Construct pd.DataFrame from cleaned Visit 2 and 3 survey data
     for a specific survey (e.g. BDI), and supply methods for
@@ -641,7 +719,7 @@ class Visit23Stats(_DescStat):
 
 # %%
 class RestRatings(_DescStat):
-    """Get data and supply statistic, plotting methods.
+    """Get resting frequency data and supply statistic, plotting methods.
 
     Construct pd.DataFrame from cleaned Visit 2 and 3 resting-state
     emotion frequency responses and supply methods for generating
@@ -751,19 +829,19 @@ class RestRatings(_DescStat):
 
 
 class StimRatings(_DescStat):
-    """Generate descriptives for stimulus ratings survey.
+    """Processs post-scan stimulus ratings data.
 
-    Calculate descriptive statistics and draw plots for
-    endorsement, arousal, and valence responses.
+    Construct pd.DataFrame from cleaned Visit 2 and 3 post-scan
+    stimulus ratings, then calculate descriptive statistics and
+    draw plots for emotion endorsement, valence, and arousal
+    responses.
+
+    Inherits _DescStat.
 
     Attributes
     ----------
     out_dir : path
         Output destination for generated files
-    df_all : pd.DataFrame
-        Day2, day3 stimulus ratings
-    emo_list : list
-        Emotion categories of stimuli
 
     Methods
     -------
@@ -772,45 +850,59 @@ class StimRatings(_DescStat):
     arousal_valence(stim_type, prompt_name)
         Generate stats and plots for arousal and valence responses
 
+    Example
+    -------
+    stim_stats = StimRatings("/path/to/project/dir", True)
+    stim_stats.endorsement("Videos")
+    stim_stats.arousal_valence("Videos")
+
     """
 
     def __init__(self, proj_dir, draw_plot):
         """Initialize.
 
+        Trigger construction of long-formatted dataframe of
+        resting state emotion frequency responses.
+
         Parameters
         ----------
         proj_dir : path
             Location of project's experiment directory
+        draw_plot : bool
+            Whether to draw figures
 
         Attributes
         ----------
         out_dir : path
             Output destination for generated files
+        _emo_list : list
+            Emotions categories presented in task
 
         Raises
         ------
+        TypeError
+            Incorrect user-input parameter types
 
         """
+        # Validate user input
         if not isinstance(draw_plot, bool):
             raise TypeError("Expected draw_plot type bool")
+
+        # Set attrs
         print("\nInitializing DescriptStimRatings")
         self._draw_plot = draw_plot
         self._proj_dir = proj_dir
         self.out_dir = os.path.join(
             proj_dir, "analyses/surveys_stats_descriptive"
         )
-        df = self._get_data()
+
+        # Trigger dataframe construction, initialize helper
+        df, self._emo_list = self._get_data()
         super().__init__(df)
 
-    def _get_data(self) -> pd.DataFrame:
-        """Make a dataframe of stimulus ratings.
-
-        Attributes
-        ----------
-        emo_list : list
-            Emotion categories of stimuli
-
-        """
+    def _get_data(self) -> Tuple[pd.DataFrame, list]:
+        """Make a dataframe of stimulus ratings."""
+        # Check for cleaned files
         day2_path = os.path.join(
             self._proj_dir,
             "data_survey/visit_day2/data_clean",
@@ -825,19 +917,20 @@ class StimRatings(_DescStat):
             if not os.path.exists(day):
                 raise FileNotFoundError(f"Expected to find : {day}")
 
-        # Combine visit data
+        # Read-in, combine visit data
         df_day2 = pd.read_csv(day2_path)
         df_day3 = pd.read_csv(day3_path)
         df_all = pd.concat([df_day2, df_day3], ignore_index=True)
         df_all = df_all.sort_values(
             by=["study_id", "session", "type", "emotion", "prompt"]
         ).reset_index(drop=True)
+
+        # Manage column types and get list of emos
         df_all["emotion"] = df_all["emotion"].str.title()
         for col_name in ["session", "type", "emotion", "prompt"]:
             df_all[col_name] = df_all[col_name].astype(pd.StringDtype())
-        self.emo_list = df_all["emotion"].unique().tolist()
-        self.df_all = df_all
-        return df_all
+        emo_list = df_all["emotion"].unique().tolist()
+        return (df_all, emo_list)
 
     def endorsement(self, stim_type):
         """Generate descriptive info for emotion endorsements.
@@ -868,19 +961,19 @@ class StimRatings(_DescStat):
         print(f"\tGenerating descriptives of endorsement for : {stim_type}")
 
         # Get endorsement data for stimulus type
-        df_end = self.df_all[
-            (self.df_all["type"] == stim_type)
-            & (self.df_all["prompt"] == "Endorsement")
-        ].copy()
+        df_all = self.df.copy()
+        df_end = df_all[
+            (df_all["type"] == stim_type) & (df_all["prompt"] == "Endorsement")
+        ]
 
         # Generate confusion matrix of endorsement probabilities
         out_stat = os.path.join(
             self.out_dir,
-            f"stats_stim-ratings_endorsement_{stim_type.lower()}.csv",
+            f"table_stim-ratings_endorsement_{stim_type.lower()}.csv",
         )
         self.df = df_end
-        df_conf = self.confusion_matrix(self.emo_list, "study_id", 5)
-        df_conf.to_csv(out_stat, index=False)
+        df_conf = self.confusion_matrix(self._emo_list, "study_id", 5)
+        df_conf.to_csv(out_stat)
         print(f"\t\tWrote dataset : {out_stat}")
 
         # Draw heatmap
@@ -896,10 +989,14 @@ class StimRatings(_DescStat):
                 + "Endorsement Proportion",
                 out_path=out_plot,
             )
+        self.df = df_all.copy()
         return df_conf
 
     def arousal_valence(self, stim_type):
         """Generate descriptive info for emotion valence and arousal ratings.
+
+        Caculate descriptive stats for each emotion category, save
+        dataframe and draw boxplots.
 
         Parameters
         ----------
@@ -920,30 +1017,29 @@ class StimRatings(_DescStat):
             Unexpected prompt type
 
         """
+        # Validate
         if stim_type not in ["Videos", "Scenarios"]:
             raise ValueError(f"Unexpected stimulus type : {stim_type}")
 
         # Get relevant data
         print(f"\tGenerating descriptives for {stim_type}: Arousal, Valence")
-        df = self.df_all[
-            (self.df_all["type"] == stim_type)
-            & (self.df_all["prompt"] != "Endorsement")
+        df_all = self.df.copy()
+        df_av = df_all[
+            (df_all["type"] == stim_type) & (df_all["prompt"] != "Endorsement")
         ].copy()
-        df["response"] = df["response"].astype("Int64")
+        df_av["response"] = df_av["response"].astype("Int64")
 
-        # Calculate descriptive stats
-        self.df = df
+        # Calculate descriptive stats, write out
+        self.df = df_av
         df_stats = self.calc_long_stats("prompt", "emotion")
-
-        # Write stats
         out_path = os.path.join(
             self.out_dir,
-            f"stats_stim-ratings_{stim_type.lower()}.csv",
+            f"table_stim-ratings_{stim_type.lower()}.csv",
         )
         df_stats.to_csv(out_path)
         print(f"\t\tWrote dataset : {out_path}")
 
-        #
+        # Draw boxplot
         if self._draw_plot:
             out_plot = os.path.join(
                 self.out_dir,
@@ -959,6 +1055,7 @@ class StimRatings(_DescStat):
                 main_title=f"Post-Scan {stim_type[:-1]} Ratings",
                 out_path=out_plot,
             )
+        self.df = df_all.copy()
         return df_stats
 
 

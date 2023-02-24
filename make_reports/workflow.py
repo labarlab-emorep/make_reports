@@ -616,7 +616,7 @@ class CalcRedcapQualtricsStats:
 
     """
 
-    def __init__(self, proj_dir, sur_list, draw_plot, write_json=True):
+    def __init__(self, proj_dir, sur_list, draw_plot, write_json):
         """Initialize.
 
         Parameters
@@ -627,7 +627,7 @@ class CalcRedcapQualtricsStats:
             REDCap or Qualtrics survey abbreviations
         draw_plot : bool
             Whether to generate, write figure
-        write_json : bool, optional
+        write_json : bool
             Whether to save generated descriptive
             statistics to JSON
 
@@ -876,6 +876,8 @@ def calc_task_stats(proj_dir, survey_list, draw_plot):
 
     Raises
     ------
+    FileNotFoundError
+        Project directory does not exist
     TypeError
         Unexpected type of parameter
     ValueError
@@ -888,7 +890,10 @@ def calc_task_stats(proj_dir, survey_list, draw_plot):
     for sur in survey_list:
         if sur not in ["rest", "stim", "task"]:
             raise ValueError(f"Unexpected survey name : {sur}")
+    if not os.path.exists(proj_dir):
+        raise FileNotFoundError(f"Expected to find directory : {proj_dir}")
 
+    # Process in-scan post resting-state emotion frequency responses
     survey_descriptives = {}
     if "rest" in survey_list:
         print("\nWorking on rest-ratings data")
@@ -916,12 +921,14 @@ def calc_task_stats(proj_dir, survey_list, draw_plot):
                 out_path=out_plot,
             )
 
+    # Process post-scan stimulus response task
     if "stim" in survey_list:
         stim_stats = calc_surveys.StimRatings(proj_dir, draw_plot)
         for stim_type in ["Videos", "Scenarios"]:
             _ = stim_stats.endorsement(stim_type)
             survey_descriptives["stim"] = stim_stats.arousal_valence(stim_type)
 
+    # Process in-scan emorep task responses
     if "task" in survey_list:
         task_stats = calc_surveys.EmorepTask(proj_dir, draw_plot)
         survey_descriptives["task"] = task_stats.desc_intensity()
@@ -932,11 +939,13 @@ def calc_task_stats(proj_dir, survey_list, draw_plot):
 
 
 # %%
-def make_survey_table(proj_dir, sur_online, sur_scanner, draw_plot):
+def make_survey_table(
+    proj_dir, sur_online, sur_scanner, draw_plot, write_json
+):
     """Title."""
     #
     calc_rcq = CalcRedcapQualtricsStats(
-        proj_dir, sur_online, draw_plot, write_json=False
+        proj_dir, sur_online, draw_plot, write_json
     )
     calc_rcq.match_survey_visits()
     data_rcq = calc_rcq.survey_descriptives
