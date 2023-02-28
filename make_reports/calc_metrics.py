@@ -12,6 +12,7 @@ import os
 import json
 import datetime
 import pandas as pd
+import matplotlib.pyplot as plt
 import seaborn as sns
 import importlib.resources as pkg_resources
 from make_reports import report_helper
@@ -321,3 +322,102 @@ def calc_pending(redcap_token):
         h_delta = today_date - h_date.date()
         pend_dict[h_subj] = f"{h_delta.days} days"
     return pend_dict
+
+
+# %%
+def scan_pace(redcap_token, proj_dir):
+    """Generate barplot of attempted scans per calender week.
+
+    Mine REDCap Visit 2, 3 Logs (MRI) for timestamps, indicating a log was
+    started. Calculate how many scans occured during each calendar week, by
+    visit number, and then generate and save a stacked barplot.
+
+    Plot written to:
+        <proj_dir>/analyses/metrics_recruit/weekly_scan_attempts.png
+
+    Parameters
+    ----------
+    redcap_token : str
+        API token for RedCap project
+    proj_dir : path
+        Project's experiment directory
+
+    Returns
+    -------
+    pd.DataFrame
+        Weekly scan attempts
+
+    """
+
+    def _get_visit_log(rep_key: str, day: str) -> pd.DataFrame:
+        """Return dataframe of MRI visit log datetimes."""
+        # Manage differing column names
+        col_switch = {
+            "day2": ("date_mriv3_v2", "session_numberv3_v2"),
+            "day3": ("date_mriv3", "session_numberv3"),
+        }
+        col_date = col_switch[day][0]
+        col_value = col_switch[day][1]
+
+        # Download dataframe, clean up
+        df_visit = report_helper.pull_redcap_data(redcap_token, rep_key)
+        df_visit = df_visit[df_visit[col_value].notna()].reset_index(drop=True)
+        df_visit.rename(columns={col_date: "datetime"}, inplace=True)
+        df_visit["datetime"] = df_visit["datetime"].astype("datetime64[ns]")
+
+        # Extract values of interest
+        df_out = df_visit[["datetime"]].copy()
+        df_out["Visit"] = day
+        return df_out
+
+    # Access report keys, visit info
+    with pkg_resources.open_text(
+        reference_files, "log_keys_redcap.json"
+    ) as jf:
+        report_keys = json.load(jf)
+    df2 = _get_visit_log(report_keys["mri_visit2"], "day2")
+    df3 = _get_visit_log(report_keys["mri_visit3"], "day3")
+
+    # Combine dataframes, ready for weekly totalling
+    df = pd.concat([df2, df3], ignore_index=True)
+    df = df.sort_values(by=["datetime"]).reset_index(drop=True)
+    df["datetime"] = df["datetime"] - pd.to_timedelta(7, unit="d")
+    df["count"] = 1
+
+    # Determine scan attempts per week, by visit. Reorganize for
+    # stacked bar plots.
+    df_week = (
+        df.groupby(["Visit", pd.Grouper(key="datetime", freq="W-SUN")])[
+            "count"
+        ]
+        .sum()
+        .reset_index()
+        .sort_values("datetime")
+    )
+    df_plot = pd.pivot(
+        df_week, index=["datetime"], columns="Visit", values="count"
+    )
+    df_plot = df_plot.reset_index()
+    df_plot["datetime"] = df_plot["datetime"].dt.strftime("%Y-%m-%d")
+
+    # Draw and save plot
+    df_plot.plot(
+        x="datetime",
+        kind="bar",
+        stacked=True,
+        title="Weekly Scan Attempts by Visit",
+        figsize=(12, 6),
+    )
+    plt.axhline(y=4, color="black", linestyle="-")
+    plt.ylabel("Total Attempts")
+    plt.xlabel("Week Start Date")
+    out_plot = os.path.join(
+        proj_dir, "analyses/metrics_recruit", "weekly_scan_attempts.png"
+    )
+    plt.savefig(out_plot, bbox_inches="tight")
+    print(f"\t\tDrew barplot : {out_plot}")
+    plt.close()
+    return df_week
+
+
+# %%

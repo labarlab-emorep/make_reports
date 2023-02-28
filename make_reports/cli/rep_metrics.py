@@ -5,6 +5,7 @@ Desc.
 Example
 -------
 rep_metrics --recruit-demo
+rep_metrics --scan-pace --redcap-token $PAT_REDCAP_EMOREP
 rep_metrics --pending-scans --redcap-token $PAT_REDCAP_EMOREP
 
 """
@@ -57,6 +58,17 @@ def _get_args():
         default=None,
         help="API token for RedCap project",
     )
+    parser.add_argument(
+        "--scan-pace",
+        action="store_true",
+        help=textwrap.dedent(
+            """\
+            Requires --redcap-token.
+            Plot weekly scanning pace.
+            True if "--scan-pace" else False.
+            """
+        ),
+    )
 
     if len(sys.argv) <= 1:
         parser.print_help(sys.stderr)
@@ -72,11 +84,17 @@ def main():
     recruit_demo = args.recruit_demo
     pending_scans = args.pending_scans
     redcap_token = args.redcap_token
+    scan_pace = args.scan_pace
 
-    if pending_scans and not redcap_token:
-        raise ValueError("Option --pending-scans requires --redcap_token.")
+    if not redcap_token:
+        if pending_scans:
+            raise ValueError("Option --pending-scans requires --redcap_token.")
+        if scan_pace:
+            raise ValueError("Option --scan-pace requires --redcap_token.")
 
-    workflow.get_metrics(proj_dir, recruit_demo, pending_scans, redcap_token)
+    workflow.get_metrics(
+        proj_dir, recruit_demo, pending_scans, scan_pace, redcap_token
+    )
 
 
 if __name__ == "__main__":
