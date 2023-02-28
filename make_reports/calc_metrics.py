@@ -171,10 +171,6 @@ def demographics(proj_dir, final_demo):
     -------
 
     """
-    #
-    calc_props = _CalcProp(final_demo)
-
-    #
     plot_plan_all = [
         ("sex", "Female"),
         ("race", "Asian"),
@@ -182,7 +178,10 @@ def demographics(proj_dir, final_demo):
         ("ethnicity", "Hispanic or Latino"),
         ("race", "White"),
     ]
+
+    #
     plot_dict = {}
+    calc_props = _CalcProp(final_demo)
     for h_col, h_val in plot_plan_all:
         calc_props.get_demo_props([h_col], [h_val])
         plot_dict[h_val] = {
@@ -203,15 +202,22 @@ def demographics(proj_dir, final_demo):
     )
 
     #
-    plot_group_all = sns.catplot(
+    ax = sns.catplot(
         data=df_plot_all, x="Group", y="Proportion", hue="Type", jitter=False
-    ).set(title="Recruitment Demographics")
-    plot_group_all.set_xticklabels(rotation=30, horizontalalignment="right")
+    )
+    ax.set(
+        title="Planned vs Actual Participant Demographics",
+        ylabel="Proportion of Sample",
+        xlabel=None,
+    )
+    ax.set_xticklabels(rotation=30, horizontalalignment="right")
+
     out_file = os.path.join(
         proj_dir, "analyses/metrics_recruit", "demo_recruit_all.png"
     )
-    plot_group_all.savefig(out_file)
+    ax.savefig(out_file)
     print(f"\tWrote : {out_file}")
+    plt.close(ax.fig)
 
     #
     plot_plan_sex = [
@@ -241,7 +247,8 @@ def demographics(proj_dir, final_demo):
             )
             del h_dict, h_row
 
-    plot_group_sex = sns.catplot(
+    #
+    ax = sns.catplot(
         data=df_plot_sex,
         x="Group",
         y="Proportion",
@@ -251,13 +258,17 @@ def demographics(proj_dir, final_demo):
         height=4,
         aspect=0.6,
     )
-    plot_group_sex.set_xticklabels(rotation=30, horizontalalignment="right")
+    ax.set(
+        ylabel="Proportion of Sample",
+        xlabel=None,
+    )
+    ax.set_xticklabels(rotation=30, horizontalalignment="right")
     out_file = os.path.join(
         proj_dir, "analyses/metrics_recruit", "demo_recruit_sex.png"
     )
-    plot_group_sex.savefig(out_file)
+    ax.savefig(out_file)
     print(f"\tWrote : {out_file}")
-
+    plt.close(ax.fig)
     return {"all": df_plot_all, "sex": df_plot_sex}
 
 

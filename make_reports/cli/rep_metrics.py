@@ -88,9 +88,9 @@ def main():
 
     if not redcap_token:
         if pending_scans:
-            raise ValueError("Option --pending-scans requires --redcap_token.")
+            raise ValueError("Option --pending-scans requires --redcap-token.")
         if scan_pace:
-            raise ValueError("Option --scan-pace requires --redcap_token.")
+            raise ValueError("Option --scan-pace requires --redcap-token.")
 
     workflow.get_metrics(
         proj_dir, recruit_demo, pending_scans, scan_pace, redcap_token
