@@ -538,20 +538,22 @@ def generate_guids(proj_dir, user_name, user_pass, find_mismatch):
             print("No mismatches found!")
 
 
-def get_metrics(
-    proj_dir, recruit_demo, pending_scans, scan_pace, redcap_token
-):
-    """Title.
+def get_metrics(proj_dir, recruit_demo, scan_pace, redcap_token):
+    """Generate descriptive metrics about the data.
 
-    Desc.
+    Miscellaneous methods to aid in guiding data collection
+    and maintenance.
 
     Parameters
     ----------
     proj_dir : path
+        Project's experiment directory
     recruit_demo : bool
-    pending_scans : bool
+        Compare enrolled demographics versus proposed
     scan_pace : bool
+        Plot number of attempted scans by week
     redcap_token : str
+        API token for RedCap project
 
     """
 
@@ -570,6 +572,10 @@ def get_metrics(
             cl_data.clean_qualtrics()
             print("\tDone.")
 
+    out_dir = os.path.join(proj_dir, "analyses/metrics_recruit")
+    if not os.path.exists(out_dir):
+        os.makedirs(out_dir)
+
     # Compare planned versus actual recruitment demographics
     if recruit_demo:
         _get_surveys()
@@ -582,15 +588,6 @@ def get_metrics(
     if scan_pace:
         print("Calculate number of attempted scans per week ...\n")
         _ = calc_metrics.scan_pace(redcap_token, proj_dir)
-
-    #
-    if pending_scans:
-        print("\nFinding participants missing day3 scan ...\n")
-        pend_dict = calc_metrics.calc_pending(redcap_token)
-        print("\tSubj \t Time since day2 scan")
-        for subid, days in pend_dict.items():
-            print(f"\t{subid} \t {days}")
-        print("")
 
 
 # %%
