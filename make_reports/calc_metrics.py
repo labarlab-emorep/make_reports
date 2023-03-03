@@ -12,6 +12,7 @@ import os
 import json
 import datetime
 import pandas as pd
+import numpy as np
 import matplotlib.pyplot as plt
 import seaborn as sns
 import importlib.resources as pkg_resources
@@ -395,8 +396,7 @@ def scan_pace(redcap_token, proj_dir):
     df["datetime"] = df["datetime"] - pd.to_timedelta(7, unit="d")
     df["count"] = 1
 
-    # Determine scan attempts per week, by visit. Reorganize for
-    # stacked bar plots.
+    # Determine scan attempts per week, by visit
     df_week = (
         df.groupby(["Visit", pd.Grouper(key="datetime", freq="W-SUN")])[
             "count"
@@ -405,8 +405,38 @@ def scan_pace(redcap_token, proj_dir):
         .reset_index()
         .sort_values("datetime")
     )
+
+    # Find weeks where scans did not occur
+    def _fill_weeks(day: str) -> pd.DataFrame:
+        "Return dataframe including weeks without scans for visit."
+        s = pd.date_range(
+            "2022-04-17",
+            datetime.date.today().strftime("%Y-%m-%d"),
+            freq="W-SUN",
+        )
+        df_left = pd.DataFrame(
+            data={"datetime": s, "Visit": np.nan, "count": np.nan}
+        )
+        df = pd.merge(
+            df_left,
+            df_week[df_week["Visit"] == day],
+            how="left",
+            on="datetime",
+        )
+        df["Visit_y"] = day
+        df["count_y"] = df["count_y"].replace(np.nan, 0.0)
+        df = df.drop(["Visit_x", "count_x"], axis=1)
+        df = df.rename(columns={"Visit_y": "Visit", "count_y": "count"})
+        return df
+
+    df2 = _fill_weeks("day2")
+    df3 = _fill_weeks("day3")
+    df_all = pd.concat([df2, df3]).reset_index(drop=True)
+    df_all = df_all.sort_values(by="datetime").reset_index(drop=True)
+
+    # Make plotting df
     df_plot = pd.pivot(
-        df_week, index=["datetime"], columns="Visit", values="count"
+        df_all, index=["datetime"], columns="Visit", values="count"
     )
     df_plot = df_plot.reset_index()
     df_plot["datetime"] = df_plot["datetime"].dt.strftime("%Y-%m-%d")
