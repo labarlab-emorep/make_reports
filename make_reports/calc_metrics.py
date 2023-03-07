@@ -1,12 +1,4 @@
-"""Title.
-
-Calculate project stats:
-    Demographic rates vs proposed
-    Time between visits
-    Retention rates over time
-    Recruitment pace
-
-"""
+"""Calculate metrics for tracking data acquistion."""
 # %%
 import os
 import json
@@ -22,68 +14,104 @@ from make_reports import reference_files
 
 # %%
 class _CalcProp:
-    """Title.
+    """Calculate planned and actual demographic proportions.
 
-    Desc.
+    Actual demographic proportions are derived from REDCap's demographic
+    report, and planned demographics have been hardcoded from the grant
+    proposal.
 
     Attributes
     ----------
-    prop_actual
-    prop_plan
+    prop_plan : float
+        Planned sample proportion of demographic group
+    prop_actual : float
+        Actual sample proportion of demographic group
+
+    Example
+    -------
+    final_demo = make_reports.build_reports.DemoAll.final_demo
+    cp_obj = calc_metrics._CalcProp(final_demo)
+    cp_obj.get_demo_props(["sex"], ["Male"])
+    actual_proportion = cp_obj.prop_actual
+    planned_proportion = cp_obj.prop_plan
 
     """
 
     def __init__(self, final_demo):
-        """Title.
+        """Initialize.
 
-        Desc.
+        Parameters
+        ----------
+        final_demo : make_reports.build_reports.DemoAll.final_demo
+            pd.DataFrame, compiled demographic info
 
         """
+        print("\tInitializing _CalcProp")
         self._final_demo = final_demo
         self._total_rec = final_demo.shape[0]
         self._planned_demo()
 
     def get_demo_props(self, names, values):
-        """Title.
-
-        Desc.
+        """Determine planned and actual demographic proportions.
 
         Parameters
         ----------
         names : list
+            [sex | race | ethnicity]
+            Demographic column names of self._df_plan
         values : list
+            [Female | Male | Asian | Black or African-American |
+            Hispanic or Latino]
+            Specified values of self._df_plan columns
 
         Attributes
         ----------
         prop_plan : float
+            Planned sample proportion of demographic group
         prop_actual : float
+            Actual sample proportion of demographic group
+
+        Example
+        -------
+        final_demo = make_reports.build_reports.DemoAll.final_demo
+        cp_obj = calc_metrics._CalcProp(final_demo)
+        cp_obj.get_demo_props(["sex"], ["Male"])
+        cp_obj.get_demo_props(["sex", "race"], ["Female", "Asian"])
 
         """
-        #
+        # Validate
+        if len(names) > 2:
+            raise ValueError("Length of names, values must be 1 or 2")
         if len(names) != len(values):
             raise ValueError("Lengths of names and values are not equal.")
+        for _name in names:
+            if _name not in ["sex", "race", "ethnicity"]:
+                raise ValueError(f"Improper names arg supplied : {_name}")
+        for _value in values:
+            if _value not in [
+                "Female",
+                "Male",
+                "Asian",
+                "Black or African-American",
+                "Hispanic or Latino",
+            ]:
+                raise ValueError(f"Improper values arg supplied : {_value}")
 
-        #
+        # Trigger proper method based on length of list
         self._names = names
         self._values = values
-
-        #
         meth_dict = {1: "_one_fact", 2: "_two_fact"}
         meth_find = getattr(self, meth_dict[len(names)])
         idx_plan, idx_final = meth_find()
 
-        #
+        # Convert counts (idxs) to proportions
         self.prop_plan = round(
             (self._df_plan.loc[idx_plan, "prop"].sum() / 100), 3
         )
         self.prop_actual = round((len(idx_final) / self._total_rec), 3)
 
-    def _one_fact(self):
-        """Title.
-
-        Desc.
-
-        """
+    def _one_fact(self) -> tuple:
+        """Return planned, actual counts for one column querries."""
         idx_plan = self._df_plan.index[
             self._df_plan[self._names[0]] == self._values[0]
         ]
@@ -92,12 +120,8 @@ class _CalcProp:
         ].tolist()
         return (idx_plan, idx_final)
 
-    def _two_fact(self):
-        """Title.
-
-        Desc.
-
-        """
+    def _two_fact(self) -> tuple:
+        """Return planned, actual counts for two column querries."""
         idx_plan = self._df_plan.index[
             (self._df_plan[self._names[0]] == self._values[0])
             & (self._df_plan[self._names[1]] == self._values[1])
@@ -109,12 +133,9 @@ class _CalcProp:
         return (idx_plan, idx_final)
 
     def _planned_demo(self):
-        """Title.
-
-        Desc.
-
-        """
-        #
+        """Set pd.DataFrame attribute of planned demographics."""
+        # Convert values from grant proposal to long-formatted dataframe,
+        # make each column of long dataframe as array.
         sex_list = (["Male"] * 12) + (["Female"] * 12)
         his_list = (
             (["Hispanic or Latino"] * 6) + (["Not Hispanic or Latino"] * 6)
@@ -153,6 +174,8 @@ class _CalcProp:
             29.21,
             1.13,
         ]
+
+        # Organize arrays and make dict
         demo_plan = {
             "sex": sex_list,
             "ethnicity": his_list,
@@ -164,14 +187,30 @@ class _CalcProp:
 
 # %%
 def demographics(proj_dir, final_demo):
-    """Title.
+    """Check on demographic recruitment.
 
-    Desc.
+    Generate dataframes and plots with planned demographic
+    proportions versus sample actual.
+
+    Plots are written to:
+        <proj_dir>/analyses/metrics_recruit/demo_recruit_[all|sex].png"
+
+    Parameters
+    ----------
+    proj_dir : path
+        Project's experiment directory
+    final_demo : make_reports.build_reports.DemoAll.final_demo
+        pd.DataFrame, compiled demographic info
 
     Returns
     -------
+    dict
+        Planned versus actual demographic proportions for
+        one and two factors.
+        ["one_factor"] = pd.DataFrame
 
     """
+    # Line up single factor querries
     plot_plan_all = [
         ("sex", "Female"),
         ("race", "Asian"),
@@ -180,7 +219,7 @@ def demographics(proj_dir, final_demo):
         ("race", "White"),
     ]
 
-    #
+    # Make a single factor dataframe
     plot_dict = {}
     calc_props = _CalcProp(final_demo)
     for h_col, h_val in plot_plan_all:
@@ -190,7 +229,6 @@ def demographics(proj_dir, final_demo):
             "Actual": calc_props.prop_actual,
         }
 
-    #
     df_plot = pd.DataFrame.from_dict(plot_dict, orient="index")
     df_plot = df_plot.reset_index()
     df_plot = df_plot.rename(columns={"index": "Group"})
@@ -202,7 +240,7 @@ def demographics(proj_dir, final_demo):
         value_name="Proportion",
     )
 
-    #
+    # Draw and save factor scatter plot
     ax = sns.catplot(
         data=df_plot_all, x="Group", y="Proportion", hue="Type", jitter=False
     )
@@ -212,7 +250,6 @@ def demographics(proj_dir, final_demo):
         xlabel=None,
     )
     ax.set_xticklabels(rotation=30, horizontalalignment="right")
-
     out_file = os.path.join(
         proj_dir, "analyses/metrics_recruit", "demo_recruit_all.png"
     )
@@ -220,7 +257,7 @@ def demographics(proj_dir, final_demo):
     print(f"\tWrote : {out_file}")
     plt.close(ax.fig)
 
-    #
+    # Line up two factor querries
     plot_plan_sex = [
         (["sex", "race"], ["Female", "Asian"]),
         (["sex", "race"], ["Male", "Asian"]),
@@ -229,6 +266,8 @@ def demographics(proj_dir, final_demo):
         (["sex", "ethnicity"], ["Female", "Hispanic or Latino"]),
         (["sex", "ethnicity"], ["Male", "Hispanic or Latino"]),
     ]
+
+    # make a two factor dataframe
     df_plot_sex = pd.DataFrame(columns=["Sex", "Group", "Type", "Proportion"])
     for h_col, h_val in plot_plan_sex:
         calc_props.get_demo_props(h_col, h_val)
@@ -248,7 +287,7 @@ def demographics(proj_dir, final_demo):
             )
             del h_dict, h_row
 
-    #
+    # Draw and save plot
     ax = sns.catplot(
         data=df_plot_sex,
         x="Group",
@@ -270,7 +309,7 @@ def demographics(proj_dir, final_demo):
     ax.savefig(out_file)
     print(f"\tWrote : {out_file}")
     plt.close(ax.fig)
-    return {"all": df_plot_all, "sex": df_plot_sex}
+    return {"one_factor": df_plot_all, "two_factor": df_plot_sex}
 
 
 # %%
