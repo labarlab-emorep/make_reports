@@ -91,6 +91,7 @@ class _CalcProp:
             if _value not in [
                 "Female",
                 "Male",
+                "White",
                 "Asian",
                 "Black or African-American",
                 "Hispanic or Latino",
@@ -188,6 +189,8 @@ class _CalcProp:
 # %%
 def demographics(proj_dir, final_demo):
     """Check on demographic recruitment.
+
+    Currently only supports a subset of total planned demographics.
 
     Generate dataframes and plots with planned demographic
     proportions versus sample actual.

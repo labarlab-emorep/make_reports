@@ -10,7 +10,7 @@ setup(
             "rep_dl=make_reports.cli.dl_surveys:main",
             "rep_cl=make_reports.cli.cl_surveys:main",
             "rep_manager=make_reports.cli.rep_manager:main",
-            "rep_metrics=make_reports.cli.rep_metrics:main",
+            "rep_recruit=make_reports.cli.rep_recruit:main",
             "rep_ndar=make_reports.cli.rep_ndar:main",
             "gen_guids=make_reports.cli.gen_guids:main",
             "sur_stats=make_reports.cli.sur_stats:main",

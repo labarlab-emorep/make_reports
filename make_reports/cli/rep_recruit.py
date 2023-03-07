@@ -1,4 +1,4 @@
-"""Generate descriptive metrics from the data.
+"""Generate descriptive metrics about recruitment.
 
 Make plots and reports to give snapshots of the data:
     -   recruit-demo : Mine REDCap demographics to compare the
@@ -13,8 +13,8 @@ Plots and reports are written to:
 
 Examples
 --------
-rep_metrics --recruit-demo
-rep_metrics --scan-pace --redcap-token $PAT_REDCAP_EMOREP
+rep_recruit --recruit-demo
+rep_recruit --scan-pace --redcap-token $PAT_REDCAP_EMOREP
 
 """
 import sys
