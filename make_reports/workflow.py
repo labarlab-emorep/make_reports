@@ -538,47 +538,56 @@ def generate_guids(proj_dir, user_name, user_pass, find_mismatch):
             print("No mismatches found!")
 
 
-def get_metrics(proj_dir, recruit_demo, pending_scans, redcap_token):
-    """Title.
+def get_metrics(proj_dir, recruit_demo, scan_pace, redcap_token):
+    """Generate descriptive metrics about the data.
 
-    Desc.
+    Miscellaneous methods to aid in guiding data collection
+    and maintenance.
 
     Parameters
     ----------
     proj_dir : path
+        Project's experiment directory
     recruit_demo : bool
-    pending_scans : bool
+        Compare enrolled demographics versus proposed
+    scan_pace : bool
+        Plot number of attempted scans by week
+    redcap_token : str
+        API token for RedCap project
 
     """
-    # Check for clean RedCap/visit data, generate if needed
-    redcap_clean = glob.glob(
-        f"{proj_dir}/data_survey/redcap_demographics/data_clean/*.csv"
-    )
-    visit_clean = glob.glob(f"{proj_dir}/data_survey/visit*/data_clean/*.csv")
-    if len(redcap_clean) != 4 or len(visit_clean) != 17:
-        print("Missing RedCap, Qualtrics clean data. Cleaning ...")
-        cl_data = CleanSurveys(proj_dir)
-        cl_data.clean_redcap()
-        cl_data.clean_qualtrics()
-        print("\tDone.")
 
-    #
+    def _get_surveys():
+        """Check for survey data and attempt cleaning if needed."""
+        redcap_clean = glob.glob(
+            f"{proj_dir}/data_survey/redcap_demographics/data_clean/*.csv"
+        )
+        visit_clean = glob.glob(
+            f"{proj_dir}/data_survey/visit*/data_clean/*.csv"
+        )
+        if len(redcap_clean) != 4 or len(visit_clean) != 17:
+            print("Missing RedCap, Qualtrics clean data. Cleaning ...")
+            cl_data = CleanSurveys(proj_dir)
+            cl_data.clean_redcap()
+            cl_data.clean_qualtrics()
+            print("\tDone.")
+
+    out_dir = os.path.join(proj_dir, "analyses/metrics_recruit")
+    if not os.path.exists(out_dir):
+        os.makedirs(out_dir)
+
+    # Compare planned versus actual recruitment demographics
     if recruit_demo:
-        # Get redcap demo info, use only consented data
+        _get_surveys()
         redcap_demo = build_reports.DemoAll(proj_dir)
         redcap_demo.remove_withdrawn()
-
         print("\nComparing planned vs. actual recruitment demographics ...")
         _ = calc_metrics.demographics(proj_dir, redcap_demo.final_demo)
 
-    #
-    if pending_scans:
-        print("\nFinding participants missing day3 scan ...\n")
-        pend_dict = calc_metrics.calc_pending(redcap_token)
-        print("\tSubj \t Time since day2 scan")
-        for subid, days in pend_dict.items():
-            print(f"\t{subid} \t {days}")
-        print("")
+    # Plot number of attempted scans per week
+    if scan_pace:
+        print("Calculate number of attempted scans per week ...\n")
+        _ = calc_metrics.scan_pace(redcap_token, proj_dir)
 
 
 # %%

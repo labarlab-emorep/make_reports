@@ -1,6 +1,10 @@
-"""Title.
+"""Generate descriptive statistics for participant responses.
 
-Desc.
+Manage and report on participant responses to REDCap, Qualtrics,
+and EmoRep tasks. Methods are organized according to their visit
+for REDCap and Qualtrics surveys, or task type. The post-scan
+stimulus rating task is treated as an EmoRep task instead of a
+Qualtrics survey.
 
 """
 # %%
