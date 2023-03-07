@@ -5,7 +5,7 @@ REDCap, Qualtrics, rest-ratings, and stim-ratings
 surveys.
 
 Output files are written to:
-    <proj_dir>/analyses/surveys_stats_descriptive
+    <proj_dir>/analyses/metrics_surveys
 
 Examples
 --------

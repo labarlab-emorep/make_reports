@@ -13,11 +13,8 @@ def main():
         rep_manager : Generate regular reports submitted by lab manager
         rep_ndar    : Generate reports for NDAR submission
         rep_recruit : Track recruitmentment demographics and pace
-        gen_guids   : Generate and check GUIDs
-
-    Sub-packages under development:
-
         sur_stats   : Get descriptive stats and plots for surveys and task
+        gen_guids   : Generate and check GUIDs
 
     """
     )

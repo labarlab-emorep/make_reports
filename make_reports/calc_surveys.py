@@ -896,9 +896,7 @@ class StimRatings(_DescStat):
         print("\nInitializing DescriptStimRatings")
         self._draw_plot = draw_plot
         self._proj_dir = proj_dir
-        self.out_dir = os.path.join(
-            proj_dir, "analyses/surveys_stats_descriptive"
-        )
+        self.out_dir = os.path.join(proj_dir, "analyses/metrics_surveys")
 
         # Trigger dataframe construction, initialize helper
         df, self._emo_list = self._get_data()
@@ -1108,7 +1106,8 @@ class EmorepTask(_DescStat):
 
         Attributes
         ----------
-
+        out_dir : path
+            Output destination for generated files
 
         Raises
         ------
@@ -1122,9 +1121,7 @@ class EmorepTask(_DescStat):
 
         print("\nInitializing DescriptTask")
         self._draw_plot = draw_plot
-        self.out_dir = os.path.join(
-            proj_dir, "analyses/surveys_stats_descriptive"
-        )
+        self.out_dir = os.path.join(proj_dir, "analyses/metrics_surveys")
 
         # Find all events files, make and initialize dataframe
         mri_rawdata = os.path.join(proj_dir, "data_scanner_BIDS", "rawdata")
