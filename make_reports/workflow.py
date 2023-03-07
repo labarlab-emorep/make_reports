@@ -663,9 +663,7 @@ class CalcRedcapQualtricsStats:
         self._write_json = write_json
         self._proj_dir = proj_dir
         self._sur_list = sur_list
-        self.out_dir = os.path.join(
-            proj_dir, "analyses/surveys_stats_descriptive"
-        )
+        self.out_dir = os.path.join(proj_dir, "analyses/metrics_surveys")
         self.survey_descriptives = {}
         self._has_subscales = ["ALS", "ERQ", "RRS"]
         self._visit1_list = [
@@ -678,6 +676,8 @@ class CalcRedcapQualtricsStats:
             "TAS",
         ]
         self._visit23_list = ["STAI_State", "PANAS", "BDI"]
+        if not os.path.exists(self.out_dir):
+            os.makedirs(self.out_dir)
 
         # Validate survey list
         for sur in sur_list:
@@ -902,22 +902,20 @@ def calc_task_stats(proj_dir, survey_list, draw_plot):
     if not os.path.exists(proj_dir):
         raise FileNotFoundError(f"Expected to find directory : {proj_dir}")
 
+    out_dir = os.path.join(proj_dir, "analyses/metrics_surveys")
+    if not os.path.exists(out_dir):
+        os.makedirs(out_dir)
+
     # Process in-scan post resting-state emotion frequency responses
     survey_descriptives = {}
     if "rest" in survey_list:
         print("\nWorking on rest-ratings data")
         rest_stats = calc_surveys.RestRatings(proj_dir)
-        out_path = os.path.join(
-            proj_dir,
-            "analyses/surveys_stats_descriptive",
-            "table_rest-ratings.csv",
-        )
+        out_path = os.path.join(out_dir, "table_rest-ratings.csv")
         survey_descriptives["rest"] = rest_stats.write_stats(out_path)
         if draw_plot:
             out_plot = os.path.join(
-                proj_dir,
-                "analyses/surveys_stats_descriptive",
-                "plot_boxplot-long_rest-ratings.png",
+                out_dir, "plot_boxplot-long_rest-ratings.png"
             )
             rest_stats.draw_long_boxplot(
                 x_col="emotion",
@@ -983,7 +981,7 @@ def make_survey_table(proj_dir, sur_online, sur_scanner):
             )
     out_stats = os.path.join(
         proj_dir,
-        "analyses/surveys_stats_descriptive",
+        "analyses/metrics_surveys",
         "table_redcap_qualtrics.csv",
     )
     df_all.to_csv(out_stats, index=False)
