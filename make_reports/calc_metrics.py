@@ -2,6 +2,7 @@
 # %%
 import os
 import json
+import glob
 import datetime
 import pandas as pd
 import numpy as np
@@ -438,6 +439,88 @@ def scan_pace(redcap_token, proj_dir):
     print(f"\t\tDrew barplot : {out_plot}")
     plt.close()
     return df_week
+
+
+# %%
+def censored_volumes(proj_dir):
+    """Plot proportion of volumes exceed framewise displacement threshold.
+
+    Parameters
+    ----------
+    proj_dir : path
+        Project's experiment directory
+
+    Returns
+    -------
+    pd.DataFrame
+        long-formatted proportions, organized by subject, session, and run
+
+    """
+    # Identify available participants
+    deriv_dir = os.path.join(
+        proj_dir, "data_scanner_BIDS/derivatives/model_fsl"
+    )
+    subj_list = [os.path.basename(x) for x in glob.glob(f"{deriv_dir}/sub-*")]
+
+    # Capture all proportion data, organized by subject * session * run
+    data_dict = {}
+    for subj in subj_list:
+        data_dict[subj] = {}
+        for sess in ["ses-day2", "ses-day3"]:
+            search_path = os.path.join(
+                deriv_dir, subj, sess, "func/confounds_proportions"
+            )
+            run_list = sorted(glob.glob(f"{search_path}/*proportion.json"))
+            if not run_list:
+                continue
+            data_dict[subj][sess] = {}
+            for run_path in run_list:
+                with open(run_path) as jf:
+                    run_dict = json.load(jf)
+                data_dict[subj][sess][run_dict["Run"]] = run_dict["CensorProp"]
+
+    # Unpack data_dict and make long-formatted dataframe
+    rec = {}
+    for name in data_dict:
+        rec[name] = pd.DataFrame.from_records(data_dict[name]).unstack()
+    df = pd.DataFrame.from_records(rec)
+    df = df.reset_index()
+    df_long = pd.melt(
+        df, id_vars=["level_0", "level_1"], value_vars=df.columns.to_list()[2:]
+    )
+
+    # # Determine proportion of runs dropped when using
+    # # motion criterion = 20%
+    # df_2 = df_long[df_long["level_0"] == "ses-day2"]
+    # df_3 = df_long[df_long["level_0"] == "ses-day3"]
+    # prop_2 = round(
+    #     len(df_2.index[df_2["value"] >= 0.2].tolist()) / df_2.shape[0], 2
+    # )
+    # prop_3 = round(
+    #     len(df_3.index[df_3["value"] >= 0.2].tolist()) / df_3.shape[0], 2
+    # )
+
+    # Draw and save plot
+    fig, ax = plt.subplots()
+    sns.boxplot(
+        x="level_0",
+        y="value",
+        data=df_long,
+    )
+    plt.legend(bbox_to_anchor=(1.02, 1), loc="upper left", borderaxespad=0)
+    plt.ylabel("Proportion")
+    plt.xlabel("Session")
+    plt.title("Proportion of Volumes Exceeding FD Thresholding")
+
+    out_path = os.path.join(
+        proj_dir,
+        "analyses/metrics_recruit",
+        "plot_boxplot-double_epi-motion.png",
+    )
+    plt.savefig(out_path, bbox_inches="tight")
+    print(f"\t\tDrew boxplot : {out_path}")
+    plt.close()
+    return df_long
 
 
 # %%
