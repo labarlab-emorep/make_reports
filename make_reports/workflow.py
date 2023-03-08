@@ -538,7 +538,7 @@ def generate_guids(proj_dir, user_name, user_pass, find_mismatch):
             print("No mismatches found!")
 
 
-def get_metrics(proj_dir, recruit_demo, scan_pace, redcap_token):
+def get_metrics(proj_dir, recruit_demo, prop_motion, scan_pace, redcap_token):
     """Generate descriptive metrics about the data.
 
     Miscellaneous methods to aid in guiding data collection
@@ -550,6 +550,8 @@ def get_metrics(proj_dir, recruit_demo, scan_pace, redcap_token):
         Project's experiment directory
     recruit_demo : bool
         Compare enrolled demographics versus proposed
+    prop_motion : bool
+        Calculate proportion of volumes that exceed FD threshold
     scan_pace : bool
         Plot number of attempted scans by week
     redcap_token : str
@@ -588,6 +590,9 @@ def get_metrics(proj_dir, recruit_demo, scan_pace, redcap_token):
     if scan_pace:
         print("Calculate number of attempted scans per week ...\n")
         _ = calc_metrics.scan_pace(redcap_token, proj_dir)
+
+    if prop_motion:
+        _ = calc_metrics.censored_volumes(proj_dir)
 
 
 # %%
