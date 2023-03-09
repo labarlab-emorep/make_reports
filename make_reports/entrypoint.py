@@ -1,9 +1,12 @@
 """Print entrypoint help."""
+import make_reports._version as ver
 
 
 def main():
     print(
-        """
+        f"""
+
+    Version : {ver.__version__}
 
     The package make_reports consists of several sub-packages
     that can be accessed from their respective entrypoints (below).

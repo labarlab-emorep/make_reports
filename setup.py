@@ -1,8 +1,10 @@
 from setuptools import setup, find_packages
 
+exec(open("make_reports/_version.py").read())
+
 setup(
     name="make_reports",
-    version="0.3.0",
+    version=__version__,  # noqa: F821
     packages=find_packages(),
     entry_points={
         "console_scripts": [
@@ -26,6 +28,6 @@ setup(
         "pydicom>=2.3.1",
         "requests>=2.22.0",
         "seaborn>=0.12.2",
-        "setuptools>=45.2.0",
+        "setuptools>=65.5.1",
     ],
 )
