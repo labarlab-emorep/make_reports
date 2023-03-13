@@ -451,7 +451,7 @@ class _DescStat:
         -------
         pd.DataFrame
             Confusion matrix
-            column = stimulus, row = participant response
+            row = stimulus, column = participant response
 
         Raises
         ------
@@ -498,22 +498,20 @@ class _DescStat:
                 count_dict[emo][sub_emo] = round(count_emo / max_total, 2)
         del df_emo
 
-        # Generate dataframe and transponse for intuitive
-        # stimulus-response axes.
+        # Generate dataframe
         df_corr = pd.DataFrame.from_dict(
             {i: count_dict[i] for i in count_dict.keys()},
             orient="index",
         )
-        df_trans = df_corr.transpose()
-        return df_trans
+        return df_corr
 
     def confusion_heatmap(
         self,
         df_conf,
         main_title,
         out_path,
-        x_lab="Stimulus Category",
-        y_lab="Participant Endorsement",
+        y_lab="Stimulus Category",
+        x_lab="Participant Endorsement",
     ):
         """Draw a heatmap from a confusion matrix.
 
