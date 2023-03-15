@@ -20,10 +20,10 @@ def pull_redcap_data(
         RedCap API token
     report_id : str, int
         RedCap Report ID
-    content : string
+    content : string, optional
         Data export type
-    return_format : str
-        Data export format
+    return_format : str, optional
+        Data export format, e.g. csv
 
     Returns
     -------
@@ -158,7 +158,7 @@ def mine_template(template_file):
     Parameters
     ----------
     template_file : str
-        Name of nda template
+        Name of nda template existing in make_reports.reference_files
 
     Returns
     -------

@@ -1,11 +1,23 @@
-r"""Title.
+"""Generate descriptive metrics about recruitment.
 
-Desc.
+Make plots and reports to give snapshots of the data:
+    -   recruit-demo : Mine REDCap demographics to compare the
+            actual enrolled demographic profile versus the
+            proposed to help curtail under-representation.
+    -   scan-pace : Quantify and plot the number of scans
+            attempted each week, to help understand recruitment
+            pace and adjustments.
+    -   prop-motion : Calculate the proportion of volumes that
+            exceed framewise displacement thresholds.
 
-Example
--------
+Plots and reports are written to:
+    <proj-dir>/analyses/metrics_recruit
+
+Examples
+--------
 rep_metrics --recruit-demo
-rep_metrics --pending-scans --redcap-token $PAT_REDCAP_EMOREP
+rep_metrics --prop-motion
+rep_metrics --scan-pace --redcap-token $PAT_REDCAP_EMOREP
 
 """
 import sys
@@ -20,17 +32,6 @@ def _get_args():
         description=__doc__, formatter_class=RawTextHelpFormatter
     )
     parser.add_argument(
-        "--pending-scans",
-        action="store_true",
-        help=textwrap.dedent(
-            """\
-            Determine which participants need a second scan, requires
-            --redcap-token.
-            True if "--pending-scans" else False.
-            """
-        ),
-    )
-    parser.add_argument(
         "--proj-dir",
         type=str,
         default="/mnt/keoki/experiments2/EmoRep/Exp2_Compute_Emotion",
@@ -42,12 +43,20 @@ def _get_args():
         ),
     )
     parser.add_argument(
+        "--prop-motion",
+        action="store_true",
+        help=textwrap.dedent(
+            """\
+            Calculate proportion of volumes that exceed FD threshold
+            """
+        ),
+    )
+    parser.add_argument(
         "--recruit-demo",
         action="store_true",
         help=textwrap.dedent(
             """\
-            Whether to calculated recruitement demographics,
-            True if "--recruit-demo" else False.
+            Calculate recruitement demographics\
             """
         ),
     )
@@ -56,6 +65,16 @@ def _get_args():
         type=str,
         default=None,
         help="API token for RedCap project",
+    )
+    parser.add_argument(
+        "--scan-pace",
+        action="store_true",
+        help=textwrap.dedent(
+            """\
+            Requires --redcap-token.
+            Plot weekly scanning pace.
+            """
+        ),
     )
 
     if len(sys.argv) <= 1:
@@ -70,10 +89,16 @@ def main():
     args = _get_args().parse_args()
     proj_dir = args.proj_dir
     recruit_demo = args.recruit_demo
-    pending_scans = args.pending_scans
+    prop_motion = args.prop_motion
     redcap_token = args.redcap_token
+    scan_pace = args.scan_pace
 
-    workflow.calc_metrics(proj_dir, recruit_demo, pending_scans, redcap_token)
+    if not redcap_token and scan_pace:
+        raise ValueError("Option --scan-pace requires --redcap-token.")
+
+    workflow.get_metrics(
+        proj_dir, recruit_demo, prop_motion, scan_pace, redcap_token
+    )
 
 
 if __name__ == "__main__":
