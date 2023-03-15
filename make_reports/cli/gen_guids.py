@@ -1,4 +1,4 @@
-r"""Generate GUIDs for EmoRep.
+"""Generate GUIDs for EmoRep.
 
 Utilize RedCap demographic information to generate a batch
 of GUIDs using the NDA's guid-tool for linux. Compare generated

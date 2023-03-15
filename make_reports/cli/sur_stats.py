@@ -1,4 +1,4 @@
-r"""Generate descriptives for survey data.
+"""Generate descriptives for survey data.
 
 Calculate descriptive statistics and draw plots for
 REDCap, Qualtrics, rest-ratings, and stim-ratings
@@ -12,7 +12,7 @@ Examples
 sur_stats --survey-avail
 sur_stats --survey-all --draw-plots
 sur_stats --survey-names AIM ALS BDI --write-json
-sur_stast --make-tables --draw-plots
+sur_stats --make-tables --draw-plots
 
 """
 import sys
