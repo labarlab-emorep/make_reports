@@ -89,7 +89,9 @@ def main():
     proj_dir = args.proj_dir
     query_date = args.query_date
 
-    workflows.make_regular_reports(regular_reports, query_date, proj_dir)
+    required_reports.make_regular_reports(
+        regular_reports, query_date, proj_dir
+    )
 
 
 if __name__ == "__main__":
