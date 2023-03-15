@@ -267,12 +267,12 @@ def get_survey_age(df_survey, df_demo, subj_col):
     return df_survey
 
 
-def pilot_list():
+def pilot_list() -> list:
     """Return a list of pilot participants."""
     return ["ER0001", "ER0002", "ER0003", "ER0004", "ER0005"]
 
 
-def redcap_dict():
+def redcap_dict() -> dict:
     """Return a dict of RedCap surveys."""
     # Key : RedCap dataframe, matches reference_files.report_keys_redcap.json
     # Value : output parent directory name
@@ -286,7 +286,7 @@ def redcap_dict():
     }
 
 
-def qualtrics_dict():
+def qualtrics_dict() -> dict:
     """Return a dict of Qualtrics surveys."""
     # Key : Qualtrics dataframe, matches
     #       reference_files.report_keys_qualtrics.json
@@ -301,6 +301,6 @@ def qualtrics_dict():
     }
 
 
-def withdrew_list():
+def withdrew_list() -> list:
     """Return a list of participants who withdrew consent."""
     return ["ER0103", "ER0229"]

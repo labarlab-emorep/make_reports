@@ -18,7 +18,7 @@ sur_stats --make-tables --draw-plots
 import sys
 import textwrap
 from argparse import ArgumentParser, RawTextHelpFormatter
-from make_reports import workflow
+from make_reports.workflows import behavioral_reports
 
 
 def _get_args():
@@ -112,7 +112,7 @@ def _get_args():
 
 
 def main():
-    """Capture arguments and trigger workflow."""
+    """Capture arguments and trigger workflows."""
     args = _get_args().parse_args()
     draw_plot = args.draw_plots
     write_json = args.write_json
@@ -166,17 +166,19 @@ def main():
 
     # Trigger workflows based on user input
     if make_tables:
-        workflow.make_survey_table(proj_dir, sur_online, sur_scanner)
+        behavioral_reports.make_survey_table(proj_dir, sur_online, sur_scanner)
         sys.exit(0)
 
     if sur_online:
-        sur_stat = workflow.CalcRedcapQualtricsStats(
+        sur_stat = behavioral_reports.CalcRedcapQualtricsStats(
             proj_dir, sur_online, draw_plot, write_json
         )
         sur_stat.match_survey_visits()
 
     if sur_scanner:
-        _ = workflow.calc_task_stats(proj_dir, sur_scanner, draw_plot)
+        _ = behavioral_reports.calc_task_stats(
+            proj_dir, sur_scanner, draw_plot
+        )
 
 
 if __name__ == "__main__":

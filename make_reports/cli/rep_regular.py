@@ -4,17 +4,17 @@ Mine RedCap demographic information to construct reports regularly
 submitted to the NIH or Duke.
 
 Reports are written to:
-    <proj_dir>/documents/manager_reports
+    <proj_dir>/documents/regular_reports
 
 Previous submissions can also be generated via --query-date.
 
 Examples
 --------
-rep_manager \
-    --report-names nih4 nih12 duke3
+rep_regular \
+    --names nih4 nih12 duke3
 
-rep_manager \
-    --report-names nih4 \
+rep_regular \
+    --names nih4 \
     --query-date 2022-06-29
 
 """
@@ -22,7 +22,7 @@ import sys
 import textwrap
 from datetime import date
 from argparse import ArgumentParser, RawTextHelpFormatter
-from make_reports import workflow
+from make_reports.workflows import required_reports
 
 
 def _get_args():
@@ -59,14 +59,14 @@ def _get_args():
 
     required_args = parser.add_argument_group("Required Arguments")
     required_args.add_argument(
-        "--report-names",
+        "--names",
         nargs="+",
         required=True,
         type=str,
         help=textwrap.dedent(
             """\
             [nih4 | nih12 | duke3]
-            List of lab manager reports to generate. Acceptable
+            List of reguilar reports to generate. Acceptable
             args are "nih4", "nih12", and "duke3" for the reports
             submitted to the NIH every 4 months, NIH every 12 months,
             and Duke every 3 months, respectively.
@@ -85,11 +85,11 @@ def _get_args():
 def main():
     """Capture arguments and trigger workflow."""
     args = _get_args().parse_args()
-    manager_reports = args.report_names
+    regular_reports = args.names
     proj_dir = args.proj_dir
     query_date = args.query_date
 
-    workflow.make_manager_reports(manager_reports, query_date, proj_dir)
+    workflows.make_regular_reports(regular_reports, query_date, proj_dir)
 
 
 if __name__ == "__main__":

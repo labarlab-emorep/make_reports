@@ -27,7 +27,7 @@ import sys
 import textwrap
 from datetime import datetime
 from argparse import ArgumentParser, RawTextHelpFormatter
-from make_reports import workflow
+from make_reports.workflows import required_reports
 
 
 def _get_args():
@@ -140,7 +140,7 @@ def main():
     # Generate requested reports
     if ndar_reports_all:
         ndar_reports = rep_avail
-    workflow.make_ndar_reports(ndar_reports, proj_dir, close_date)
+    required_reports.make_ndar_reports(ndar_reports, proj_dir, close_date)
 
 
 if __name__ == "__main__":

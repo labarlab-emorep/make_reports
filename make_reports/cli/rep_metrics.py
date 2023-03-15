@@ -23,7 +23,7 @@ rep_metrics --scan-pace --redcap-token $PAT_REDCAP_EMOREP
 import sys
 import textwrap
 from argparse import ArgumentParser, RawTextHelpFormatter
-from make_reports import workflow
+from make_reports.workflows import data_metrics
 
 
 def _get_args():
@@ -96,7 +96,7 @@ def main():
     if not redcap_token and scan_pace:
         raise ValueError("Option --scan-pace requires --redcap-token.")
 
-    workflow.get_metrics(
+    data_metrics.get_metrics(
         proj_dir, recruit_demo, prop_motion, scan_pace, redcap_token
     )
 
