@@ -11,7 +11,7 @@ setup(
             "make_reports=make_reports.entrypoint:main",
             "rep_dl=make_reports.cli.dl_surveys:main",
             "rep_cl=make_reports.cli.cl_surveys:main",
-            "rep_manager=make_reports.cli.rep_manager:main",
+            "rep_regular=make_reports.cli.rep_regular:main",
             "rep_metrics=make_reports.cli.rep_metrics:main",
             "rep_ndar=make_reports.cli.rep_ndar:main",
             "gen_guids=make_reports.cli.gen_guids:main",

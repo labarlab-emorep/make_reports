@@ -31,7 +31,7 @@ import pandas as pd
 import numpy as np
 from datetime import datetime
 import pydicom
-from make_reports import report_helper
+from make_reports.resources import report_helper
 
 
 class NdarAffim01:

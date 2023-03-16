@@ -6,7 +6,7 @@ import re
 import pandas as pd
 import numpy as np
 from string import punctuation
-from make_reports import report_helper
+from make_reports.resources import report_helper
 import importlib.resources as pkg_resources
 from make_reports import reference_files
 

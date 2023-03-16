@@ -21,7 +21,7 @@ rep_cl \
 import sys
 import textwrap
 from argparse import ArgumentParser, RawTextHelpFormatter
-from make_reports import workflow
+from make_reports.workflows import manage_data
 
 
 def _get_args():
@@ -88,7 +88,7 @@ def main():
     clean_qualtrics = args.clean_qualtrics
 
     # Get cleaning object
-    cl_data = workflow.CleanSurveys(proj_dir)
+    cl_data = manage_data.CleanSurveys(proj_dir)
 
     # Trigger desired cleaning methods
     cl_dict = {
