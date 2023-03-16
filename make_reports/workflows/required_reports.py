@@ -128,24 +128,24 @@ def make_ndar_reports(ndar_reports, proj_dir, close_date):
         cl_data.clean_qualtrics()
         print("\tDone.")
 
-    # Set switch to find appropriate class in make_reports.build_ndar:
+    # Set switch to find appropriate class in
+    # make_reports.resources.build_ndar:
     #   key = user-specified report name
     #   value = relevant class
-    mod_build = "make_reports.build_ndar"
     nda_switch = {
-        "demo_info01": f"{mod_build}.NdarDemoInfo01",
-        "affim01": f"{mod_build}.NdarAffim01",
-        "als01": f"{mod_build}.NdarAls01",
-        "bdi01": f"{mod_build}.NdarBdi01",
-        "brd01": f"{mod_build}.NdarBrd01",
-        "emrq01": f"{mod_build}.NdarEmrq01",
-        "image03": f"{mod_build}.NdarImage03",
-        "panas01": f"{mod_build}.NdarPanas01",
-        "pswq01": f"{mod_build}.NdarPswq01",
-        "restsurv01": f"{mod_build}.NdarRest01",
-        "rrs01": f"{mod_build}.NdarRrs01",
-        "stai01": f"{mod_build}.NdarStai01",
-        "tas01": f"{mod_build}.NdarTas01",
+        "demo_info01": "NdarDemoInfo01",
+        "affim01": "NdarAffim01",
+        "als01": "NdarAls01",
+        "bdi01": "NdarBdi01",
+        "brd01": "NdarBrd01",
+        "emrq01": "NdarEmrq01",
+        "image03": "NdarImage03",
+        "panas01": "NdarPanas01",
+        "pswq01": "NdarPswq01",
+        "restsurv01": "NdarRest01",
+        "rrs01": "NdarRrs01",
+        "stai01": "NdarStai01",
+        "tas01": "NdarTas01",
     }
 
     # Validate ndar_reports arguments
@@ -172,15 +172,14 @@ def make_ndar_reports(ndar_reports, proj_dir, close_date):
     # Make requested reports
     for report in ndar_reports:
 
-        # Get appropriate class from make_reports.build_ndar
-        h_pkg, h_mod, h_class = nda_switch[report].split(".")
-        mod = __import__(f"{h_pkg}.{h_mod}", fromlist=[h_class])
-        rep_class = getattr(mod, h_class)
+        # Get appropriate class for report
+        mod = __import__(
+            "make_reports.resources.build_ndar", fromlist=[nda_switch[report]]
+        )
+        rep_class = getattr(mod, nda_switch[report])
 
-        # Generate report
+        # Generate, write report
         rep_obj = rep_class(proj_dir, redcap_demo.final_demo)
-
-        # Write out report
         out_file = os.path.join(report_dir, f"{report}_dataset.csv")
         print(f"\tWriting : {out_file}")
         rep_obj.df_report.to_csv(out_file, index=False, na_rep="")
