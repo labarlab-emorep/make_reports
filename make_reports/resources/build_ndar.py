@@ -986,7 +986,7 @@ class NdarImage03:
     information to identify required values.
 
     Make copies of study participants' NIfTI and events files in:
-        <proj_dir>/ndar_report/data_mri
+        <proj_dir>/ndar_upload/data_mri
 
     Attributes
     ----------
@@ -1474,76 +1474,97 @@ class NdarImage03:
         """
         print(f"\t\tWriting line for {self._subj} {self._sess} : fmap ...")
 
-        # Set paths for nii/json files, get JSON info
-        nii_file = sorted(glob.glob(f"{self._subj_sess}/fmap/*.nii.gz"))[0]
-        json_file = sorted(glob.glob(f"{self._subj_sess}/fmap/*.json"))[0]
-        if not nii_file:
+        # Find nii, json files
+        nii_list = sorted(glob.glob(f"{self._subj_sess}/fmap/*.nii.gz"))
+        json_list = sorted(glob.glob(f"{self._subj_sess}/fmap/*.json"))
+        if not nii_list:
             raise FileNotFoundError(
                 f"Expected to find : {self._subj_sess}/fmap/*.nii.gz"
             )
-        if not json_file:
+        if not json_list:
             raise FileNotFoundError(
                 f"Expected to find : {self._subj_sess}/fmap/*.json"
             )
-        with open(json_file, "r") as jf:
-            nii_json = json.load(jf)
-
-        # Get DICOM header info
-        day = self._sess.split("-")[1]
-        dicom_dir = os.path.join(
-            self._source_dir,
-            self._subj_nda,
-            f"{day}*",
-            "DICOM",
-            "Field_Map_PA",
-        )
-        dicom_list = sorted(glob.glob(f"{dicom_dir}/*.dcm"))
-        if not dicom_list:
-            raise FileNotFoundError(
-                f"Expected to find DICOMs in : {dicom_dir}"
+        if len(nii_list) != len(json_list):
+            raise ValueError(
+                "Detected uneven number of NIfTI and JSON files "
+                + f"in {self._subj_sess}/fmap"
             )
-        dicom_file = dicom_list[0]
-        dicom_hdr = pydicom.read_file(dicom_file)
 
-        # Get demographic info
-        scan_date = datetime.strptime(dicom_hdr[0x08, 0x20].value, "%Y%m%d")
-        demo_dict = self._get_subj_demo(scan_date)
+        # Add row for each fmap
+        for nii_path, json_path in zip(nii_list, json_list):
+            with open(json_path, "r") as jf:
+                nii_json = json.load(jf)
 
-        # Make a host file
-        h_guid = demo_dict["subjectkey"]
-        host_nii = f"{h_guid}_{day}_fmap1_revpol.nii.gz"
-        self._make_host(nii_file, host_nii)
+            # Setup dcm path so glob finds the appropriate Field_Map_PA
+            # or Field_Map_PA_run[1|2] (new fmap protocol).
+            day = self._sess.split("-")[1]
+            h_path = os.path.join(
+                self._source_dir,
+                self._subj_nda,
+                f"{day}*",
+                "DICOM",
+            )
+            nii_file = os.path.basename(nii_path)
+            if "run" in nii_file:
+                fmap_num = nii_file.split("run-")[1].split("_")[0][1]
+                dicom_dir = os.path.join(h_path, f"Field_Map_PA_run{fmap_num}")
+            else:
+                dicom_dir = os.path.join(h_path, "Field_Map_PA")
 
-        # Get general, anat specific acquisition info
-        std_dict = self._get_std_info(nii_json, dicom_hdr)
+            # Find dcms, get header
+            dicom_list = sorted(glob.glob(f"{dicom_dir}/*.dcm"))
+            if not dicom_list:
+                raise FileNotFoundError(
+                    f"Expected to find DICOMs in : {dicom_dir}"
+                )
+            dicom_hdr = pydicom.read_file(dicom_list[0])
 
-        # Setup fmap-specific values
-        fmap_image03 = {
-            "image_file": f"data_mri/{host_nii}",
-            "image_description": "fmap (reverse phase polarity)",
-            "scan_type": "Field Map",
-            "image_history": "No modifications",
-            "image_num_dimensions": 4,
-            "image_extent4": len(dicom_list),
-            "extent4_type": "time",
-            "image_unit4": "number of Volumes (across time)",
-            "image_resolution1": 2.0,
-            "image_resolution2": 2.0,
-            "image_resolution3": float(nii_json["SliceThickness"]),
-            "image_resolution4": float(nii_json["RepetitionTime"]),
-            "image_slice_thickness": float(nii_json["SliceThickness"]),
-            "slice_timing": f"{nii_json['SliceTiming']}",
-        }
+            # Get demographic info
+            scan_date = datetime.strptime(
+                dicom_hdr[0x08, 0x20].value, "%Y%m%d"
+            )
+            demo_dict = self._get_subj_demo(scan_date)
 
-        # Combine all dicts
-        fmap_image03.update(demo_dict)
-        fmap_image03.update(std_dict)
+            # Make a host file
+            h_guid = demo_dict["subjectkey"]
+            host_nii = (
+                f"{h_guid}_{day}_fmap{fmap_num}_revpol.nii.gz"
+                if "fmap_num" in locals()
+                else f"{h_guid}_{day}_fmap1_revpol.nii.gz"
+            )
+            self._make_host(nii_path, host_nii)
 
-        # Add scan info to report
-        new_row = pd.DataFrame(fmap_image03, index=[0])
-        self._df_report_study = pd.concat(
-            [self._df_report_study.loc[:], new_row]
-        ).reset_index(drop=True)
+            # Get general, anat specific acquisition info
+            std_dict = self._get_std_info(nii_json, dicom_hdr)
+
+            # Setup fmap-specific values
+            fmap_image03 = {
+                "image_file": f"data_mri/{host_nii}",
+                "image_description": "fmap (reverse phase polarity)",
+                "scan_type": "Field Map",
+                "image_history": "No modifications",
+                "image_num_dimensions": 4,
+                "image_extent4": len(dicom_list),
+                "extent4_type": "time",
+                "image_unit4": "number of Volumes (across time)",
+                "image_resolution1": 2.0,
+                "image_resolution2": 2.0,
+                "image_resolution3": float(nii_json["SliceThickness"]),
+                "image_resolution4": float(nii_json["RepetitionTime"]),
+                "image_slice_thickness": float(nii_json["SliceThickness"]),
+                "slice_timing": f"{nii_json['SliceTiming']}",
+            }
+
+            # Combine all dicts
+            fmap_image03.update(demo_dict)
+            fmap_image03.update(std_dict)
+
+            # Add scan info to report
+            new_row = pd.DataFrame(fmap_image03, index=[0])
+            self._df_report_study = pd.concat(
+                [self._df_report_study.loc[:], new_row]
+            ).reset_index(drop=True)
 
     def info_func(self):
         """Write image03 line for func data.
@@ -2046,7 +2067,7 @@ class NdarPhysio:
     for each file.
 
     Make copies of physio files in:
-        <proj_dir>/ndar_report/data_phys
+        <proj_dir>/ndar_upload/data_phys
 
     Attributes
     ----------
