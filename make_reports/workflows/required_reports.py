@@ -8,10 +8,9 @@ accompanying data. Also supports GUID generation.
 # %%
 import os
 import glob
-import json
 from datetime import datetime
-import pandas as pd
 from make_reports.resources import build_reports
+from make_reports.workflows import manage_data
 
 
 # %%
@@ -47,7 +46,7 @@ def make_regular_reports(regular_reports, query_date, proj_dir):
     )
     if len(redcap_clean) != 4:
         print("No clean data found in RedCap, cleaning ...")
-        cl_data = CleanSurveys(proj_dir)
+        cl_data = manage_data.CleanSurveys(proj_dir)
         cl_data.clean_redcap()
         print("\tDone.")
 
@@ -123,7 +122,7 @@ def make_ndar_reports(ndar_reports, proj_dir, close_date):
     visit_clean = glob.glob(f"{proj_dir}/data_survey/visit*/data_clean/*.csv")
     if len(redcap_clean) != 4 or len(visit_clean) != 17:
         print("Missing RedCap, Qualtrics clean data. Cleaning ...")
-        cl_data = CleanSurveys(proj_dir)
+        cl_data = manage_data.CleanSurveys(proj_dir)
         cl_data.clean_redcap()
         cl_data.clean_qualtrics()
         print("\tDone.")
@@ -232,7 +231,7 @@ def generate_guids(proj_dir, user_name, user_pass, find_mismatch):
     )
     if not os.path.exists(chk_demo):
         print("Missing clean RedCap demographics, cleaning ...")
-        cl_data = CleanSurveys(proj_dir)
+        cl_data = manage_data.CleanSurveys(proj_dir)
         cl_data.clean_redcap()
         print("\tDone.")
 

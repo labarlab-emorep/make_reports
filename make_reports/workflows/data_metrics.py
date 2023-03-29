@@ -7,10 +7,8 @@ and amount of motion in EPI data.
 # %%
 import os
 import glob
-import json
-from datetime import datetime
-import pandas as pd
 from make_reports.resources import build_reports, calc_metrics
+from make_reports.workflows import manage_data
 
 
 # %%
@@ -45,7 +43,7 @@ def get_metrics(proj_dir, recruit_demo, prop_motion, scan_pace, redcap_token):
         )
         if len(redcap_clean) != 4 or len(visit_clean) != 17:
             print("Missing RedCap, Qualtrics clean data. Cleaning ...")
-            cl_data = CleanSurveys(proj_dir)
+            cl_data = manage_data.CleanSurveys(proj_dir)
             cl_data.clean_redcap()
             cl_data.clean_qualtrics()
             print("\tDone.")
@@ -69,3 +67,24 @@ def get_metrics(proj_dir, recruit_demo, prop_motion, scan_pace, redcap_token):
 
     if prop_motion:
         _ = calc_metrics.censored_volumes(proj_dir)
+
+
+# %%
+def prisma_flow(proj_dir):
+    """Title."""
+    from graphviz import Digraph as prisma
+
+    # 1) Enrolled -- consent + demo + guid
+    #       from build_reports.DemoAll.final_demo
+    # 2) Visit 1
+    #       Complete surveys
+    # 3) Visit 2
+    #       BDI
+    #       MRI
+    # 4) Visit 3
+    #       BDI
+    #       MRI
+
+    #
+    redcap_demo = build_reports.DemoAll(proj_dir)
+    final_demo = redcap_demo.final_demo

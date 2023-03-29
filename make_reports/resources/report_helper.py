@@ -301,6 +301,70 @@ def qualtrics_dict() -> dict:
     }
 
 
-def withdrew_list() -> list:
-    """Return a list of participants who withdrew consent."""
-    return ["ER0103", "ER0229"]
+class Lost:
+    """Hold lists of participnats lost to follow-up.
+
+    Attributes
+    ----------
+    all : list
+        Participants lost to follow-up at any point
+    visit1 : list
+        Participants lost to follow-up after visit 1
+    visit2 : list
+        Participants lost to follow-up after visit 2
+    visit3 : list
+        Participants lost to follow-up after visit 3
+
+    """
+
+    def __init__(self):
+        self.visit1 = ["ER0190", "ER0193", "ER0213"]
+        self.visit2 = ["ER0087", "ER0166"]
+        self.visit3 = []
+        self.all = self.visit1 + self.visit2 + self.visit3
+
+
+class Excluded:
+    """Hold lists of participants who were excluded.
+
+    Attributes
+    ----------
+    all : list
+        Participants excluded at any point
+    visit1 : list
+        Participants excluded during or after visit 1
+    visit2 : list
+        Participants excluded during or after visit 2
+    visit3 : list
+        Participants excluded during or after visit 3
+
+    """
+
+    def __init__(self):
+        self.visit1 = []
+        self.visit2 = ["ER0017", "ER0032", "ER0080", "ER0162"]
+        self.visit3 = []
+        self.all = self.visit1 + self.visit2 + self.visit3
+
+
+class Withdrew:
+    """Hold lists of participants who withdrew consent.
+
+    Attributes
+    ----------
+    all : list
+        Participants who withdrew at any point
+    visit1 : list
+        Participants who withdrew during or after visit 1
+    visit2 : list
+        Participants who withdrew during or after visit 2
+    visit3 : list
+        Participants who withdrew during or after visit 3
+
+    """
+
+    def __init__(self):
+        self.visit1 = ["ER0086"]
+        self.visit2 = ["ER0103"]
+        self.visit3 = ["ER0229"]
+        self.all = self.visit1 + self.visit2 + self.visit3
