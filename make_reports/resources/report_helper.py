@@ -343,7 +343,7 @@ class Excluded:
     def __init__(self):
         self.visit1 = []
         self.visit2 = ["ER0017", "ER0032", "ER0080", "ER0162"]
-        self.visit3 = []
+        self.visit3 = ["ER0057", "ER0325"]
         self.all = self.visit1 + self.visit2 + self.visit3
 
 

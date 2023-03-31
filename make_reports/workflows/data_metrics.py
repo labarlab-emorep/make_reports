@@ -106,10 +106,52 @@ def prisma_flow(proj_dir, redcap_token):
     num_v1_w = len(report_helper.Withdrew().visit1)
     num_v1_l = len(report_helper.Lost().visit1)
 
+    # Visit2
+    num_v2_sur = len(
+        df_compl.index[
+            (df_compl["day_2_fully_completed"] == 1.0)
+            | (df_compl["bdi_day2_completed"] == 1.0)
+        ].tolist()
+    )
+    num_v2_mri = len(
+        df_compl.index[
+            (df_compl["day_2_fully_completed"] == 1.0)
+            | (df_compl["imaging_day2_completed"] == 1.0)
+        ].tolist()
+    )
+    num_v2_x = len(report_helper.Excluded().visit2)
+    num_v2_w = len(report_helper.Withdrew().visit2)
+    num_v2_l = len(report_helper.Lost().visit2)
+
+    # Visit3
+    num_v3_sur = len(
+        df_compl.index[
+            (df_compl["day_3_fully_completed"] == 1.0)
+            | (df_compl["bdi_day3_completed"] == 1.0)
+        ].tolist()
+    )
+    num_v3_mri = len(
+        df_compl.index[
+            (df_compl["day_3_fully_completed"] == 1.0)
+            | (df_compl["imaging_day3_completed"] == 1.0)
+        ].tolist()
+    )
+    num_v3_x = len(report_helper.Excluded().visit3)
+    num_v3_w = len(report_helper.Withdrew().visit3)
+    num_v3_l = len(report_helper.Lost().visit3)
+
+    # Final
+    num_final = len(
+        df_compl.index[
+            (df_compl["day_3_fully_completed"] == 1.0)
+            & (df_compl["withdrew_flag___1"] == 0.0)
+        ].tolist()
+    )
+
     #
     flo = Digraph("participant_flow")
     flo.attr(label="Participant Flow", labelloc="t", fontsize="18")
-    flo.node("a", f"Recruited individuals: {num_recruit}", shape="box")
+    flo.node("a", f"Recruited Individuals: {num_recruit}", shape="box")
     with flo.subgraph() as c:
         c.attr(rank="same")
         c.node(
@@ -128,17 +170,37 @@ def prisma_flow(proj_dir, redcap_token):
         )
     with flo.subgraph() as c:
         c.attr(rank="same")
-        c.node("d", "Visit2\nSurveys: TODO\lMRI: TODO\l", shape="box")
         c.node(
-            "e", "Excluded: TODO\lLost: TODO\lWithdrawn: TODO\l", shape="box"
+            "d",
+            "Visit2\n"
+            + f"Surveys: {num_v2_sur}\l"  # noqa: W605
+            + f"MRI: {num_v2_mri}\l",  # noqa: W605
+            shape="box",
+        )
+        c.node(
+            "e",
+            f"Excluded: {num_v2_x}\l"  # noqa: W605
+            + f"Lost: {num_v2_l}\l"  # noqa: W605
+            + f"Withdrawn: {num_v2_w}\l",  # noqa: W605
+            shape="box",
         )
     with flo.subgraph() as c:
         c.attr(rank="same")
-        c.node("f", "Visit3\nSurveys: TODO\lMRI: TODO\l", shape="box")
         c.node(
-            "g", "Excluded: TODO\lLost: TODO\lWithdrawn: TODO\l", shape="box"
+            "f",
+            "Visit3\n"
+            + f"Surveys: {num_v3_sur}\l"  # noqa: W605
+            + f"MRI: {num_v3_mri}\l",  # noqa: W605
+            shape="box",
         )
-    flo.node("i", "Final: TODO", shape="box")
+        c.node(
+            "g",
+            f"Excluded: {num_v3_x}\l"  # noqa: W605
+            + f"Lost: {num_v3_l}\l"  # noqa: W605
+            + f"Withdrawn: {num_v3_w}\l",  # noqa: W605
+            shape="box",
+        )
+    flo.node("i", f"Final: {num_final}", shape="box")
     flo.edges(["ab", "bc", "bd", "de", "df", "fg", "fi"])
 
     flo.format = "png"
