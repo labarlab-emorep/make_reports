@@ -8,9 +8,7 @@ import pandas as pd
 import numpy as np
 import matplotlib.pyplot as plt
 import seaborn as sns
-import importlib.resources as pkg_resources
-from make_reports.resources import report_helper
-from make_reports import reference_files
+from make_reports.resources import survey_download
 
 
 # %%
@@ -340,45 +338,14 @@ def scan_pace(redcap_token, proj_dir):
         Weekly scan attempts
 
     """
-
-    def _get_visit_log(rep_key: str, day: str) -> pd.DataFrame:
-        """Return dataframe of MRI visit log datetimes."""
-        # Manage differing column names
-        col_switch = {
-            "day2": ("date_mriv3_v2", "session_numberv3_v2"),
-            "day3": ("date_mriv3", "session_numberv3"),
-        }
-        col_date = col_switch[day][0]
-        col_value = col_switch[day][1]
-
-        # Download dataframe, clean up
-        df_visit = report_helper.pull_redcap_data(redcap_token, rep_key)
-        df_visit = df_visit[df_visit[col_value].notna()].reset_index(drop=True)
-        df_visit.rename(columns={col_date: "datetime"}, inplace=True)
-        df_visit["datetime"] = df_visit["datetime"].astype("datetime64[ns]")
-
-        # Extract values of interest
-        df_out = df_visit[["datetime"]].copy()
-        df_out["Visit"] = day
-        return df_out
-
-    # Access report keys, visit info
-    with pkg_resources.open_text(
-        reference_files, "log_keys_redcap.json"
-    ) as jf:
-        report_keys = json.load(jf)
-    df2 = _get_visit_log(report_keys["mri_visit2"], "day2")
-    df3 = _get_visit_log(report_keys["mri_visit3"], "day3")
-
-    # Combine dataframes, ready for weekly totalling
-    df = pd.concat([df2, df3], ignore_index=True)
-    df = df.sort_values(by=["datetime"]).reset_index(drop=True)
-    df["datetime"] = df["datetime"] - pd.to_timedelta(7, unit="d")
-    df["count"] = 1
+    # Get data, ready for weekly totals
+    df_log = survey_download.download_mri_log(redcap_token)
+    df_log["datetime"] = df_log["datetime"] - pd.to_timedelta(7, unit="d")
+    df_log["count"] = 1
 
     # Determine scan attempts per week, by visit
     df_week = (
-        df.groupby(["Visit", pd.Grouper(key="datetime", freq="W-SUN")])[
+        df_log.groupby(["Visit", pd.Grouper(key="datetime", freq="W-SUN")])[
             "count"
         ]
         .sum()

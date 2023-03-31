@@ -318,7 +318,7 @@ class Lost:
     """
 
     def __init__(self):
-        self.visit1 = ["ER0190", "ER0193", "ER0213"]
+        self.visit1 = ["ER0166", "ER0190", "ER0193", "ER0213"]
         self.visit2 = ["ER0087", "ER0166"]
         self.visit3 = []
         self.all = self.visit1 + self.visit2 + self.visit3

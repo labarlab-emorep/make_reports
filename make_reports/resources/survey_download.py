@@ -1,13 +1,123 @@
 """Functions for downloading survey data from RedCap and Qualtrics."""
 import os
 import json
+import pandas as pd
 import importlib.resources as pkg_resources
 from make_reports.resources import report_helper
 from make_reports import reference_files
 
 
+def download_mri_log(redcap_token):
+    """Download and combine MRI Visit Logs by session.
+
+    Returns a reduced report, containing only a datetime column
+    and visit identifier. Used for calculating weekly scan
+    attempts.
+
+    Parameters
+    ----------
+    redcap_token : str
+        API token for RedCap
+
+    Returns
+    -------
+    pd.DataFrame
+
+    """
+
+    def _get_visit_log(rep_key: str, day: str) -> pd.DataFrame:
+        """Return dataframe of MRI visit log datetimes."""
+        # Manage differing column names
+        col_switch = {
+            "day2": ("date_mriv3_v2", "session_numberv3_v2"),
+            "day3": ("date_mriv3", "session_numberv3"),
+        }
+        col_date = col_switch[day][0]
+        col_value = col_switch[day][1]
+
+        # Download dataframe, clean up
+        df_visit = report_helper.pull_redcap_data(redcap_token, rep_key)
+        df_visit = df_visit[df_visit[col_value].notna()].reset_index(drop=True)
+        df_visit.rename(columns={col_date: "datetime"}, inplace=True)
+        df_visit["datetime"] = df_visit["datetime"].astype("datetime64[ns]")
+
+        # Extract values of interest
+        df_out = df_visit[["datetime"]].copy()
+        df_out["Visit"] = day
+        return df_out
+
+    # Access report keys, visit info
+    with pkg_resources.open_text(
+        reference_files, "log_keys_redcap.json"
+    ) as jf:
+        report_keys = json.load(jf)
+    df2 = _get_visit_log(report_keys["mri_visit2"], "day2")
+    df3 = _get_visit_log(report_keys["mri_visit3"], "day3")
+
+    # Combine dataframes, ready for weekly totaling
+    df = pd.concat([df2, df3], ignore_index=True)
+    df = df.sort_values(by=["datetime"]).reset_index(drop=True)
+    return df
+
+
+def download_completion_log(redcap_token):
+    """Return Completion log.
+
+    Only includes participants who have a value in the
+    'prescreening_completed' field.
+
+    Parameters
+    ----------
+    redcap_token : str
+        API token for RedCap
+
+    Returns
+    -------
+    pd.DataFrame
+
+    """
+    with pkg_resources.open_text(
+        reference_files, "log_keys_redcap.json"
+    ) as jf:
+        report_keys = json.load(jf)
+    df_compl = report_helper.pull_redcap_data(
+        redcap_token, report_keys["completion_log"]
+    )
+    df_compl = df_compl[
+        df_compl["prescreening_completed"].notna()
+    ].reset_index(drop=True)
+    return df_compl
+
+
+def download_prescreening(redcap_token):
+    """Return reduced prescreening survey.
+
+    Parameters
+    ----------
+    redcap_token : str
+        API token for RedCap
+
+    Returns
+    -------
+    pd.DataFrame
+
+    """
+    with pkg_resources.open_text(
+        reference_files, "report_keys_redcap.json"
+    ) as jf:
+        report_keys = json.load(jf)
+    df_pre = report_helper.pull_redcap_data(
+        redcap_token, report_keys["prescreen"]
+    )
+    df_pre = df_pre[df_pre["permission"] == 1].reset_index(drop=True)
+    df_out = df_pre[
+        ["record_id", "permission", "prescreening_survey_complete"]
+    ].copy()
+    return df_out
+
+
 def _download_info(database, survey_name=None):
-    """Gather API survey IDs and organiation mapping.
+    """Gather API survey IDs and organization mapping.
 
     Parameters
     ----------

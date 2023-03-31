@@ -7,7 +7,9 @@ and amount of motion in EPI data.
 # %%
 import os
 import glob
+from graphviz import Digraph
 from make_reports.resources import build_reports, calc_metrics
+from make_reports.resources import survey_download, report_helper
 from make_reports.workflows import manage_data
 
 
@@ -70,10 +72,10 @@ def get_metrics(proj_dir, recruit_demo, prop_motion, scan_pace, redcap_token):
 
 
 # %%
-def prisma_flow(proj_dir):
+def prisma_flow(proj_dir, redcap_token):
     """Title."""
-    from graphviz import Digraph as prisma
-
+    # 0) Recruit
+    #       from prescreening
     # 1) Enrolled -- consent + demo + guid
     #       from build_reports.DemoAll.final_demo
     # 2) Visit 1
@@ -85,6 +87,62 @@ def prisma_flow(proj_dir):
     #       BDI
     #       MRI
 
-    #
+    # Recruit
+    df_pre = survey_download.download_prescreening(redcap_token)
+    num_recruit = df_pre.shape[0]
+
+    # Visit1
     redcap_demo = build_reports.DemoAll(proj_dir)
-    final_demo = redcap_demo.final_demo
+    df_compl = survey_download.download_completion_log(redcap_token)
+
+    num_enroll = redcap_demo.final_demo.shape[0]
+    num_v1_sur = len(
+        df_compl.index[
+            (df_compl["day_1_fully_completed"] == 1.0)
+            | (df_compl["emotion_quest_completed"] == 1.0)
+        ].tolist()
+    )
+    num_v1_x = len(report_helper.Excluded().visit1)
+    num_v1_w = len(report_helper.Withdrew().visit1)
+    num_v1_l = len(report_helper.Lost().visit1)
+
+    #
+    flo = Digraph("participant_flow")
+    flo.attr(label="Participant Flow", labelloc="t", fontsize="18")
+    flo.node("a", f"Recruited individuals: {num_recruit}", shape="box")
+    with flo.subgraph() as c:
+        c.attr(rank="same")
+        c.node(
+            "b",
+            "Visit1\n"
+            + f"Enrolled: {num_enroll}\l"  # noqa: W605
+            + f"Surveys: {num_v1_sur}\l",  # noqa: W605
+            shape="box",
+        )
+        c.node(
+            "c",
+            f"Excluded: {num_v1_x}\l"  # noqa: W605
+            + f"Lost: {num_v1_l}\l"  # noqa: W605
+            + f"Withdrawn: {num_v1_w}\l",  # noqa: W605
+            shape="box",
+        )
+    with flo.subgraph() as c:
+        c.attr(rank="same")
+        c.node("d", "Visit2\nSurveys: TODO\lMRI: TODO\l", shape="box")
+        c.node(
+            "e", "Excluded: TODO\lLost: TODO\lWithdrawn: TODO\l", shape="box"
+        )
+    with flo.subgraph() as c:
+        c.attr(rank="same")
+        c.node("f", "Visit3\nSurveys: TODO\lMRI: TODO\l", shape="box")
+        c.node(
+            "g", "Excluded: TODO\lLost: TODO\lWithdrawn: TODO\l", shape="box"
+        )
+    flo.node("i", "Final: TODO", shape="box")
+    flo.edges(["ab", "bc", "bd", "de", "df", "fg", "fi"])
+
+    flo.format = "png"
+    out_plot = os.path.join(
+        proj_dir, "analyses/metrics_recruit", "plot_flow-participant"
+    )
+    flo.render(out_plot)
