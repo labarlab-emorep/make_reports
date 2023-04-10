@@ -329,7 +329,7 @@ class ManagerRegular:
 
     Attributes
     ----------
-    df_report : pd.DataFrame
+    df_report : pd.DataFrame, None
         Relevant info and format for requested report
     range_end : datetime
         End of period for report
@@ -456,13 +456,8 @@ class ManagerRegular:
             self._final_demo["interview_date"] >= self.range_start
         ) & (self._final_demo["interview_date"] <= self.range_end)
 
-        # Subset final_demo according to mask, check if data exist
+        # Subset final_demo according to mask
         self._df_range = self._final_demo.loc[range_bool]
-        if self._df_range.empty:
-            raise ValueError(
-                "No data collected for query range : "
-                + f"{self.range_start} - {self.range_end}"
-            )
         print(f"\tReport range : {self.range_start} - {self.range_end}")
 
     def make_nih4(self):
@@ -474,7 +469,7 @@ class ManagerRegular:
 
         Attributes
         ----------
-        df_report : pd.DataFrame
+        df_report : pd.DataFrame, None
             Relevant info, format for requested report
 
         """
@@ -507,11 +502,18 @@ class ManagerRegular:
         # Set project start date (approximately)
         proj_start = datetime.strptime("2020-06-30", "%Y-%m-%d").date()
 
-        # Find data within range
+        # Find data within range, check for data
         self._get_data_range(
             nih_4mo_ranges,
             start_date=proj_start,
         )
+        if self._df_range.empty:
+            print(
+                "\t\tNo data collected for query range : "
+                + f"{self.range_start} - {self.range_end}, skipping ..."
+            )
+            self.df_report = None
+            return
 
         # Calculate number of minority, hispanic, and total recruited
         num_minority = len(
@@ -549,7 +551,7 @@ class ManagerRegular:
 
         Attributes
         ----------
-        df_report : pd.DataFrame
+        df_report : pd.DataFrame, None
             Relevant info, format for requested report
 
         """
@@ -578,8 +580,15 @@ class ManagerRegular:
             ("2025-10-01", "2025-12-31"),
         ]
 
-        # Find data within range
+        # Find data within range, check for data
         self._get_data_range(duke_3mo_ranges)
+        if self._df_range.empty:
+            print(
+                "\t\tNo data collected for query range : "
+                + f"{self.range_start} - {self.range_end}, skipping ..."
+            )
+            self.df_report = None
+            return
 
         # Get gender, ethnicity, race responses
         df_hold = self._df_range[
@@ -628,7 +637,7 @@ class ManagerRegular:
 
         Attributes
         ----------
-        df_report : pd.DataFrame
+        df_report : pd.DataFrame, None
             Relevant info, format for requested report
 
         """
@@ -642,8 +651,15 @@ class ManagerRegular:
             ("2025-04-01", "2026-03-31"),
         ]
 
-        # Get data from query range
+        # Get data from query range, check for data
         self._get_data_range(nih_annual_ranges)
+        if self._df_range.empty:
+            print(
+                "\t\tNo data collected for query range : "
+                + f"{self.range_start} - {self.range_end}, skipping ..."
+            )
+            self.df_report = None
+            return
 
         # Extract relevant columns for the report
         cols_desired = [

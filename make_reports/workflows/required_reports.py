@@ -9,6 +9,7 @@ accompanying data. Also supports GUID generation.
 import os
 import glob
 from datetime import datetime
+import pandas as pd
 from make_reports.resources import build_reports
 from make_reports.workflows import manage_data
 
@@ -85,8 +86,9 @@ def make_regular_reports(regular_reports, query_date, proj_dir):
         out_file = os.path.join(
             manager_dir, f"report_{report}_{start_date}_{end_date}.csv"
         )
-        print(f"\tWriting : {out_file}")
-        mr.df_report.to_csv(out_file, index=False, na_rep="")
+        if isinstance(mr.df_report, pd.DataFrame):
+            print(f"\tWriting : {out_file}")
+            mr.df_report.to_csv(out_file, index=False, na_rep="")
         del mr
 
 
