@@ -9,9 +9,6 @@ to the EmoRep scheme.
 # %%
 import os
 import glob
-import json
-from datetime import datetime
-import pandas as pd
 from make_reports.resources import survey_download, survey_clean
 from make_reports.resources import report_helper
 

@@ -7,6 +7,9 @@ Make plots and reports to give snapshots of the data:
     -   scan-pace : Quantify and plot the number of scans
             attempted each week, to help understand recruitment
             pace and adjustments.
+    -   participant-flow : Draw PRISMA flowchart of participant
+            flow, exclusion, lost-to-follow-up, and withdrawal
+            for Experiment2
     -   prop-motion : Calculate the proportion of volumes that
             exceed framewise displacement thresholds.
 
@@ -17,6 +20,7 @@ Examples
 --------
 rep_metrics --recruit-demo
 rep_metrics --prop-motion
+rep_metrics --participant-flow --redcap-token $PAT_REDCAP_EMOREP
 rep_metrics --scan-pace --redcap-token $PAT_REDCAP_EMOREP
 
 """
@@ -32,6 +36,16 @@ def _get_args():
         description=__doc__, formatter_class=RawTextHelpFormatter
     )
     parser.add_argument(
+        "--participant-flow",
+        action="store_true",
+        help=textwrap.dedent(
+            """\
+            Requires --redcap-token.
+            Draw participant PRISMA flowchart.
+            """
+        ),
+    )
+    parser.add_argument(
         "--proj-dir",
         type=str,
         default="/mnt/keoki/experiments2/EmoRep/Exp2_Compute_Emotion",
@@ -45,20 +59,12 @@ def _get_args():
     parser.add_argument(
         "--prop-motion",
         action="store_true",
-        help=textwrap.dedent(
-            """\
-            Calculate proportion of volumes that exceed FD threshold
-            """
-        ),
+        help="Calculate proportion of volumes that exceed FD threshold",
     )
     parser.add_argument(
         "--recruit-demo",
         action="store_true",
-        help=textwrap.dedent(
-            """\
-            Calculate recruitement demographics\
-            """
-        ),
+        help="Calculate recruitement demographics",
     )
     parser.add_argument(
         "--redcap-token",
@@ -91,13 +97,21 @@ def main():
     recruit_demo = args.recruit_demo
     prop_motion = args.prop_motion
     redcap_token = args.redcap_token
+    participant_flow = args.participant_flow
     scan_pace = args.scan_pace
 
     if not redcap_token and scan_pace:
         raise ValueError("Option --scan-pace requires --redcap-token.")
+    if not redcap_token and participant_flow:
+        raise ValueError("Option --participant-flow requires --redcap-token.")
 
     data_metrics.get_metrics(
-        proj_dir, recruit_demo, prop_motion, scan_pace, redcap_token
+        proj_dir,
+        recruit_demo,
+        prop_motion,
+        scan_pace,
+        participant_flow,
+        redcap_token,
     )
 
 

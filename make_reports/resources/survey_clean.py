@@ -464,14 +464,14 @@ class CleanQualtrics:
             Location of parent directory for project
         _qualtrics_dict : make_reports.report_helper.qualtrics_dict
             Mapping of survey name to directory organization
-        _withdrew_list : make_reports.report_helper.withdrew_list
+        _withdrew_list : make_reports.report_helper.Withdrew().all
             Participant who have withdrawn from study
 
         """
         self._proj_dir = proj_dir
         self._qualtrics_dict = report_helper.qualtrics_dict()
         self._pilot_list = report_helper.pilot_list()
-        self._withdrew_list = report_helper.withdrew_list()
+        self._withdrew_list = report_helper.Withdrew().all
 
     def clean_surveys(self, survey_name):
         """Split and clean original Qualtrics survey data.

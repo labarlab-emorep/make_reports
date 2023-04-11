@@ -6,11 +6,10 @@ REDCap, Qualtrics, and EmoRep task participant responses.
 """
 # %%
 import os
-import glob
 import json
-from datetime import datetime
 import pandas as pd
 from make_reports.resources import calc_surveys
+
 
 # %%
 class CalcRedcapQualtricsStats:

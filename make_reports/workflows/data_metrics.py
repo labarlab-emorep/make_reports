@@ -7,14 +7,19 @@ and amount of motion in EPI data.
 # %%
 import os
 import glob
-import json
-from datetime import datetime
-import pandas as pd
 from make_reports.resources import build_reports, calc_metrics
+from make_reports.workflows import manage_data
 
 
 # %%
-def get_metrics(proj_dir, recruit_demo, prop_motion, scan_pace, redcap_token):
+def get_metrics(
+    proj_dir,
+    recruit_demo,
+    prop_motion,
+    scan_pace,
+    participant_flow,
+    redcap_token,
+):
     """Generate descriptive metrics about the data.
 
     Miscellaneous methods to aid in guiding data collection
@@ -30,6 +35,8 @@ def get_metrics(proj_dir, recruit_demo, prop_motion, scan_pace, redcap_token):
         Calculate proportion of volumes that exceed FD threshold
     scan_pace : bool
         Plot number of attempted scans by week
+    participant_flow : bool
+        Draw participant PRISMA flowchart
     redcap_token : str
         API token for RedCap project
 
@@ -45,7 +52,7 @@ def get_metrics(proj_dir, recruit_demo, prop_motion, scan_pace, redcap_token):
         )
         if len(redcap_clean) != 4 or len(visit_clean) != 17:
             print("Missing RedCap, Qualtrics clean data. Cleaning ...")
-            cl_data = CleanSurveys(proj_dir)
+            cl_data = manage_data.CleanSurveys(proj_dir)
             cl_data.clean_redcap()
             cl_data.clean_qualtrics()
             print("\tDone.")
@@ -67,5 +74,11 @@ def get_metrics(proj_dir, recruit_demo, prop_motion, scan_pace, redcap_token):
         print("Calculate number of attempted scans per week ...\n")
         _ = calc_metrics.scan_pace(redcap_token, proj_dir)
 
+    # Plot proportion of volumes censored
     if prop_motion:
         _ = calc_metrics.censored_volumes(proj_dir)
+
+    # Draw PRSIMA flow
+    if participant_flow:
+        part_flo = calc_metrics.ParticipantFlow(proj_dir, redcap_token)
+        part_flo.draw_prisma()
