@@ -17,7 +17,7 @@ import sys
 import textwrap
 from getpass import getpass
 from argparse import ArgumentParser, RawTextHelpFormatter
-from make_reports import workflow
+from make_reports.workflows import required_reports
 
 
 def _get_args():
@@ -61,7 +61,7 @@ def _get_args():
 
 
 def main():
-    """Capture arguments and trigger workflow."""
+    """Capture arguments and trigger workflows."""
     args = _get_args().parse_args()
     proj_dir = args.proj_dir
     user_name = args.user_name
@@ -81,9 +81,11 @@ def main():
         print("\nNo password provided, exiting.")
         sys.exit(0)
 
-    # Start workflow
+    # Start workflows
     print("\nStarting workflow ...")
-    workflow.generate_guids(proj_dir, user_name, user_pass, find_mismatch)
+    required_reports.generate_guids(
+        proj_dir, user_name, user_pass, find_mismatch
+    )
 
 
 if __name__ == "__main__":

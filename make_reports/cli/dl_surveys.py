@@ -19,7 +19,7 @@ import os
 import sys
 import textwrap
 from argparse import ArgumentParser, RawTextHelpFormatter
-from make_reports import workflow
+from make_reports.workflows import manage_data
 
 
 def _get_args():
@@ -81,7 +81,7 @@ def _get_args():
 
 
 def main():
-    """Capture arguments and trigger workflow."""
+    """Capture arguments and trigger workflows."""
     args = _get_args().parse_args()
     proj_dir = args.proj_dir
     qualtrics_token = args.qualtrics_token
@@ -101,7 +101,7 @@ def main():
         if not os.path.exists(sur_dir):
             os.path.makedirs(sur_dir)
 
-    workflow.download_surveys(
+    manage_data.download_surveys(
         proj_dir,
         redcap_token=redcap_token,
         qualtrics_token=qualtrics_token,

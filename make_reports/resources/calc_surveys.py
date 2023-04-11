@@ -43,7 +43,7 @@ class _DescStat:
     confusion_heatmap(**args)
         Generate heatmap from confusion matrix
     confusion_matrix(emo_list, subj_col, num_exp)
-        Generate confusion matrix of participant stimulus
+        Generate confusion matrices of participant stimulus
         endorsement proportions
     draw_double_boxplot(fac_col, fac_a, fac_b, main_title, out_path)
         Generate and write a boxplot with two factors
@@ -449,9 +449,9 @@ class _DescStat:
 
         Returns
         -------
-        pd.DataFrame
-            Confusion matrix
-            row = stimulus, column = participant response
+        tuple of pd.DataFrame
+            [0] = proportion confusion matrix
+            [1] = count confusion matrix
 
         Raises
         ------
@@ -465,7 +465,7 @@ class _DescStat:
         Example
         -------
         stat_obj = _DescStat(pd.DataFrame)
-        df_confusion = stat_obj.confusion_matrix(
+        df_prop, df_count = stat_obj.confusion_matrix(
             ["emo1", ... "emo15"], "subj_id", 5
         )
 
@@ -490,20 +490,27 @@ class _DescStat:
 
         # Calc proportion each emotion is endorsed as every emotion
         count_dict = {}
+        prop_dict = {}
         for emo in emo_list:
             count_dict[emo] = {}
+            prop_dict[emo] = {}
             df_emo = self.df[self.df[emo_col] == emo]
             for sub_emo in emo_list:
                 count_emo = len(df_emo[df_emo[resp_col].str.contains(sub_emo)])
-                count_dict[emo][sub_emo] = round(count_emo / max_total, 2)
+                count_dict[emo][sub_emo] = count_emo
+                prop_dict[emo][sub_emo] = round(count_emo / max_total, 2)
         del df_emo
 
         # Generate dataframe
-        df_corr = pd.DataFrame.from_dict(
+        df_prop = pd.DataFrame.from_dict(
+            {i: prop_dict[i] for i in prop_dict.keys()},
+            orient="index",
+        )
+        df_count = pd.DataFrame.from_dict(
             {i: count_dict[i] for i in count_dict.keys()},
             orient="index",
         )
-        return df_corr
+        return (df_prop, df_count)
 
     def confusion_heatmap(
         self,
@@ -531,12 +538,10 @@ class _DescStat:
         Example
         -------
         stat_obj = _DescStat(pd.DataFrame)
-        df_confusion = stat_obj.confusion_matrix(
+        df_conf, _ = stat_obj.confusion_matrix(
             ["emo1", ... "emo15"], "subj_id", 5
         )
-        stat_obj.confusion_heatmap(
-            df_confusion, "Title", "/some/path/file.png"
-        )
+        stat_obj.confusion_heatmap(df_conf, "Title", "/some/path/file.png")
 
         """
         # Draw and write
@@ -946,9 +951,9 @@ class StimRatings(_DescStat):
 
         Returns
         -------
-        pd.DataFrame
-            Columns = participant endorsement proportions
-            Rows = emotion category
+        tuple of pd.DataFrame
+            [0] = proportion confusion matrix
+            [1] = count confusion matrix
 
         Raises
         ------
@@ -967,30 +972,35 @@ class StimRatings(_DescStat):
         ]
 
         # Generate confusion matrix of endorsement probabilities
-        out_stat = os.path.join(
+        out_prop = os.path.join(
             self.out_dir,
-            f"table_stim-ratings_endorsement_{stim_type.lower()}.csv",
+            f"table_stim-ratings_endorsement-prop_{stim_type.lower()}.csv",
         )
+        out_count = out_prop.replace("-prop", "-count")
         self.df = df_end
-        df_conf = self.confusion_matrix(self._emo_list, "study_id", 5)
-        df_conf.to_csv(out_stat)
-        print(f"\t\tWrote dataset : {out_stat}")
+        df_prop, df_count = self.confusion_matrix(
+            self._emo_list, "study_id", 5
+        )
+        df_prop.to_csv(out_prop)
+        df_count.to_csv(out_count)
+        print(f"\t\tWrote dataset : {out_prop}")
+        print(f"\t\tWrote dataset : {out_count}")
 
         # Draw heatmap
         if self._draw_plot:
             out_plot = os.path.join(
                 self.out_dir,
-                "plot_heatmap_stim-ratings_endorsement_"
+                "plot_heatmap-prop_stim-ratings_endorsement_"
                 + f"{stim_type.lower()}.png",
             )
             self.confusion_heatmap(
-                df_conf,
+                df_prop,
                 main_title=f"Post-Scan {stim_type[:-1]} "
                 + "Endorsement Proportion",
                 out_path=out_plot,
             )
         self.df = df_all.copy()
-        return df_conf
+        return (df_prop, df_count)
 
     def arousal_valence(self, stim_type):
         """Generate descriptive info for emotion valence and arousal ratings.
@@ -1254,8 +1264,9 @@ class EmorepTask(_DescStat):
 
         Returns
         -------
-        dict
-            pd.DataFrames of confusion matrices for each task
+        tuple of pd.DataFrame
+            [0] = proportion confusion matrix
+            [1] = count confusion matrix
 
         Raises
         ------
@@ -1280,26 +1291,30 @@ class EmorepTask(_DescStat):
 
         # Calculate confusion matrix, write out
         self.df = df_emo
-        df_conf = self.confusion_matrix(emo_all, "subj", 2)
-        out_data = os.path.join(
-            self.out_dir, f"table_task-emotion_{task.lower()}.csv"
+        df_prop, df_count = self.confusion_matrix(emo_all, "subj", 2)
+        out_prop = os.path.join(
+            self.out_dir,
+            f"table_task-emotion_endorsement-prop_{task.lower()}.csv",
         )
-        df_conf.to_csv(out_data)
-        print(f"\t\tWrote dataset : {out_data}")
+        out_count = out_prop.replace("-prop", "-count")
+        df_prop.to_csv(out_prop)
+        df_count.to_csv(out_count)
+        print(f"\t\tWrote dataset : {out_prop}")
+        print(f"\t\tWrote dataset : {out_count}")
 
         # Draw heatmap
         if self._draw_plot:
             out_plot = os.path.join(
                 self.out_dir,
-                f"plot_heatmap_task-emotion_{task.lower()}.png",
+                f"plot_heatmap-prop_task-emotion_{task.lower()}.png",
             )
             self.confusion_heatmap(
-                df_conf,
+                df_count,
                 main_title=f"In-Scan {task[:-1]} Endorsement Proportion",
                 out_path=out_plot,
             )
         self.df = df_all.copy()
-        return df_conf
+        return (df_prop, df_count)
 
 
 # %%
