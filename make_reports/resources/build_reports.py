@@ -641,14 +641,15 @@ class ManagerRegular:
             Relevant info, format for requested report
 
         """
-        # Set start, end dates for report periods
+        # Set start, end dates for report periods.
+        # Update - now include all since the beginning of the project.
         nih_annual_ranges = [
             ("2020-04-01", "2020-03-31"),
-            ("2021-04-01", "2022-03-31"),
-            ("2022-04-01", "2023-03-31"),
-            ("2023-04-01", "2024-03-31"),
-            ("2024-04-01", "2025-03-31"),
-            ("2025-04-01", "2026-03-31"),
+            ("2020-04-01", "2022-03-31"),
+            ("2020-04-01", "2023-03-31"),
+            ("2020-04-01", "2024-03-31"),
+            ("2020-04-01", "2025-03-31"),
+            ("2020-04-01", "2026-03-31"),
         ]
 
         # Get data from query range, check for data
@@ -680,7 +681,20 @@ class ManagerRegular:
             "age": "Age",
         }
         self.df_report = self.df_report.rename(columns=col_names)
-        self.df_report["Age Units"] = "Years"
+        self.df_report["Age Unit"] = "Years"
+
+        # Fine-tune formatting per NIH reqs
+        self.df_report = self.df_report.drop("Record_ID", axis=1)
+        self.df_report["Age"] = self.df_report["Age"].astype(int)
+        self.df_report["Race"] = self.df_report["Race"].str.replace("-", " ")
+        idx_other = self.df_report.index[
+            self.df_report["Race"].str.contains("Other")
+        ]
+        self.df_report.loc[idx_other, "Race"] = "Unknown"
+        idx_unkn = self.df_report.index[
+            self.df_report["Race"].str.contains("Unknown")
+        ]
+        self.df_report.loc[idx_unkn, "Race"] = "Unknown"
 
 
 class GenerateGuids:
