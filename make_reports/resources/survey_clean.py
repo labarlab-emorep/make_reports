@@ -471,7 +471,10 @@ class CleanQualtrics:
         self._proj_dir = proj_dir
         self._qualtrics_dict = report_helper.qualtrics_dict()
         self._pilot_list = report_helper.pilot_list()
-        self._withdrew_list = report_helper.Withdrew().all
+
+        part_comp = report_helper.ParticipantComplete()
+        part_comp.status_change("withdrew")
+        self._withdrew_list = part_comp.all
 
     def clean_surveys(self, survey_name):
         """Split and clean original Qualtrics survey data.

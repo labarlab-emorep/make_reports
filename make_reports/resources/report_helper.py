@@ -1,7 +1,20 @@
-"""Supporting functions for making reports."""
+"""Supporting functions for making reports.
+
+pull_redcap_data : download survey data from REDCAP
+pull_qualtrics_data : download survey data from Qualtrics
+mine_template : extract values from NDA templates
+calc_age_mo : calculate age-in-months
+get_survey_age : add survey age to dataframe
+pilot_list : pilot participants
+redcap_dict : REDCAP survey mappings
+qualtrics_dict : Qualtrics survey mappings
+ParticipantComplete : track participant, data completion status
+
+"""
 import sys
 import io
 import requests
+import json
 import csv
 import zipfile
 import pandas as pd
@@ -301,70 +314,90 @@ def qualtrics_dict() -> dict:
     }
 
 
-class Lost:
-    """Hold lists of participnats lost to follow-up.
+class ParticipantComplete:
+    """Track participants who change status or have incomplete data.
 
-    Attributes
-    ----------
-    all : list
-        Participants lost to follow-up at any point
-    visit1 : list
-        Participants lost to follow-up after visit 1
-    visit2 : list
-        Participants lost to follow-up after visit 2
-    visit3 : list
-        Participants lost to follow-up after visit 3
+    TODO
 
     """
 
-    def __init__(self):
-        self.visit1 = ["ER0166", "ER0190", "ER0193", "ER0213"]
-        self.visit2 = ["ER0087", "ER0166"]
-        self.visit3 = []
-        self.all = self.visit1 + self.visit2 + self.visit3
+    def status_change(self, title):
+        """Participants whose status changed after enrollment.
 
+        Set list (lost) or dict (excluded, withdrew) attributes
+        holding which participants did not complete the study
+        and the reason why.
 
-class Excluded:
-    """Hold lists of participants who were excluded.
+        Parameters
+        ----------
+        title : str
+            [lost | excluded | withdrew]
+            Type of status change
 
-    Attributes
-    ----------
-    all : list
-        Participants excluded at any point
-    visit1 : list
-        Participants excluded during or after visit 1
-    visit2 : list
-        Participants excluded during or after visit 2
-    visit3 : list
-        Participants excluded during or after visit 3
+        Attributes
+        ----------
+        all : list
+            Participants with status change at any point
+        visit1 : list, dict
+            Participants with status change after visit 1
+        visit2 : list, dict
+            Participants with status change after visit 2
+        visit3 : list, dict
+            Participants with status change after visit 3
 
-    """
+        """
+        if title not in ["lost", "excluded", "withdrew"]:
+            raise ValueError(f"Unexpected title value : {title}")
 
-    def __init__(self):
-        self.visit1 = []
-        self.visit2 = ["ER0017", "ER0032", "ER0080", "ER0162"]
-        self.visit3 = ["ER0057", "ER0325"]
-        self.all = self.visit1 + self.visit2 + self.visit3
+        self._title = title
+        self._visit_dicts()
+        if title == "lost":
+            self.all = self.visit1 + self.visit2 + self.visit3
+            self.all.sort()
+        else:
+            self._build_all()
 
+    def incomplete(self):
+        """Participants with incomplete data.
 
-class Withdrew:
-    """Hold lists of participants who withdrew consent.
+        Attributes
+        ----------
+        all : list
+            Participants missing any data
+        visit1 : dict
+            Reasons and lists of participants missing visit 1 data
+        visit2 : dict
+            Reasons and lists of participants missing visit 2 data
+        visit3 : dict
+            Reasons and lists of participants missing visit 3 data
 
-    Attributes
-    ----------
-    all : list
-        Participants who withdrew at any point
-    visit1 : list
-        Participants who withdrew during or after visit 1
-    visit2 : list
-        Participants who withdrew during or after visit 2
-    visit3 : list
-        Participants who withdrew during or after visit 3
+        """
+        self._title = "incomplete"
+        self._visit_dicts()
+        self._build_all()
 
-    """
+    def _build_all(self):
+        """Unpack nested dicts to build a list of participants."""
+        _all = []
+        for visit in [self.visit1, self.visit2, self.visit3]:
+            if len(visit) == 0:
+                continue
+            for reason in visit:
+                _all.append(visit[reason])
+        self.all = [y for x in _all for y in x]
+        self.all.sort()
 
-    def __init__(self):
-        self.visit1 = ["ER0086"]
-        self.visit2 = ["ER0103"]
-        self.visit3 = ["ER0229"]
-        self.all = self.visit1 + self.visit2 + self.visit3
+    def _visit_dicts(self):
+        """Set visit1-3 attributes from reference json."""
+        _dict = self._load_json()
+        self.visit1 = _dict["visit1"]
+        self.visit2 = _dict["visit2"]
+        self.visit3 = _dict["visit3"]
+
+    def _load_json(self) -> dict:
+        """Return dict of participant status change or incomplete."""
+        with pkg_resources.open_text(
+            reference_files, f"participant_{self._title}.json"
+        ) as jf:
+            out_dict = json.load(jf)
+        return out_dict

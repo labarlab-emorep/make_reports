@@ -297,7 +297,9 @@ class DemoAll:
 
     def remove_withdrawn(self):
         """Remove participants from final_demo who have withdrawn consent."""
-        withdrew_list = report_helper.Withdrew().all
+        part_comp = report_helper.ParticipantComplete()
+        part_comp.status_change("withdrew")
+        withdrew_list = part_comp.all
         self.final_demo = self.final_demo[
             ~self.final_demo.src_subject_id.str.contains(
                 "|".join(withdrew_list)
