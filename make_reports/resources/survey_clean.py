@@ -306,6 +306,7 @@ class CleanRedcap:
 
         # Drop participants who have withdrawn consent
         df_raw = df_raw[~df_raw["record_id"].isin(self._withdrew_list)]
+        df_raw = df_raw.reset_index(drop=True)
 
         # Separate pilot from study data
         pilot_list = [int(x[-1]) for x in self._pilot_list]
@@ -338,6 +339,7 @@ class CleanRedcap:
 
         # Drop participants who have withdrawn consent
         df_raw = df_raw[~df_raw["record_id"].isin(self._withdrew_list)]
+        df_raw = df_raw.reset_index(drop=True)
 
         # Separate pilot from study data
         pilot_list = [int(x[-1]) for x in self._pilot_list]
@@ -366,6 +368,7 @@ class CleanRedcap:
 
         # Drop participants who have withdrawn consent
         df_raw = df_raw[~df_raw["record_id"].isin(self._withdrew_list)]
+        df_raw = df_raw.reset_index(drop=True)
 
         # Separate pilot from study data
         idx_pilot = df_raw[
@@ -419,6 +422,7 @@ class CleanRedcap:
 
         # Drop participants who have withdrawn consent
         df_raw = df_raw[~df_raw["study_id"].isin(self._withdrew_list)]
+        df_raw = df_raw.reset_index(drop=True)
 
         # Separate pilot from study data
         idx_pilot = df_raw[
@@ -1032,4 +1036,11 @@ class CombineRestRatings:
             df_sess = pd.concat([df_sess, df_beh_trans], ignore_index=True)
             del df_beh, df_beh_trans
 
+        # Remove responses from withdrawn participants
+        part_comp = report_helper.ParticipantComplete()
+        part_comp.status_change("withdrew")
+        df_sess = df_sess[
+            ~df_sess.study_id.str.contains("|".join(part_comp.all))
+        ]
+        df_sess = df_sess.reset_index(drop=True)
         self.df_sess = df_sess
