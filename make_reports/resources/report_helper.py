@@ -317,7 +317,40 @@ def qualtrics_dict() -> dict:
 class ParticipantComplete:
     """Track participants who change status or have incomplete data.
 
-    TODO
+    Determine visit-specific participants who have been lost-to-follow up
+    excluded, or have withdrawn consent. Lost participants yields
+    lists of participants, withdrawn or excluded yields dictionaries
+    organized by visit and reason.
+
+    Attributes
+    ----------
+    all : list
+        Participants with status change at any point or any incomplete data
+    visit1 : list, dict
+        Participants with status change after visit 1 or missing visit 1 data
+    visit2 : list, dict
+        Participants with status change after visit 2 or missing visit 2 data
+    visit3 : list, dict
+        Participants with status change after visit 3 or missing visit 3 data
+
+    Methods
+    -------
+    status_change(title)
+        [lost | withdrew | excluded]
+        Set all, visit attributes for lost, withdrawn, or excluded participants
+    incomplete()
+        Under development
+        Set all, visit attributes for missing data
+
+    Example
+    -------
+    pc = ParticipantComplete()
+    pc.status_change("lost)
+    v1_list = pc.visit1
+    pc.status_change("excluded")
+    v1_dict = pc.visit1
+    pc.status_change("withdrew")
+    all_list = pc.all
 
     """
 

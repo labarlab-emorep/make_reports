@@ -578,7 +578,7 @@ class ParticipantFlow:
                 "2",
                 f"Excluded: {change_dict['excluded']['visit1']}\l"  # noqa: W605, E501
                 + f"Lost: {change_dict['lost']['visit1']}\l"  # noqa: W605
-                + f"Withdrawn: {change_dict['withdrawn']['visit1']}\l",  # noqa: W605, E501
+                + f"Withdrawn: {change_dict['withdrew']['visit1']}\l",  # noqa: W605, E501
                 shape="box",
             )
 
@@ -589,7 +589,7 @@ class ParticipantFlow:
             _sur, _mri = self._v23_comp(day)
             _excl = change_dict["excluded"][f"visit{day}"]
             _lost = change_dict["lost"][f"visit{day}"]
-            _with = change_dict["withdrawn"][f"visit{day}"]
+            _with = change_dict["withdrew"][f"visit{day}"]
 
             with flo.subgraph() as c:
                 c.attr(rank="same")
@@ -651,10 +651,22 @@ class ParticipantFlow:
         for stat in ["lost", "excluded", "withdrew"]:
             out_dict[stat] = {}
             part_comp.status_change(stat)
-            out_dict[stat]["visit1"] = len(part_comp.visit1)
-            out_dict[stat]["visit2"] = len(part_comp.visit2)
-            out_dict[stat]["visit3"] = len(part_comp.visit3)
+            if stat == "lost":
+                out_dict[stat]["visit1"] = len(part_comp.visit1)
+                out_dict[stat]["visit2"] = len(part_comp.visit2)
+                out_dict[stat]["visit3"] = len(part_comp.visit3)
+            else:
+                out_dict[stat]["visit1"] = self._unpack(part_comp.visit1)
+                out_dict[stat]["visit2"] = self._unpack(part_comp.visit2)
+                out_dict[stat]["visit3"] = self._unpack(part_comp.visit3)
         return out_dict
+
+    def _unpack(self, in_dict) -> int:
+        """Return total length of dict value lists."""
+        run_tot = 0
+        for _, value in in_dict.items():
+            run_tot += len(value)
+        return run_tot
 
     def _v1_comp(self) -> int:
         """Return number of visit1 complete."""

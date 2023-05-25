@@ -1,5 +1,9 @@
 {
-    "visit1": {
+    "visit1": {},
+    "visit2": {
+        "Compliance": [
+            "ER0057"
+        ],
         "MRI Compatibility": [
             "ER0411"
         ],
@@ -10,11 +14,6 @@
             "ER0080",
             "ER0162",
             "ER0325"
-        ]
-    },
-    "visit2": {
-        "Compliance": [
-            "ER0057"
         ]
     },
     "visit3": {}
