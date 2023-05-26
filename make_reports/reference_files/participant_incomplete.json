@@ -1,14 +1,10 @@
 {
-    "visit1": {},
-    "visit2": {
-        "EAE": [
-            "ER0103"
-        ],
-        "Time Conflict": [
-            "ER0800",
-            "ER1014"
+    "visit1": {
+        "Other": [
+            "ER0325"
         ]
     },
+    "visit2": {},
     "visit3": {
         "EAE": [
             "ER0229",

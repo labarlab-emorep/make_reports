@@ -18,6 +18,7 @@ import json
 import csv
 import zipfile
 import pandas as pd
+import numpy as np
 import importlib.resources as pkg_resources
 from make_reports import reference_files
 
@@ -434,3 +435,68 @@ class ParticipantComplete:
         ) as jf:
             out_dict = json.load(jf)
         return out_dict
+
+
+class AddStatus(ParticipantComplete):
+    """Title.
+
+    Inherits ParticipantComplete
+
+    """
+
+    def enroll_status(self, df):
+        """Title.
+
+        Parameters
+        ----------
+        df : pd.DataFrame
+            Requires column titled src_subject_id
+
+        Returns
+        -------
+        pd.DataFrame
+
+        """
+        if "src_subject_id" not in df.columns:
+            raise KeyError("Dataframe missing column src_subject_id")
+        self._df = df
+        self._df["enroll_status"] = "enrolled"
+        self._df["visit"] = np.NaN
+        self._df["reason"] = np.NaN
+
+        #
+        self._visit_list = ["visit1", "visit2", "visit3"]
+        self._add_lost()
+        self._add_excl_with("excluded")
+        self._add_excl_with("withdrew")
+        return self._df
+
+    def _add_lost(self):
+        """Title."""
+        self.status_change("lost")
+        for visit in self._visit_list:
+            subj_list = getattr(self, visit)
+            if not subj_list:
+                continue
+            idx_subj = self._subj_idx(subj_list)
+            self._df.loc[idx_subj, "enroll_status"] = "lost"
+            self._df.loc[idx_subj, "visit"] = visit
+
+    def _subj_idx(self, subj_list):
+        """Title."""
+        return self._df.index[
+            self._df["src_subject_id"].isin(subj_list)
+        ].to_list()
+
+    def _add_excl_with(self, stat: str):
+        """Title."""
+        self.status_change(stat)
+        for visit in self._visit_list:
+            subj_dict = getattr(self, visit)
+            if not subj_dict:
+                continue
+            for reas, subj_list in subj_dict.items():
+                idx_subj = self._subj_idx(subj_list)
+                self._df.loc[idx_subj, "enroll_status"] = stat
+                self._df.loc[idx_subj, "visit"] = visit
+                self._df.loc[idx_subj, "reason"] = reas

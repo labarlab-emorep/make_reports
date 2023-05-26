@@ -292,7 +292,9 @@ class DemoAll:
             "is_minority": self._subj_minor,
             "years_education": subj_educate,
         }
-        self.final_demo = pd.DataFrame(out_dict, columns=out_dict.keys())
+        final_demo = pd.DataFrame(out_dict, columns=out_dict.keys())
+        add_stat = report_helper.AddStatus()
+        self.final_demo = add_stat.enroll_status(final_demo)
         del df_merge
 
     def remove_withdrawn(self):

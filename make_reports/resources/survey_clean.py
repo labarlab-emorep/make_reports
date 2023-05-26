@@ -16,8 +16,9 @@ class CleanRedcap:
 
     Find downloaded original/raw RedCap survey responses, and
     convert values into usable dataframe types and formats. Participants
-    who have withdraw consent are included in the cleaned dataframes
-    for NIH/Duke reporting purposes.
+    who have withdrawn consent are included in the Consent, GUID, and
+    demographic dataframes for NIH/Duke reporting purposes but are
+    removed from the BDI dataframes.
 
     Attributes
     ----------
@@ -45,10 +46,6 @@ class CleanRedcap:
         self._proj_dir = proj_dir
         self._redcap_dict = report_helper.redcap_dict()
         self._pilot_list = report_helper.pilot_list()
-
-        part_comp = report_helper.ParticipantComplete()
-        part_comp.status_change("withdrew")
-        self._withdrew_list = [int(x[2:]) for x in part_comp.all]
 
     def clean_surveys(self, survey_name):
         """Clean original RedCap survey data.
@@ -304,10 +301,6 @@ class CleanRedcap:
         ].astype("str").isin(special_list)
         df_raw.loc[sp_mask, ["middle_name"]] = np.nan
 
-        # Drop participants who have withdrawn consent
-        df_raw = df_raw[~df_raw["record_id"].isin(self._withdrew_list)]
-        df_raw = df_raw.reset_index(drop=True)
-
         # Separate pilot from study data
         pilot_list = [int(x[-1]) for x in self._pilot_list]
         idx_pilot = df_raw[df_raw["record_id"].isin(pilot_list)].index.tolist()
@@ -337,10 +330,6 @@ class CleanRedcap:
         )
         df_raw = self._df_raw[self._df_raw[col_drop].notna()]
 
-        # Drop participants who have withdrawn consent
-        df_raw = df_raw[~df_raw["record_id"].isin(self._withdrew_list)]
-        df_raw = df_raw.reset_index(drop=True)
-
         # Separate pilot from study data
         pilot_list = [int(x[-1]) for x in self._pilot_list]
         idx_pilot = df_raw[df_raw["record_id"].isin(pilot_list)].index.tolist()
@@ -365,10 +354,6 @@ class CleanRedcap:
         """
         # Drop rows without guid
         df_raw = self._df_raw[self._df_raw["guid"].notna()]
-
-        # Drop participants who have withdrawn consent
-        df_raw = df_raw[~df_raw["record_id"].isin(self._withdrew_list)]
-        df_raw = df_raw.reset_index(drop=True)
 
         # Separate pilot from study data
         idx_pilot = df_raw[
@@ -421,7 +406,10 @@ class CleanRedcap:
         df_raw["datetime"] = df_raw["datetime"].dt.strftime("%Y-%m-%d")
 
         # Drop participants who have withdrawn consent
-        df_raw = df_raw[~df_raw["study_id"].isin(self._withdrew_list)]
+        part_comp = report_helper.ParticipantComplete()
+        part_comp.status_change("withdrew")
+        withdrew_list = [int(x[2:]) for x in part_comp.all]
+        df_raw = df_raw[~df_raw["study_id"].isin(withdrew_list)]
         df_raw = df_raw.reset_index(drop=True)
 
         # Separate pilot from study data

@@ -1,19 +1,21 @@
 {
     "visit1": {},
     "visit2": {
+        "BDI": [
+            "ER0017",
+            "ER0032",
+            "ER0080",
+            "ER0162",
+            "ER0325"
+        ],
         "Compliance": [
             "ER0057"
         ],
         "MRI Compatibility": [
             "ER0411"
         ],
-        "BDI": [
-            "ER0017",
-            "ER0032",
-            "ER0037",
-            "ER0080",
-            "ER0162",
-            "ER0325"
+        "Time Conflict": [
+            "ER0087"
         ]
     },
     "visit3": {}
