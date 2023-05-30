@@ -13,6 +13,7 @@ import glob
 import datetime
 import pandas as pd
 import numpy as np
+from typing import Tuple
 import matplotlib.pyplot as plt
 import seaborn as sns
 from graphviz import Digraph
@@ -543,6 +544,11 @@ class ParticipantFlow:
         self._proj_dir = proj_dir
         self._rc_token = redcap_token
 
+        # Get record dataframes
+        self._df_compl = self._dl_compl()
+        rc_demo = build_reports.DemoAll(self._proj_dir)
+        self._df_demo = rc_demo.final_demo
+
     def draw_prisma(self):
         """Generate PRISMA flowchart of participants in study.
 
@@ -555,63 +561,55 @@ class ParticipantFlow:
             <proj-dir>/analyses_metrics/plot_flow-participant.png
 
         """
-        # Identify recruit, enroll, final numbers, and status changes
-        num_recruit = self._get_recruit()
-        num_enroll = self._get_enroll()
-        num_final = self._dl_compl()
-        change_dict = self._get_status_change()
-
-        # Build Visit0, Visit1 sections
+        # Visit0
         flo = Digraph("participant_flow")
         flo.attr(label="Participant Flow", labelloc="t", fontsize="18")
-        flo.node("0", f"Recruited Individuals: {num_recruit}", shape="box")
+        flo.node(
+            "0",
+            f"Visit0: Recruitment\nn={self._get_recruit()}",
+            shape="box",
+        )
+
+        # Visit1
+        _, v1_lost, v1_with, v1_excl = self._v1_stats()
         with flo.subgraph() as c:
             c.attr(rank="same")
             c.node(
                 "1",
-                "Visit1\n"
-                + f"Enrolled: {num_enroll}\l"  # noqa: W605
-                + f"Surveys: {self._v1_comp()}\l",  # noqa: W605
+                f"Visit1: Enrollment\nn={self._df_demo.shape[0]}",
                 shape="box",
             )
             c.node(
                 "2",
-                f"Excluded: {change_dict['excluded']['visit1']}\l"  # noqa: W605, E501
-                + f"Lost: {change_dict['lost']['visit1']}\l"  # noqa: W605
-                + f"Withdrawn: {change_dict['withdrew']['visit1']}\l",  # noqa: W605, E501
+                f"Excluded: {v1_excl}\l"  # noqa: W605, E501
+                + f"Lost: {v1_lost}\l"  # noqa: W605
+                + f"Withdrawn: {v1_with}\l",  # noqa: W605, E501
                 shape="box",
             )
 
         # Build Visit2, Visit3 sections
         count = 3
         for day in [2, 3]:
-
-            _sur, _mri = self._v23_comp(day)
-            _excl = change_dict["excluded"][f"visit{day}"]
-            _lost = change_dict["lost"][f"visit{day}"]
-            _with = change_dict["withdrew"][f"visit{day}"]
-
+            v_start, v_lost, v_excl, v_with = self._v23_stats(day)
             with flo.subgraph() as c:
                 c.attr(rank="same")
                 c.node(
                     str(count),
-                    f"Visit{day}\n"
-                    + f"Surveys: {_sur}\l"  # noqa: W605
-                    + f"MRI: {_mri}\l",  # noqa: W605
+                    f"Visit{day}: Survey & MRI\nn={v_start}",
                     shape="box",
                 )
                 count += 1
                 c.node(
                     str(count),
-                    f"Excluded: {_excl}\l"  # noqa: W605
-                    + f"Lost: {_lost}\l"  # noqa: W605
-                    + f"Withdrawn: {_with}\l",  # noqa: W605
+                    f"Excluded: {v_excl}\l"  # noqa: W605
+                    + f"Lost: {v_lost}\l"  # noqa: W605
+                    + f"Withdrawn: {v_with}\l",  # noqa: W605
                     shape="box",
                 )
                 count += 1
 
         # Build final and draw edges, write out
-        flo.node(str(count), f"Final: {num_final}", shape="box")
+        flo.node(str(count), f"Final: {self._enroll()}", shape="box")
         flo.edges(["01", "12", "13", "34", "35", "56", "57"])
         flo.format = "png"
         out_plot = os.path.join(
@@ -627,71 +625,79 @@ class ParticipantFlow:
         df_pre = survey_download.download_prescreening(self._rc_token)
         return df_pre.shape[0]
 
-    def _get_enroll(self) -> int:
-        """Determine number of participants enrolled."""
-        rc_demo = build_reports.DemoAll(self._proj_dir)
-        return rc_demo.final_demo.shape[0]
+    def _dl_compl(self) -> pd.DataFrame:
+        """Return completion log of enrolled participants."""
+        df_compl = survey_download.download_completion_log(self._rc_token)
+        df_compl = df_compl.loc[
+            (df_compl["day_1_fully_completed"] == 1.0)
+            | (
+                (df_compl["consent_form_completed"] == 1.0)
+                & (df_compl["demographics_completed"] == 1.0)
+            )
+        ].reset_index(drop=True)
+        df_compl["record_id"] = df_compl["record_id"].astype(str)
+        df_compl["record_id"] = df_compl["record_id"].str.zfill(4)
+        df_compl["record_id"] = "ER" + df_compl["record_id"]
+        return df_compl
 
-    def _dl_compl(self) -> int:
-        """Download completion log, determine final number."""
-        self._df_compl = survey_download.download_completion_log(
-            self._rc_token
-        )
-        return len(
-            self._df_compl.index[
-                (self._df_compl["day_3_fully_completed"] == 1.0)
-                & (self._df_compl["withdrew_flag___1"] == 0.0)
-            ].tolist()
-        )
-
-    def _get_status_change(self) -> dict:
-        """Return number of participants lost/excl/with by visit."""
-        part_comp = report_helper.ParticipantComplete()
-        out_dict = {}
-        for stat in ["lost", "excluded", "withdrew"]:
-            out_dict[stat] = {}
-            part_comp.status_change(stat)
-            if stat == "lost":
-                out_dict[stat]["visit1"] = len(part_comp.visit1)
-                out_dict[stat]["visit2"] = len(part_comp.visit2)
-                out_dict[stat]["visit3"] = len(part_comp.visit3)
-            else:
-                out_dict[stat]["visit1"] = self._unpack(part_comp.visit1)
-                out_dict[stat]["visit2"] = self._unpack(part_comp.visit2)
-                out_dict[stat]["visit3"] = self._unpack(part_comp.visit3)
-        return out_dict
-
-    def _unpack(self, in_dict) -> int:
-        """Return total length of dict value lists."""
-        run_tot = 0
-        for _, value in in_dict.items():
-            run_tot += len(value)
-        return run_tot
-
-    def _v1_comp(self) -> int:
-        """Return number of visit1 complete."""
-        return len(
+    def _v1_stats(self) -> Tuple:
+        """Return 4 tuple of visit1 status info."""
+        # Particpants who start V1 -- completed all or completed consent & demo
+        v1_start = len(
             self._df_compl.index[
                 (self._df_compl["day_1_fully_completed"] == 1.0)
-                | (self._df_compl["emotion_quest_completed"] == 1.0)
-            ].tolist()
+                | (
+                    (self._df_compl["consent_form_completed"] == 1.0)
+                    & (self._df_compl["demographics_completed"] == 1.0)
+                )
+            ].to_list()
         )
 
-    def _v23_comp(self, day: int) -> tuple:
-        """Return tuple of visit2/3 survey, MRI counts."""
-        num_sur = len(
+        # Participants with status change
+        v1_lost = self._stat_change("visit1", "lost")
+        v1_excl = self._stat_change("visit1", "excluded")
+        v1_with = self._stat_change("visit1", "withdrew")
+        return (v1_start, v1_lost, v1_excl, v1_with)
+
+    def _stat_change(self, visit: str, status: str) -> int:
+        """Return number of participants of status in visit."""
+        if visit not in ["visit1", "visit2", "visit3"]:
+            raise ValueError("Unexpected visit name.")
+        if status not in ["lost", "excluded", "withdrew"]:
+            raise ValueError("Unexpected status name.")
+        return len(
+            self._df_demo.index[
+                (self._df_demo["enroll_status"] == status)
+                & (self._df_demo["visit"] == visit)
+            ].to_list()
+        )
+
+    def _v23_stats(self, day: int) -> tuple:
+        """Return 4 tuple of visit2/3 status info."""
+        if day not in [2, 3]:
+            raise ValueError(f"Unexpected day identifier : {day}")
+
+        # Participants who start V2/3 -- completed all or BDI
+        v_start = len(
             self._df_compl.index[
                 (self._df_compl[f"day_{day}_fully_completed"] == 1.0)
                 | (self._df_compl[f"bdi_day{day}_completed"] == 1.0)
             ].tolist()
         )
-        num_mri = len(
-            self._df_compl.index[
-                (self._df_compl[f"day_{day}_fully_completed"] == 1.0)
-                | (self._df_compl[f"imaging_day{day}_completed"] == 1.0)
-            ].tolist()
+
+        # Participants with status change
+        v_lost = self._stat_change(f"visit{day}", "lost")
+        v_excl = self._stat_change(f"visit{day}", "excluded")
+        v_with = self._stat_change(f"visit{day}", "withdrew")
+        return (v_start, v_lost, v_excl, v_with)
+
+    def _enroll(self) -> int:
+        """Return number of currently enrolled participants."""
+        return len(
+            self._df_demo.index[
+                self._df_demo["enroll_status"] == "enrolled"
+            ].to_list()
         )
-        return (num_sur, num_mri)
 
 
 # %%
