@@ -571,26 +571,27 @@ class ParticipantFlow:
         )
 
         # Visit1
-        _, v1_lost, v1_with, v1_excl = self._v1_stats()
+        v1_start, v1_lost, v1_excl, v1_with, v1_incomp = self._v1_stats()
         with flo.subgraph() as c:
             c.attr(rank="same")
             c.node(
                 "1",
-                f"Visit1: Enrollment\nn={self._df_demo.shape[0]}",
+                f"Visit1: Enrollment\nn={v1_start}",
                 shape="box",
             )
             c.node(
                 "2",
-                f"Excluded: {v1_excl}\l"  # noqa: W605, E501
+                f"Excluded: {v1_excl}\l"  # noqa: W605
+                + f"Incomplete: {v1_incomp}\l"  # noqa: W605
                 + f"Lost: {v1_lost}\l"  # noqa: W605
-                + f"Withdrawn: {v1_with}\l",  # noqa: W605, E501
+                + f"Withdrawn: {v1_with}\l",  # noqa: W605
                 shape="box",
             )
 
         # Build Visit2, Visit3 sections
         count = 3
         for day in [2, 3]:
-            v_start, v_lost, v_excl, v_with = self._v23_stats(day)
+            v_start, v_lost, v_excl, v_with, v_incomp = self._v23_stats(day)
             with flo.subgraph() as c:
                 c.attr(rank="same")
                 c.node(
@@ -602,6 +603,7 @@ class ParticipantFlow:
                 c.node(
                     str(count),
                     f"Excluded: {v_excl}\l"  # noqa: W605
+                    + f"Incomplete: {v_incomp}\l"  # noqa: W605
                     + f"Lost: {v_lost}\l"  # noqa: W605
                     + f"Withdrawn: {v_with}\l",  # noqa: W605
                     shape="box",
@@ -609,7 +611,12 @@ class ParticipantFlow:
                 count += 1
 
         # Build final and draw edges, write out
-        flo.node(str(count), f"Final: {self._enroll()}", shape="box")
+        num_final, num_compl = self._final_num()
+        flo.node(
+            str(count),
+            f"Final: n={num_final}\nComplete: n={num_compl}\l",  # noqa: W605
+            shape="box",
+        )
         flo.edges(["01", "12", "13", "34", "35", "56", "57"])
         flo.format = "png"
         out_plot = os.path.join(
@@ -657,13 +664,14 @@ class ParticipantFlow:
         v1_lost = self._stat_change("visit1", "lost")
         v1_excl = self._stat_change("visit1", "excluded")
         v1_with = self._stat_change("visit1", "withdrew")
-        return (v1_start, v1_lost, v1_excl, v1_with)
+        v1_incomp = self._stat_change("visit1", "incomplete")
+        return (v1_start, v1_lost, v1_excl, v1_with, v1_incomp)
 
     def _stat_change(self, visit: str, status: str) -> int:
         """Return number of participants of status in visit."""
         if visit not in ["visit1", "visit2", "visit3"]:
             raise ValueError("Unexpected visit name.")
-        if status not in ["lost", "excluded", "withdrew"]:
+        if status not in ["lost", "excluded", "withdrew", "incomplete"]:
             raise ValueError("Unexpected status name.")
         return len(
             self._df_demo.index[
@@ -689,15 +697,25 @@ class ParticipantFlow:
         v_lost = self._stat_change(f"visit{day}", "lost")
         v_excl = self._stat_change(f"visit{day}", "excluded")
         v_with = self._stat_change(f"visit{day}", "withdrew")
-        return (v_start, v_lost, v_excl, v_with)
+        v_incomp = self._stat_change(f"visit{day}", "incomplete")
+        return (v_start, v_lost, v_excl, v_with, v_incomp)
 
-    def _enroll(self) -> int:
-        """Return number of currently enrolled participants."""
-        return len(
+    def _final_num(self) -> Tuple:
+        """Return tuple of enrolled/incomplete and complete participants."""
+        num_final = len(
             self._df_demo.index[
-                self._df_demo["enroll_status"] == "enrolled"
+                (self._df_demo["enroll_status"] == "enrolled")
+                | (self._df_demo["enroll_status"] == "incomplete")
             ].to_list()
         )
+        num_compl = len(
+            self._df_compl.index[
+                (self._df_compl["day_1_fully_completed"] == 1.0)
+                & (self._df_compl["day_2_fully_completed"] == 1.0)
+                & (self._df_compl["day_3_fully_completed"] == 1.0)
+            ].tolist()
+        )
+        return (num_final, num_compl)
 
 
 # %%
