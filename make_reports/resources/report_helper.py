@@ -1,10 +1,24 @@
-"""Supporting functions for making reports."""
+"""Supporting functions for making reports.
+
+pull_redcap_data : download survey data from REDCAP
+pull_qualtrics_data : download survey data from Qualtrics
+mine_template : extract values from NDA templates
+calc_age_mo : calculate age-in-months
+get_survey_age : add survey age to dataframe
+pilot_list : pilot participants
+redcap_dict : REDCAP survey mappings
+qualtrics_dict : Qualtrics survey mappings
+ParticipantComplete : track participant, data completion status
+
+"""
 import sys
 import io
 import requests
+import json
 import csv
 import zipfile
 import pandas as pd
+import numpy as np
 import importlib.resources as pkg_resources
 from make_reports import reference_files
 
@@ -301,70 +315,205 @@ def qualtrics_dict() -> dict:
     }
 
 
-class Lost:
-    """Hold lists of participnats lost to follow-up.
+class ParticipantComplete:
+    """Track participants who change status or have incomplete data.
+
+    Determine visit-specific participants who have been lost-to-follow up
+    excluded, or have withdrawn consent. Lost participants yields
+    lists of participants, withdrawn or excluded yields dictionaries
+    organized by visit and reason.
 
     Attributes
     ----------
     all : list
-        Participants lost to follow-up at any point
-    visit1 : list
-        Participants lost to follow-up after visit 1
-    visit2 : list
-        Participants lost to follow-up after visit 2
-    visit3 : list
-        Participants lost to follow-up after visit 3
+        Participants with status change at any point or any incomplete data
+    visit1 : list, dict
+        Participants with status change after visit 1 or missing visit 1 data
+    visit2 : list, dict
+        Participants with status change after visit 2 or missing visit 2 data
+    visit3 : list, dict
+        Participants with status change after visit 3 or missing visit 3 data
+
+    Methods
+    -------
+    status_change(title)
+        [lost | withdrew | excluded]
+        Set all, visit attributes for lost, withdrawn, or excluded participants
+    incomplete()
+        Under development
+        Set all, visit attributes for missing data
+
+    Example
+    -------
+    pc = ParticipantComplete()
+    pc.status_change("lost)
+    v1_list = pc.visit1
+    pc.status_change("excluded")
+    v1_dict = pc.visit1
+    pc.status_change("withdrew")
+    all_list = pc.all
 
     """
 
-    def __init__(self):
-        self.visit1 = ["ER0166", "ER0190", "ER0193", "ER0213"]
-        self.visit2 = ["ER0087", "ER0166"]
-        self.visit3 = []
-        self.all = self.visit1 + self.visit2 + self.visit3
+    def status_change(self, title):
+        """Participants whose status changed after enrollment.
+
+        Set list (lost) or dict (excluded, withdrew) attributes
+        holding which participants did not complete the study
+        and the reason why.
+
+        Parameters
+        ----------
+        title : str
+            [lost | excluded | withdrew]
+            Type of status change
+
+        Attributes
+        ----------
+        all : list
+            Participants with status change at any point
+        visit1 : list, dict
+            Participants with status change after visit 1
+        visit2 : list, dict
+            Participants with status change after visit 2
+        visit3 : list, dict
+            Participants with status change after visit 3
+
+        """
+        if title not in ["lost", "excluded", "withdrew"]:
+            raise ValueError(f"Unexpected title value : {title}")
+
+        self._title = title
+        self._visit_dicts()
+        if title == "lost":
+            self.all = self.visit1 + self.visit2 + self.visit3
+            self.all.sort()
+        else:
+            self._build_all()
+
+    def incomplete(self):
+        """Participants with incomplete data.
+
+        Attributes
+        ----------
+        all : list
+            Participants missing any data
+        visit1 : dict
+            Reasons and lists of participants missing visit 1 data
+        visit2 : dict
+            Reasons and lists of participants missing visit 2 data
+        visit3 : dict
+            Reasons and lists of participants missing visit 3 data
+
+        """
+        self._title = "incomplete"
+        self._visit_dicts()
+        self._build_all()
+
+    def _build_all(self):
+        """Unpack nested dicts to build a list of participants."""
+        _all = []
+        for visit in [self.visit1, self.visit2, self.visit3]:
+            if len(visit) == 0:
+                continue
+            for reason in visit:
+                _all.append(visit[reason])
+        self.all = [y for x in _all for y in x]
+        self.all.sort()
+
+    def _visit_dicts(self):
+        """Set visit1-3 attributes from reference json."""
+        _dict = self._load_json()
+        self.visit1 = _dict["visit1"]
+        self.visit2 = _dict["visit2"]
+        self.visit3 = _dict["visit3"]
+
+    def _load_json(self) -> dict:
+        """Return dict of participant status change or incomplete."""
+        with pkg_resources.open_text(
+            reference_files, f"participant_{self._title}.json"
+        ) as jf:
+            out_dict = json.load(jf)
+        return out_dict
 
 
-class Excluded:
-    """Hold lists of participants who were excluded.
+class AddStatus(ParticipantComplete):
+    """Title.
 
-    Attributes
-    ----------
-    all : list
-        Participants excluded at any point
-    visit1 : list
-        Participants excluded during or after visit 1
-    visit2 : list
-        Participants excluded during or after visit 2
-    visit3 : list
-        Participants excluded during or after visit 3
+    Inherits ParticipantComplete
 
     """
 
-    def __init__(self):
-        self.visit1 = []
-        self.visit2 = ["ER0017", "ER0032", "ER0080", "ER0162"]
-        self.visit3 = ["ER0057", "ER0325"]
-        self.all = self.visit1 + self.visit2 + self.visit3
+    def enroll_status(self, df, subj_col):
+        """Title.
 
+        Parameters
+        ----------
+        df : pd.DataFrame
+            Contains column subj_col with participant IDs
+        subj_col : str
+            Column name containing subject ID
 
-class Withdrew:
-    """Hold lists of participants who withdrew consent.
+        Returns
+        -------
+        pd.DataFrame
 
-    Attributes
-    ----------
-    all : list
-        Participants who withdrew at any point
-    visit1 : list
-        Participants who withdrew during or after visit 1
-    visit2 : list
-        Participants who withdrew during or after visit 2
-    visit3 : list
-        Participants who withdrew during or after visit 3
+        """
+        if subj_col not in df.columns:
+            raise KeyError(f"Dataframe missing column : {subj_col}")
+        self._df = df
+        self._subj_col = subj_col
+        self._v_list = [1, 2, 3]
+        for v_num in self._v_list:
+            self._df[f"visit{v_num}_status"] = "enrolled"
+            self._df[f"visit{v_num}_reason"] = np.NaN
 
-    """
+        # Incomplete before excluded/withdrawn to account for subsequent
+        # status changes.
+        self._add_lost()
+        self._add_ewi("incomplete")
+        self._add_ewi("excluded")
+        self._add_ewi("withdrew")
+        return self._df
 
-    def __init__(self):
-        self.visit1 = ["ER0086"]
-        self.visit2 = ["ER0103"]
-        self.visit3 = ["ER0229"]
-        self.all = self.visit1 + self.visit2 + self.visit3
+    def _add_lost(self):
+        """Add lost status to dataframe."""
+        self.status_change("lost")
+        for v_num in self._v_list:
+            subj_list = getattr(self, f"visit{v_num}")
+            if not subj_list:
+                continue
+            idx_subj = self._subj_idx(subj_list)
+            self._df.loc[idx_subj, f"visit{v_num}_status"] = "lost"
+            self._clear_status(v_num, idx_subj)
+
+    def _subj_idx(self, subj_list) -> list:
+        """Return indices of subejcts."""
+        return self._df.index[
+            self._df[self._subj_col].isin(subj_list)
+        ].to_list()
+
+    def _clear_status(self, v_num: int, idx_subj: list):
+        """Title."""
+        while v_num < 3:
+            v_num += 1
+            self._df.loc[idx_subj, f"visit{v_num}_status"] = np.NaN
+
+    def _add_ewi(self, stat: str):
+        """Add excluded, withdrawn, incomplete statuses to dataframe."""
+        if stat == "incomplete":
+            self.incomplete()
+        else:
+            self.status_change(stat)
+
+        for v_num in self._v_list:
+            subj_dict = getattr(self, f"visit{v_num}")
+            if not subj_dict:
+                continue
+            for reas, subj_list in subj_dict.items():
+                idx_subj = self._subj_idx(subj_list)
+                self._df.loc[idx_subj, f"visit{v_num}_status"] = stat
+                self._df.loc[idx_subj, f"visit{v_num}_reason"] = reas
+                if stat == "incomplete":
+                    continue
+                self._clear_status(v_num, idx_subj)

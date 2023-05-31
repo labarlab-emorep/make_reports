@@ -293,11 +293,15 @@ class DemoAll:
             "years_education": subj_educate,
         }
         self.final_demo = pd.DataFrame(out_dict, columns=out_dict.keys())
+        # add_stat = report_helper.AddStatus()
+        # self.final_demo = add_stat.enroll_status(final_demo)
         del df_merge
 
     def remove_withdrawn(self):
         """Remove participants from final_demo who have withdrawn consent."""
-        withdrew_list = report_helper.Withdrew().all
+        part_comp = report_helper.ParticipantComplete()
+        part_comp.status_change("withdrew")
+        withdrew_list = part_comp.all
         self.final_demo = self.final_demo[
             ~self.final_demo.src_subject_id.str.contains(
                 "|".join(withdrew_list)

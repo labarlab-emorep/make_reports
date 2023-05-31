@@ -16,8 +16,9 @@ class CleanRedcap:
 
     Find downloaded original/raw RedCap survey responses, and
     convert values into usable dataframe types and formats. Participants
-    who have withdraw consent are included in the cleaned dataframes
-    for NIH/Duke reporting purposes.
+    who have withdrawn consent are included in the Consent, GUID, and
+    demographic dataframes for NIH/Duke reporting purposes but are
+    removed from the BDI dataframes.
 
     Attributes
     ----------
@@ -34,21 +35,12 @@ class CleanRedcap:
     """
 
     def __init__(self, proj_dir):
-        """Set helper attributes.
+        """Initialize.
 
         Parameters
         ----------
         proj_dir : path
             Location of parent directory for project
-
-        Attributes
-        ----------
-        _pilot_list : make_reports.report_helper.pilot_list
-            Pilot participants
-        _proj_dir : path
-            Location of parent directory for project
-        _redcap_dict : make_reports.report_helper.redcap_dict
-            Mapping of survey name to directory organization
 
         """
         self._proj_dir = proj_dir
@@ -413,6 +405,13 @@ class CleanRedcap:
         df_raw["datetime"] = pd.to_datetime(df_raw["datetime"])
         df_raw["datetime"] = df_raw["datetime"].dt.strftime("%Y-%m-%d")
 
+        # Drop participants who have withdrawn consent
+        part_comp = report_helper.ParticipantComplete()
+        part_comp.status_change("withdrew")
+        withdrew_list = [int(x[2:]) for x in part_comp.all]
+        df_raw = df_raw[~df_raw["study_id"].isin(withdrew_list)]
+        df_raw = df_raw.reset_index(drop=True)
+
         # Separate pilot from study data
         idx_pilot = df_raw[
             df_raw["study_id"].isin(self._pilot_list)
@@ -471,7 +470,10 @@ class CleanQualtrics:
         self._proj_dir = proj_dir
         self._qualtrics_dict = report_helper.qualtrics_dict()
         self._pilot_list = report_helper.pilot_list()
-        self._withdrew_list = report_helper.Withdrew().all
+
+        part_comp = report_helper.ParticipantComplete()
+        part_comp.status_change("withdrew")
+        self._withdrew_list = part_comp.all
 
     def clean_surveys(self, survey_name):
         """Split and clean original Qualtrics survey data.
@@ -1022,4 +1024,11 @@ class CombineRestRatings:
             df_sess = pd.concat([df_sess, df_beh_trans], ignore_index=True)
             del df_beh, df_beh_trans
 
+        # Remove responses from withdrawn participants
+        part_comp = report_helper.ParticipantComplete()
+        part_comp.status_change("withdrew")
+        df_sess = df_sess[
+            ~df_sess.study_id.str.contains("|".join(part_comp.all))
+        ]
+        df_sess = df_sess.reset_index(drop=True)
         self.df_sess = df_sess
