@@ -13,13 +13,11 @@ import glob
 import datetime
 import pandas as pd
 import numpy as np
-from typing import Tuple
 import matplotlib.pyplot as plt
 import seaborn as sns
 from graphviz import Digraph
 from make_reports.resources import survey_download
 from make_reports.resources import build_reports
-from make_reports.resources import report_helper
 
 
 # %%
@@ -571,50 +569,51 @@ class ParticipantFlow:
         )
 
         # Visit1
-        v1_start, v1_lost, v1_excl, v1_with, v1_incomp = self._v1_stats()
+        v1_dict = self._v1_subj()
         with flo.subgraph() as c:
             c.attr(rank="same")
             c.node(
                 "1",
-                f"Visit1: Enrollment\nn={v1_start}",
+                f"Visit1: Enrollment\nn={len(v1_dict['start'])}",
                 shape="box",
             )
             c.node(
                 "2",
-                f"Excluded: {v1_excl}\l"  # noqa: W605
-                + f"Incomplete: {v1_incomp}\l"  # noqa: W605
-                + f"Lost: {v1_lost}\l"  # noqa: W605
-                + f"Withdrawn: {v1_with}\l",  # noqa: W605
+                f"Excluded: {len(v1_dict['excluded'])}\l"  # noqa: W605
+                + f"Incomplete: {len(v1_dict['incomplete'])}\l"  # noqa: W605
+                + f"Lost: {len(v1_dict['lost'])}\l"  # noqa: W605
+                + f"Withdrawn: {len(v1_dict['withdrew'])}\l",  # noqa: W605
                 shape="box",
             )
 
         # Build Visit2, Visit3 sections
         count = 3
         for day in [2, 3]:
-            v_start, v_lost, v_excl, v_with, v_incomp = self._v23_stats(day)
+            v_dict = self._v23_subj(day)
             with flo.subgraph() as c:
                 c.attr(rank="same")
                 c.node(
                     str(count),
-                    f"Visit{day}: Survey & MRI\nn={v_start}",
+                    f"Visit{day}: Survey & MRI\nn={len(v_dict['start'])}",
                     shape="box",
                 )
                 count += 1
                 c.node(
                     str(count),
-                    f"Excluded: {v_excl}\l"  # noqa: W605
-                    + f"Incomplete: {v_incomp}\l"  # noqa: W605
-                    + f"Lost: {v_lost}\l"  # noqa: W605
-                    + f"Withdrawn: {v_with}\l",  # noqa: W605
+                    f"Excluded: {len(v_dict['excluded'])}\l"  # noqa: W605
+                    + f"Incomplete: {len(v_dict['incomplete'])}\l"  # noqa: W605 E501
+                    + f"Lost: {len(v_dict['lost'])}\l"  # noqa: W605
+                    + f"Withdrawn: {len(v_dict['withdrew'])}\l",  # noqa: W605
                     shape="box",
                 )
                 count += 1
 
         # Build final and draw edges, write out
-        num_final, num_compl = self._final_num()
+        final_dict = self._final_subj()
         flo.node(
             str(count),
-            f"Final: n={num_final}\nComplete: n={num_compl}\l",  # noqa: W605
+            f"Final: n={len(final_dict['final'])}\n"
+            + f"Complete: n={len(final_dict['complete'])}\l",  # noqa: W605
             shape="box",
         )
         flo.edges(["01", "12", "13", "34", "35", "56", "57"])
@@ -647,75 +646,75 @@ class ParticipantFlow:
         df_compl["record_id"] = "ER" + df_compl["record_id"]
         return df_compl
 
-    def _v1_stats(self) -> Tuple:
-        """Return 4 tuple of visit1 status info."""
+    def _v1_subj(self) -> dict:
+        """Return visit1 status info."""
         # Particpants who start V1 -- completed all or completed consent & demo
-        v1_start = len(
-            self._df_compl.index[
-                (self._df_compl["day_1_fully_completed"] == 1.0)
-                | (
-                    (self._df_compl["consent_form_completed"] == 1.0)
-                    & (self._df_compl["demographics_completed"] == 1.0)
-                )
-            ].to_list()
-        )
+        out_dict = {}
+        idx_subj = self._df_compl.index[
+            (self._df_compl["day_1_fully_completed"] == 1.0)
+            | (
+                (self._df_compl["consent_form_completed"] == 1.0)
+                & (self._df_compl["demographics_completed"] == 1.0)
+            )
+        ].to_list()
+        out_dict["start"] = self._df_compl.loc[idx_subj, "record_id"].to_list()
 
         # Participants with status change
-        v1_lost = self._stat_change("visit1", "lost")
-        v1_excl = self._stat_change("visit1", "excluded")
-        v1_with = self._stat_change("visit1", "withdrew")
-        v1_incomp = self._stat_change("visit1", "incomplete")
-        return (v1_start, v1_lost, v1_excl, v1_with, v1_incomp)
+        for stat in ["lost", "excluded", "withdrew", "incomplete"]:
+            out_dict[stat] = self._stat_change("visit1", stat)
+        return out_dict
 
-    def _stat_change(self, visit: str, status: str) -> int:
-        """Return number of participants of status in visit."""
+    def _stat_change(self, visit: str, status: str) -> list:
+        """Return list of participants of status in visit."""
         if visit not in ["visit1", "visit2", "visit3"]:
             raise ValueError("Unexpected visit name.")
         if status not in ["lost", "excluded", "withdrew", "incomplete"]:
             raise ValueError("Unexpected status name.")
-        return len(
-            self._df_demo.index[
-                (self._df_demo["enroll_status"] == status)
-                & (self._df_demo["visit"] == visit)
-            ].to_list()
-        )
 
-    def _v23_stats(self, day: int) -> tuple:
-        """Return 4 tuple of visit2/3 status info."""
+        idx_subj = self._df_demo.index[
+            (self._df_demo["enroll_status"] == status)
+            & (self._df_demo["visit"] == visit)
+        ].to_list()
+        return self._df_demo.loc[idx_subj, "src_subject_id"].to_list()
+
+    def _v23_subj(self, day: int) -> dict:
+        """Return visit 2,3 status info."""
         if day not in [2, 3]:
             raise ValueError(f"Unexpected day identifier : {day}")
 
         # Participants who start V2/3 -- completed all or BDI
-        v_start = len(
-            self._df_compl.index[
-                (self._df_compl[f"day_{day}_fully_completed"] == 1.0)
-                | (self._df_compl[f"bdi_day{day}_completed"] == 1.0)
-            ].tolist()
-        )
+        out_dict = {}
+        idx_subj = self._df_compl.index[
+            (self._df_compl[f"day_{day}_fully_completed"] == 1.0)
+            | (self._df_compl[f"bdi_day{day}_completed"] == 1.0)
+        ].tolist()
+        out_dict["start"] = self._df_compl.loc[idx_subj, "record_id"].to_list()
 
         # Participants with status change
-        v_lost = self._stat_change(f"visit{day}", "lost")
-        v_excl = self._stat_change(f"visit{day}", "excluded")
-        v_with = self._stat_change(f"visit{day}", "withdrew")
-        v_incomp = self._stat_change(f"visit{day}", "incomplete")
-        return (v_start, v_lost, v_excl, v_with, v_incomp)
+        for stat in ["lost", "excluded", "withdrew", "incomplete"]:
+            out_dict[stat] = self._stat_change(f"visit{day}", stat)
+        return out_dict
 
-    def _final_num(self) -> Tuple:
-        """Return tuple of enrolled/incomplete and complete participants."""
-        num_final = len(
-            self._df_demo.index[
-                (self._df_demo["enroll_status"] == "enrolled")
-                | (self._df_demo["enroll_status"] == "incomplete")
-            ].to_list()
-        )
-        num_compl = len(
-            self._df_compl.index[
-                (self._df_compl["day_1_fully_completed"] == 1.0)
-                & (self._df_compl["day_2_fully_completed"] == 1.0)
-                & (self._df_compl["day_3_fully_completed"] == 1.0)
-            ].tolist()
-        )
-        return (num_final, num_compl)
+    def _final_subj(self) -> dict:
+        """Return final (enrolled+incomplete) and complete participants."""
+        out_dict = {}
+        idx_enroll = self._df_demo.index[
+            (self._df_demo["enroll_status"] == "enrolled")
+            | (self._df_demo["enroll_status"] == "incomplete")
+        ].to_list()
+        out_dict["final"] = self._df_demo.loc[
+            idx_enroll, "src_subject_id"
+        ].to_list()
+
+        idx_compl = self._df_compl.index[
+            (self._df_compl["day_1_fully_completed"] == 1.0)
+            & (self._df_compl["day_2_fully_completed"] == 1.0)
+            & (self._df_compl["day_3_fully_completed"] == 1.0)
+        ].tolist()
+        out_dict["complete"] = self._df_compl.loc[
+            idx_compl, "record_id"
+        ].to_list()
+        return out_dict
 
 
 # %%
