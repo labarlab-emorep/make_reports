@@ -444,29 +444,32 @@ class AddStatus(ParticipantComplete):
 
     """
 
-    def enroll_status(self, df):
+    def enroll_status(self, df, subj_col):
         """Title.
 
         Parameters
         ----------
         df : pd.DataFrame
-            Requires column titled src_subject_id
+            Contains column subj_col with participant IDs
+        subj_col : str
+            Column name containing subject ID
 
         Returns
         -------
         pd.DataFrame
 
         """
-        if "src_subject_id" not in df.columns:
-            raise KeyError("Dataframe missing column src_subject_id")
+        if subj_col not in df.columns:
+            raise KeyError(f"Dataframe missing column : {subj_col}")
         self._df = df
-        self._df["enroll_status"] = "enrolled"
-        self._df["visit"] = np.NaN
-        self._df["reason"] = np.NaN
+        self._subj_col = subj_col
+        self._v_list = [1, 2, 3]
+        for v_num in self._v_list:
+            self._df[f"visit{v_num}_status"] = "enrolled"
+            self._df[f"visit{v_num}_reason"] = np.NaN
 
         # Incomplete before excluded/withdrawn to account for subsequent
         # status changes.
-        self._visit_list = ["visit1", "visit2", "visit3"]
         self._add_lost()
         self._add_ewi("incomplete")
         self._add_ewi("excluded")
@@ -476,19 +479,25 @@ class AddStatus(ParticipantComplete):
     def _add_lost(self):
         """Add lost status to dataframe."""
         self.status_change("lost")
-        for visit in self._visit_list:
-            subj_list = getattr(self, visit)
+        for v_num in self._v_list:
+            subj_list = getattr(self, f"visit{v_num}")
             if not subj_list:
                 continue
             idx_subj = self._subj_idx(subj_list)
-            self._df.loc[idx_subj, "enroll_status"] = "lost"
-            self._df.loc[idx_subj, "visit"] = visit
+            self._df.loc[idx_subj, f"visit{v_num}_status"] = "lost"
+            self._clear_status(v_num, idx_subj)
 
     def _subj_idx(self, subj_list) -> list:
         """Return indices of subejcts."""
         return self._df.index[
-            self._df["src_subject_id"].isin(subj_list)
+            self._df[self._subj_col].isin(subj_list)
         ].to_list()
+
+    def _clear_status(self, v_num: int, idx_subj: list):
+        """Title."""
+        while v_num < 3:
+            v_num += 1
+            self._df.loc[idx_subj, f"visit{v_num}_status"] = np.NaN
 
     def _add_ewi(self, stat: str):
         """Add excluded, withdrawn, incomplete statuses to dataframe."""
@@ -497,12 +506,14 @@ class AddStatus(ParticipantComplete):
         else:
             self.status_change(stat)
 
-        for visit in self._visit_list:
-            subj_dict = getattr(self, visit)
+        for v_num in self._v_list:
+            subj_dict = getattr(self, f"visit{v_num}")
             if not subj_dict:
                 continue
             for reas, subj_list in subj_dict.items():
                 idx_subj = self._subj_idx(subj_list)
-                self._df.loc[idx_subj, "enroll_status"] = stat
-                self._df.loc[idx_subj, "visit"] = visit
-                self._df.loc[idx_subj, "reason"] = reas
+                self._df.loc[idx_subj, f"visit{v_num}_status"] = stat
+                self._df.loc[idx_subj, f"visit{v_num}_reason"] = reas
+                if stat == "incomplete":
+                    continue
+                self._clear_status(v_num, idx_subj)

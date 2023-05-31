@@ -18,6 +18,7 @@ import seaborn as sns
 from graphviz import Digraph
 from make_reports.resources import survey_download
 from make_reports.resources import build_reports
+from make_reports.resources import report_helper
 
 
 # %%
@@ -541,11 +542,15 @@ class ParticipantFlow:
         print("Initializing ParticipantFlow")
         self._proj_dir = proj_dir
         self._rc_token = redcap_token
+        self._status_list = ["lost", "excluded", "withdrew", "incomplete"]
 
         # Get record dataframes
         self._df_compl = self._dl_compl()
         rc_demo = build_reports.DemoAll(self._proj_dir)
-        self._df_demo = rc_demo.final_demo
+        add_stat = report_helper.AddStatus()
+        self._df_demo = add_stat.enroll_status(
+            rc_demo.final_demo, "src_subject_id"
+        )
 
     def draw_prisma(self):
         """Generate PRISMA flowchart of participants in study.
@@ -660,25 +665,33 @@ class ParticipantFlow:
         out_dict["start"] = self._df_compl.loc[idx_subj, "record_id"].to_list()
 
         # Participants with status change
-        for stat in ["lost", "excluded", "withdrew", "incomplete"]:
+        for stat in self._status_list:
             out_dict[stat] = self._stat_change("visit1", stat)
         return out_dict
 
     def _stat_change(self, visit: str, status: str) -> list:
-        """Return list of participants of status in visit."""
+        """Return list of participants of status in visit.
+
+        Notes
+        -----
+        Requires output of report_helper.AddStatus.enroll_status()
+
+        """
+        # Validate args
         if visit not in ["visit1", "visit2", "visit3"]:
             raise ValueError("Unexpected visit name.")
-        if status not in ["lost", "excluded", "withdrew", "incomplete"]:
+        if status not in self._status_list:
             raise ValueError("Unexpected status name.")
 
+        # Find subjects of visit status
         idx_subj = self._df_demo.index[
-            (self._df_demo["enroll_status"] == status)
-            & (self._df_demo["visit"] == visit)
+            self._df_demo[f"{visit}_status"] == status
         ].to_list()
         return self._df_demo.loc[idx_subj, "src_subject_id"].to_list()
 
     def _v23_subj(self, day: int) -> dict:
         """Return visit 2,3 status info."""
+        # Validate args
         if day not in [2, 3]:
             raise ValueError(f"Unexpected day identifier : {day}")
 
@@ -691,7 +704,7 @@ class ParticipantFlow:
         out_dict["start"] = self._df_compl.loc[idx_subj, "record_id"].to_list()
 
         # Participants with status change
-        for stat in ["lost", "excluded", "withdrew", "incomplete"]:
+        for stat in self._status_list:
             out_dict[stat] = self._stat_change(f"visit{day}", stat)
         return out_dict
 
@@ -699,8 +712,8 @@ class ParticipantFlow:
         """Return final (enrolled+incomplete) and complete participants."""
         out_dict = {}
         idx_enroll = self._df_demo.index[
-            (self._df_demo["enroll_status"] == "enrolled")
-            | (self._df_demo["enroll_status"] == "incomplete")
+            (self._df_demo["visit3_status"] == "enrolled")
+            | (self._df_demo["visit3_status"] == "incomplete")
         ].to_list()
         out_dict["final"] = self._df_demo.loc[
             idx_enroll, "src_subject_id"
