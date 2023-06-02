@@ -712,21 +712,28 @@ class ParticipantFlow:
         """Return final (enrolled+incomplete) and complete participants."""
         out_dict = {}
         idx_enroll = self._df_demo.index[
-            (self._df_demo["visit3_status"] == "enrolled")
-            | (self._df_demo["visit3_status"] == "incomplete")
+            self._df_demo["visit3_status"] == "enrolled"
         ].to_list()
-        out_dict["final"] = self._df_demo.loc[
+        out_dict["complete"] = self._df_demo.loc[
             idx_enroll, "src_subject_id"
         ].to_list()
 
-        idx_compl = self._df_compl.index[
-            (self._df_compl["day_1_fully_completed"] == 1.0)
-            & (self._df_compl["day_2_fully_completed"] == 1.0)
-            & (self._df_compl["day_3_fully_completed"] == 1.0)
-        ].tolist()
-        out_dict["complete"] = self._df_compl.loc[
-            idx_compl, "record_id"
+        idx_incomp = self._df_demo.index[
+            self._df_demo["visit3_status"] == "incomplete"
         ].to_list()
+        idx_final = idx_enroll + idx_incomp
+        out_dict["final"] = self._df_demo.loc[
+            idx_final, "src_subject_id"
+        ].to_list()
+
+        # idx_compl = self._df_compl.index[
+        #     (self._df_compl["day_1_fully_completed"] == 1.0)
+        #     & (self._df_compl["day_2_fully_completed"] == 1.0)
+        #     & (self._df_compl["day_3_fully_completed"] == 1.0)
+        # ].tolist()
+        # out_dict["complete"] = self._df_compl.loc[
+        #     idx_compl, "record_id"
+        # ].to_list()
         return out_dict
 
 
