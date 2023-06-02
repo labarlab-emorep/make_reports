@@ -579,7 +579,9 @@ class ParticipantFlow:
             c.attr(rank="same")
             c.node(
                 "1",
-                f"Visit1: Enrollment\nn={len(v1_dict['start'])}",
+                "Visit1: Enrollment\n"
+                + f"n={len(v1_dict['start'])} {self._get_female(v1_dict['start'])}\l"  # noqa: W605 E501
+                + f"{self._get_age(v1_dict['start'])}\l",
                 shape="box",
             )
             c.node(
@@ -599,7 +601,9 @@ class ParticipantFlow:
                 c.attr(rank="same")
                 c.node(
                     str(count),
-                    f"Visit{day}: Survey & MRI\nn={len(v_dict['start'])}",
+                    f"Visit{day}: Survey & MRI\n"
+                    + f"n={len(v_dict['start'])} {self._get_female(v_dict['start'])}\l"
+                    + f"{self._get_age(v_dict['start'])}\l",
                     shape="box",
                 )
                 count += 1
@@ -615,13 +619,23 @@ class ParticipantFlow:
 
         # Build final and draw edges, write out
         final_dict = self._final_subj()
-        flo.node(
-            str(count),
-            f"Final: n={len(final_dict['final'])}\n"
-            + f"Complete: n={len(final_dict['complete'])}\l",  # noqa: W605
-            shape="box",
-        )
-        flo.edges(["01", "12", "13", "34", "35", "56", "57"])
+        with flo.subgraph() as c:
+            c.attr(rank="same")
+            c.node(
+                str(count),
+                "Final Participants:\l"
+                + f"n={len(final_dict['final'])} {self._get_female(final_dict['final'])}\l"
+                + f"{self._get_age(final_dict['final'])}\l",
+                shape="box",
+            )
+            c.node(
+                str(count + 1),
+                "Complete Data:\l"
+                + f"n={len(final_dict['complete'])} {self._get_female(final_dict['complete'])}\l"
+                + f"{self._get_age(final_dict['complete'])}\l",  # noqa: W605
+                shape="box",
+            )
+        flo.edges(["01", "12", "13", "34", "35", "56", "57", "78"])
         flo.format = "png"
         out_plot = os.path.join(
             self._proj_dir,
@@ -710,31 +724,43 @@ class ParticipantFlow:
 
     def _final_subj(self) -> dict:
         """Return final (enrolled+incomplete) and complete participants."""
+        # Participants still enrolled at end of study
         out_dict = {}
-        idx_enroll = self._df_demo.index[
-            self._df_demo["visit3_status"] == "enrolled"
+        idx_final = self._df_demo.index[
+            (self._df_demo["visit3_status"] == "enrolled")
+            | (self._df_demo["visit3_status"] == "incomplete")
         ].to_list()
-        out_dict["complete"] = self._df_demo.loc[
-            idx_enroll, "src_subject_id"
-        ].to_list()
-
-        idx_incomp = self._df_demo.index[
-            self._df_demo["visit3_status"] == "incomplete"
-        ].to_list()
-        idx_final = idx_enroll + idx_incomp
         out_dict["final"] = self._df_demo.loc[
             idx_final, "src_subject_id"
         ].to_list()
 
-        # idx_compl = self._df_compl.index[
-        #     (self._df_compl["day_1_fully_completed"] == 1.0)
-        #     & (self._df_compl["day_2_fully_completed"] == 1.0)
-        #     & (self._df_compl["day_3_fully_completed"] == 1.0)
-        # ].tolist()
-        # out_dict["complete"] = self._df_compl.loc[
-        #     idx_compl, "record_id"
-        # ].to_list()
+        # Participants from whom we have complete data
+        idx_compl = self._df_compl.index[
+            (self._df_compl["day_1_fully_completed"] == 1.0)
+            & (self._df_compl["day_2_fully_completed"] == 1.0)
+            & (self._df_compl["day_3_fully_completed"] == 1.0)
+        ].tolist()
+        out_dict["complete"] = self._df_compl.loc[
+            idx_compl, "record_id"
+        ].to_list()
         return out_dict
+
+    def _get_age(self, subj_list: list) -> str:
+        """Title."""
+        idx_demo = self._df_demo.index[
+            self._df_demo["src_subject_id"].isin(subj_list)
+        ].to_list()
+        _mean = round(self._df_demo.loc[idx_demo, "age"].mean(), 2)
+        _std = round(self._df_demo.loc[idx_demo, "age"].std(), 2)
+        return f"age={_mean}" + "\u00B1" + f"{_std}Y"
+
+    def _get_female(self, subj_list: list) -> str:
+        """Title."""
+        idx_demo = self._df_demo.index[
+            self._df_demo["src_subject_id"].isin(subj_list)
+        ].to_list()
+        num_f = self._df_demo.loc[idx_demo, "sex"].value_counts().Female
+        return f"({num_f}F)"
 
 
 # %%
