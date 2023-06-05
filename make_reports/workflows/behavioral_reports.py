@@ -1,7 +1,9 @@
 """Methods for generating descriptive stats on participant responses.
 
-Make descriptive plots and calculate descriptive statistics for
-REDCap, Qualtrics, and EmoRep task participant responses.
+CalcRedcapQualtricsStats : generate descriptive stats from REDCap,
+                            Qualtrics surveys
+calc_task_stats : generate descriptive stats for EmoRep task
+make_survey_table : organize multiple descriptive reports into tables
 
 """
 # %%
@@ -22,6 +24,18 @@ class CalcRedcapQualtricsStats:
     Written descriptive stats are titled <out_dir>/stats_<survey_name>.json,
     and plots are titled:
         <out_dir>/plot_boxplot-<single|double>_<survey_name>.png
+
+    Parameters
+    ----------
+    proj_dir : path
+        Location of project's experiment directory
+    sur_list : list
+        REDCap or Qualtrics survey abbreviations
+    draw_plot : bool
+        Whether to generate, write figure
+    write_json : bool
+        Whether to save generated descriptive
+        statistics to JSON
 
     Attributes
     ----------
@@ -48,18 +62,6 @@ class CalcRedcapQualtricsStats:
 
     def __init__(self, proj_dir, sur_list, draw_plot, write_json):
         """Initialize.
-
-        Parameters
-        ----------
-        proj_dir : path
-            Location of project's experiment directory
-        sur_list : list
-            REDCap or Qualtrics survey abbreviations
-        draw_plot : bool
-            Whether to generate, write figure
-        write_json : bool
-            Whether to save generated descriptive
-            statistics to JSON
 
         Attributes
         ----------

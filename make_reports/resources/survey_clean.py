@@ -1,4 +1,10 @@
-"""Clean survey data from RedCap and Qualtrics."""
+"""Clean survey data from RedCap and Qualtrics.
+
+CleanRedcap : organize, clean REDCap survey responses
+CleanQualtrics : organize, clean Qualtrics survey responses
+CombineRestRatings : aggregate post-rest responses into dataframe
+
+"""
 import os
 import string
 import glob
@@ -20,6 +26,11 @@ class CleanRedcap:
     demographic dataframes for NIH/Duke reporting purposes but are
     removed from the BDI dataframes.
 
+    Parameters
+    ----------
+    proj_dir : path
+        Location of parent directory for project
+
     Attributes
     ----------
     df_clean : pd.DataFrame
@@ -35,14 +46,7 @@ class CleanRedcap:
     """
 
     def __init__(self, proj_dir):
-        """Initialize.
-
-        Parameters
-        ----------
-        proj_dir : path
-            Location of parent directory for project
-
-        """
+        """Initialize."""
         self._proj_dir = proj_dir
         self._redcap_dict = report_helper.redcap_dict()
         self._pilot_list = report_helper.pilot_list()
@@ -57,11 +61,6 @@ class CleanRedcap:
         ----------
         survey_name : str, make_reports.report_helper.redcap_dict key
             Name of RedCap survey
-
-        Attributes
-        ----------
-        _df_raw : pd.DataFrame
-            Original RedCap survey data
 
         Raises
         ------
@@ -426,8 +425,13 @@ class CleanRedcap:
 class CleanQualtrics:
     """Clean Qualtrics surveys.
 
-     Find downloaded original/raw Qualtrics survey responses, and
-     convert values into usable dataframe tyeps and formats.
+    Find downloaded original/raw Qualtrics survey responses, and
+    convert values into usable dataframe tyeps and formats.
+
+    Parameters
+    ----------
+    proj_dir : path
+        Location of parent directory for project
 
     Attributes
     ----------
@@ -448,25 +452,7 @@ class CleanQualtrics:
     """
 
     def __init__(self, proj_dir):
-        """Set helper attributes.
-
-        Parameters
-        ----------
-        proj_dir : path
-            Location of parent directory for project
-
-        Attributes
-        ----------
-        _pilot_list : make_reports.report_helper.pilot_list
-            Pilot participants
-        _proj_dir : path
-            Location of parent directory for project
-        _qualtrics_dict : make_reports.report_helper.qualtrics_dict
-            Mapping of survey name to directory organization
-        _withdrew_list : make_reports.report_helper.Withdrew().all
-            Participant who have withdrawn from study
-
-        """
+        """Initialize."""
         self._proj_dir = proj_dir
         self._qualtrics_dict = report_helper.qualtrics_dict()
         self._pilot_list = report_helper.pilot_list()
@@ -484,11 +470,6 @@ class CleanQualtrics:
         ----------
         survey_name : str, make_reports.report_helper.qualtrics_dict key
             Name of Qualtrics survey session
-
-        Attributes
-        ----------
-        _df_raw : pd.DataFrame
-            Original qualtrics survey session data
 
         Raises
         ------
@@ -899,6 +880,11 @@ class CombineRestRatings:
 
     Find and combine subject rest ratings, output by dcm_conversion.
 
+    Parameters
+    ----------
+    proj_dir : path
+        Location of parent directory for project
+
     Attributes
     ----------
     df_sess : pd.DataFrame
@@ -912,19 +898,7 @@ class CombineRestRatings:
     """
 
     def __init__(self, proj_dir):
-        """Setup helper attributes.
-
-        Parameters
-        ----------
-        proj_dir : path
-            Location of parent directory for project
-
-        Attributes
-        ----------
-        _sess_valid : list
-            Valid session days
-
-        """
+        """Initialize."""
         self._sess_valid = ["day2", "day3"]
 
     def get_rest_ratings(self, sess, rawdata_path):

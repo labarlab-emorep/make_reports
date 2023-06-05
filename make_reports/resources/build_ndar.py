@@ -37,6 +37,13 @@ from make_reports.resources import report_helper
 class NdarAffim01:
     """Make affim01 report for NDAR submission.
 
+    Parameters
+    ----------
+    proj_dir : path
+        Project's experiment directory
+    final_demo : make_reports.build_reports.DemoAll.final_demo
+        pd.DataFrame, compiled demographic info
+
     Attributes
     ----------
     df_report : pd.DataFrame
@@ -57,23 +64,10 @@ class NdarAffim01:
         Get cleaned AIM Qualtrics survey from visit_day1, and
         finalized demographic information.
 
-        Parameters
-        ----------
-        proj_dir : path
-            Project's experiment directory
-        final_demo : make_reports.build_reports.DemoAll.final_demo
-            pd.DataFrame, compiled demographic info
-
         Attributes
         ----------
         nda_label : list
             NDA report template label
-        _df_aim : pd.DataFrame
-            Cleaned AIM Qualtrics survey
-        _final_demo : make_reports.build_reports.DemoAll.final_demo
-            pd.DataFrame, compiled demographic info
-        _nda_cols : list
-            NDA report template column names
 
         """
         print("Buiding NDA report : affim01 ...")
@@ -151,6 +145,13 @@ class NdarAffim01:
 class NdarAls01:
     """Make als01 report for NDAR submission.
 
+    Parameters
+    ----------
+    proj_dir : path
+        Project's experiment directory
+    final_demo : make_reports.build_reports.DemoAll.final_demo
+        pd.DataFrame, compiled demographic info
+
     Attributes
     ----------
     df_report : pd.DataFrame
@@ -171,23 +172,10 @@ class NdarAls01:
         Get cleaned ALS Qualtrics survey from visit_day1, and
         finalized demographic information.
 
-        Parameters
-        ----------
-        proj_dir : path
-            Project's experiment directory
-        final_demo : make_reports.build_reports.DemoAll.final_demo
-            pd.DataFrame, compiled demographic info
-
         Attributes
         ----------
         nda_label : list
             NDA report template label
-        _df_als : pd.DataFrame
-            Cleaned ALS Qualtrics survey
-        _final_demo : make_reports.build_reports.DemoAll.final_demo
-            pd.DataFrame, compiled demographic info
-        _nda_cols : list
-            NDA report template column names
 
         """
         print("Buiding NDA report : als01 ...")
@@ -303,6 +291,13 @@ class NdarAls01:
 class NdarBdi01:
     """Make bdi01 report for NDAR submission.
 
+    Parameters
+    ----------
+    proj_dir : path
+        Project's experiment directory
+    final_demo : make_reports.build_reports.DemoAll.final_demo
+        pd.DataFrame, compiled demographic info
+
     Attributes
     ----------
     df_report : pd.DataFrame
@@ -324,25 +319,12 @@ class NdarBdi01:
         visit_day3, and finalized demographic information.
         Generate BDI report.
 
-        Parameters
-        ----------
-        proj_dir : path
-            Project's experiment directory
-        final_demo : make_reports.build_reports.DemoAll.final_demo
-            pd.DataFrame, compiled demographic info
-
         Attributes
         ----------
         df_report : pd.DataFrame
             Report of BDI data that complies with NDAR data definitions
         nda_label : list
             NDA report template label
-        _final_demo : make_reports.build_reports.DemoAll.final_demo
-            pd.DataFrame, compiled demographic info
-        _nda_cols : list
-            NDA report template column names
-        _proj_dir : path
-            Project's experiment directory
 
         """
         # Get needed column values from report template
@@ -382,13 +364,6 @@ class NdarBdi01:
         """Find and combine cleaned BDI data.
 
         Get pilot, study data for day2, day3.
-
-        Attributes
-        ----------
-        _df_bdi_day2 : pd.DataFrame
-            Cleaned visit_day2 BDI RedCap survey
-        _df_bdi_day3 : pd.DataFrame
-            Cleaned visit_day3 BDI RedCap survey
 
         """
         # Get clean survey data
@@ -534,6 +509,13 @@ class NdarBdi01:
 class NdarBrd01:
     """Make brd01 report for NDAR submission.
 
+    Parameters
+    ----------
+    proj_dir : path
+        Project's experiment directory
+    final_demo : make_reports.build_reports.DemoAll.final_demo
+        pd.DataFrame, compiled demographic info
+
     Attributes
     ----------
     df_report : pd.DataFrame
@@ -555,25 +537,12 @@ class NdarBrd01:
         attributes, and trigger report generation method for
         each session.
 
-        Parameters
-        ----------
-        proj_dir : path
-            Project's experiment directory
-        final_demo : make_reports.build_reports.DemoAll.final_demo
-            pd.DataFrame, compiled demographic info
-
         Attributes
         ----------
         df_report : pd.DataFrame
             Report of rest rating data that complies with NDAR data definitions
         nda_label : list
             NDA report template label
-        _final_demo : make_reports.build_reports.DemoAll.final_demo
-            pd.DataFrame, compiled demographic info
-        _local_path : path
-            Local location of files to host
-        _proj_dir : path
-            Project's experiment directory
 
         """
         # Get needed column values from report template
@@ -745,6 +714,13 @@ class NdarBrd01:
 class NdarDemoInfo01:
     """Make demo_info01 report for NDAR submission.
 
+    Parameters
+    ----------
+    proj_dir : path
+        Project's experiment directory, unused
+    final_demo : make_reports.build_reports.DemoAll.final_demo
+        pd.DataFrame, compiled demographic info
+
     Attributes
     ----------
     df_report : pd.DataFrame
@@ -765,21 +741,12 @@ class NdarDemoInfo01:
         Read-in data, setup empty df_report, and coordinate
         filling df_report.
 
-        Parameters
-        ----------
-        proj_dir : path
-            Project's experiment directory, unused
-        final_demo : make_reports.build_reports.DemoAll.final_demo
-            pd.DataFrame, compiled demographic info
-
         Attributes
         ----------
         df_report : pd.DataFrame
             Report of demographic data that complies with NDAR data definitions
         nda_label : list
             NDA report template label
-        _final_demo : make_reports.build_reports.DemoAll.final_demo
-            pd.DataFrame, compiled demographic info
 
         """
         print("Buiding NDA report : demo_info01 ...")
@@ -853,6 +820,13 @@ class NdarDemoInfo01:
 class NdarEmrq01:
     """Make emrq01 report for NDAR submission.
 
+    Parameters
+    ----------
+    proj_dir : path
+        Project's experiment directory
+    final_demo : make_reports.build_reports.DemoAll.final_demo
+        pd.DataFrame, compiled demographic info
+
     Attributes
     ----------
     df_report : pd.DataFrame
@@ -873,19 +847,10 @@ class NdarEmrq01:
         Get cleaned ERQ Qualtrics survey from visit_day1, and
         finalized demographic information.
 
-        Parameters
-        ----------
-        proj_dir : path
-            Project's experiment directory
-        final_demo : make_reports.build_reports.DemoAll.final_demo
-            pd.DataFrame, compiled demographic info
-
         Attributes
         ----------
         nda_label : list
             NDA report template label
-        _nda_cols : list
-            NDA report template column names
 
         """
         print("Buiding NDA report : emrq01 ...")
@@ -988,6 +953,15 @@ class NdarImage03:
     Make copies of study participants' NIfTI and events files in:
         <proj_dir>/ndar_upload/data_mri
 
+    Parameters
+    ----------
+    proj_dir : path
+        Project's experiment directory
+    final_demo : make_reports.build_reports.DemoAll.final_demo
+        pd.DataFrame, compiled demographic info
+    test_subj : str, optional
+        BIDS subject identifier, for testing class
+
     Attributes
     ----------
     df_report : pd.DataFrame
@@ -1020,34 +994,12 @@ class NdarImage03:
         information, and combine with previously-generated image03 info
         for the pilot participants.
 
-        Parameters
-        ----------
-        proj_dir : path
-            Project's experiment directory
-        final_demo : make_reports.build_reports.DemoAll.final_demo
-            pd.DataFrame, compiled demographic info
-        test_subj : str, optional
-            BIDS subject identifier, for testing class
-
         Attributes
         ----------
         df_report : pd.DataFrame
             Image03 values for experiment/study participants
         nda_label : list
             NDA report template label
-        _df_report_study : pd.DataFrame
-            Image03 values for experiment/study participants
-        _final_demo : make_reports.build_reports.DemoAll.final_demo
-            pd.DataFrame, compiled demographic info
-        _nda_cols : list
-            NDA report template column names
-        _proj_dir : path
-            Project's experiment directory
-        _source_dir : path
-            Location of project sourcedata
-        _subj_sess_list : list
-            Paths to all participant's sessions,
-            e.g. ["/path/sub-12/ses-A", "/path/sub-12/ses-B"]
 
         Raises
         ------
@@ -1106,11 +1058,6 @@ class NdarImage03:
     def make_pilot(self):
         """Read previously-generated NDAR report for pilot participants.
 
-        Attributes
-        ----------
-        _df_report_pilot : pd.DataFrame
-            Image03 for pilot participants
-
         Raises
         ------
         FileNotFoundError
@@ -1140,17 +1087,6 @@ class NdarImage03:
         the session, and for each data type trigger appropriate method.
         Each iteration resets the attributes of sess, subj, subj_nda, and
         subj_sess so they are available for private methods.
-
-        Attributes
-        ----------
-        _sess : str
-            BIDS session
-        _subj : str
-            BIDS subject
-        _subj_nda : str
-            Participant ID
-        _subj_sess : path
-            Location of subject's session data
 
         Raises
         ------
@@ -1771,6 +1707,13 @@ class NdarImage03:
 class NdarPanas01:
     """Make panas01 report for NDAR submission.
 
+    Parameters
+    ----------
+    proj_dir : path
+        Project's experiment directory
+    final_demo : make_reports.build_reports.DemoAll.final_demo
+        pd.DataFrame, compiled demographic info
+
     Attributes
     ----------
     df_report : pd.DataFrame
@@ -1792,25 +1735,12 @@ class NdarPanas01:
         visit_day3, and finalized demographic information.
         Generate PANAS report.
 
-        Parameters
-        ----------
-        proj_dir : path
-            Project's experiment directory
-        final_demo : make_reports.build_reports.DemoAll.final_demo
-            pd.DataFrame, compiled demographic info
-
         Attributes
         ----------
         df_report : pd.DataFrame
             Report of PANAS data that complies with NDAR data definitions
         nda_label : list
             NDA report template label
-        _final_demo : make_reports.build_reports.DemoAll.final_demo
-            pd.DataFrame, compiled demographic info
-        _nda_cols : list
-            NDA report template column names
-        _proj_dir : path
-            Project's experiment directory
 
         """
         # Get needed column values from report template
@@ -2306,6 +2236,13 @@ class NdarPhysio:
 class NdarPswq01:
     """Make pswq01 report for NDAR submission.
 
+    Parameters
+    ----------
+    proj_dir : path
+        Project's experiment directory
+    final_demo : make_reports.build_reports.DemoAll.final_demo
+        pd.DataFrame, compiled demographic info
+
     Attributes
     ----------
     df_report : pd.DataFrame
@@ -2315,7 +2252,7 @@ class NdarPswq01:
 
     Methods
     -------
-    make_pswq
+    make_pswq()
         Generate pswq01 dataset, builds df_report
 
     """
@@ -2326,19 +2263,10 @@ class NdarPswq01:
         Get cleaned PSWQ Qualtrics survey from visit_day1, and
         finalized demographic information.
 
-        Parameters
-        ----------
-        proj_dir : path
-            Project's experiment directory
-        final_demo : make_reports.build_reports.DemoAll.final_demo
-            pd.DataFrame, compiled demographic info
-
         Attributes
         ----------
         nda_label : list
             NDA report template label
-        _nda_cols : list
-            NDA report template column names
 
         """
         print("Buiding NDA report : pswq01 ...")
@@ -2424,6 +2352,13 @@ class NdarPswq01:
 class NdarRest01:
     """Make restsurv01 report for NDAR submission.
 
+    Parameters
+    ----------
+    proj_dir : path
+        Project's experiment directory
+    final_demo : make_reports.build_reports.DemoAll.final_demo
+        pd.DataFrame, compiled demographic info
+
     Attributes
     ----------
     df_report : pd.DataFrame
@@ -2445,25 +2380,12 @@ class NdarRest01:
         visit_day3, and finalized demographic information.
         Generate NDAR report.
 
-        Parameters
-        ----------
-        proj_dir : path
-            Project's experiment directory
-        final_demo : make_reports.build_reports.DemoAll.final_demo
-            pd.DataFrame, compiled demographic info
-
         Attributes
         ----------
         df_report : pd.DataFrame
             Report of rest data that complies with NDAR data definitions
         nda_label : list
             NDA report template label
-        _final_demo : make_reports.build_reports.DemoAll.final_demo
-            pd.DataFrame, compiled demographic info
-        _nda_cols : list
-            NDA report template column names
-        _proj_dir : path
-            Project's experiment directory
 
         """
         # Get needed column values from report template
@@ -2503,13 +2425,6 @@ class NdarRest01:
         """Find and combine cleaned rest rating data.
 
         Get pilot, study data for day2, day3.
-
-        Attributes
-        ----------
-        _df_rest_day2 : pd.DataFrame
-            Cleaned visit_day2 rest rating survey
-        _df_rest_day3 : pd.DataFrame
-            Cleaned visit_day3 rest rating survey
 
         """
         # Get clean survey data
@@ -2653,6 +2568,13 @@ class NdarRest01:
 class NdarRrs01:
     """Make rrs01 report for NDAR submission.
 
+    Parameters
+    ----------
+    proj_dir : path
+        Project's experiment directory
+    final_demo : make_reports.build_reports.DemoAll.final_demo
+        pd.DataFrame, compiled demographic info
+
     Attributes
     ----------
     df_report : pd.DataFrame
@@ -2673,25 +2595,12 @@ class NdarRrs01:
         Get cleaned RRS Qualtrics survey from visit_day1, and
         finalized demographic information.
 
-        Parameters
-        ----------
-        proj_dir : path
-            Project's experiment directory
-        final_demo : make_reports.build_reports.DemoAll.final_demo
-            pd.DataFrame, compiled demographic info
-
         Attributes
         ----------
         df_report : pd.DataFrame
             Report of RRS data that complies with NDAR data definitions
         nda_label : list
             NDA report template label
-        _final_demo : make_reports.build_reports.DemoAll.final_demo
-            pd.DataFrame, compiled demographic info
-        _nda_cols : list
-            NDA report template column names
-        _proj_dir : path
-            Project's experiment directory
 
         """
         print("Buiding NDA report : rrs01 ...")
@@ -2806,6 +2715,13 @@ class NdarRrs01:
 class NdarStai01:
     """Make stai01 report for NDAR submission.
 
+    Parameters
+    ----------
+    proj_dir : path
+        Project's experiment directory
+    final_demo : make_reports.build_reports.DemoAll.final_demo
+        pd.DataFrame, compiled demographic info
+
     Attributes
     ----------
     df_report : pd.DataFrame
@@ -2830,25 +2746,12 @@ class NdarStai01:
         finalized demographic information. Coordinate creation
         of state, trait reports. Generate df_report.
 
-        Parameters
-        ----------
-        proj_dir : path
-            Project's experiment directory
-        final_demo : make_reports.build_reports.DemoAll.final_demo
-            pd.DataFrame, compiled demographic info
-
         Attributes
         ----------
         df_report : pd.DataFrame
             Report of STAI data that complies with NDAR data definitions
         nda_label : list
             NDA report template label
-        _final_demo : make_reports.build_reports.DemoAll.final_demo
-            pd.DataFrame, compiled demographic info
-        _nda_cols : list
-            NDA report template column names
-        _proj_dir : path
-            Project's experiment directory
 
         """
         print("Buiding NDA report : stai01 ...")
@@ -3141,6 +3044,13 @@ class NdarStai01:
 class NdarTas01:
     """Make tas01 report for NDAR submission.
 
+    Parameters
+    ----------
+    proj_dir : path
+        Project's experiment directory
+    final_demo : make_reports.build_reports.DemoAll.final_demo
+        pd.DataFrame, compiled demographic info
+
     Attributes
     ----------
     df_report : pd.DataFrame
@@ -3161,23 +3071,10 @@ class NdarTas01:
         Get cleaned TAS Qualtrics survey from visit_day1, and
         finalized demographic information.
 
-        Parameters
-        ----------
-        proj_dir : path
-            Project's experiment directory
-        final_demo : make_reports.build_reports.DemoAll.final_demo
-            pd.DataFrame, compiled demographic info
-
         Attributes
         ----------
         nda_label : list
             NDA report template label
-        _df_stai : pd.DataFrame
-            Cleaned TAS Qualtrics survey
-        _final_demo : make_reports.build_reports.DemoAll.final_demo
-            pd.DataFrame, compiled demographic info
-        _nda_cols : list
-            NDA report template column names
 
         """
         print("Buiding NDA report : tas01 ...")

@@ -1,8 +1,9 @@
 """Methods for generating reports required by the NIH or Duke.
 
-Generates the regular reports required by the NIH (4mo, 12mo)
-and by Duke (3mo). Generates datasets required by NIH NDAR and
-accompanying data. Also supports GUID generation.
+make_regular_reports : Generate reports submited to NIH or Duke
+make_ndar_reports : Generate reports, data submitted to NIH Data
+                        Archive (NDAR)
+gen_guids : generate or check GUIDs
 
 """
 # %%

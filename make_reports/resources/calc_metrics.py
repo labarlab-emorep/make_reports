@@ -1,8 +1,8 @@
 """Calculate metrics for tracking data acquistion.
 
-demographics    : compare proposed to actual demographic numbers
-scan_pace       : plot number of attempted scans by week
-censored_volumes    : plot proportion of volumes exceeding FD threshold
+demographics : compare proposed to actual demographic numbers
+scan_pace : plot number of attempted scans by week
+censored_volumes : plot proportion of volumes exceeding FD threshold
 ParticipantFlow : generate PRISMA flowchart of participants in experiment
 
 """
@@ -29,6 +29,11 @@ class _CalcProp:
     report, and planned demographics have been hardcoded from the grant
     proposal.
 
+    Parameters
+    ----------
+    final_demo : make_reports.build_reports.DemoAll.final_demo
+        pd.DataFrame, compiled demographic info
+
     Attributes
     ----------
     prop_plan : float
@@ -47,14 +52,7 @@ class _CalcProp:
     """
 
     def __init__(self, final_demo):
-        """Initialize.
-
-        Parameters
-        ----------
-        final_demo : make_reports.build_reports.DemoAll.final_demo
-            pd.DataFrame, compiled demographic info
-
-        """
+        """Initialize."""
         print("\tInitializing _CalcProp")
         self._final_demo = final_demo
         self._total_rec = final_demo.shape[0]
@@ -516,6 +514,18 @@ def censored_volumes(proj_dir):
 class ParticipantFlow:
     """Generate PRISMA flowchart of participants in study.
 
+    PRISMA main flow includes recruitment, visits 1-3, and
+    final participant numbers. Offshoots include numbers
+    of participants who withdrew, were excluded, lost-to-
+    follow up, and contributed incomplete data.
+
+    Parameters
+    ----------
+    proj_dir : str, os.PathLike
+        Project's experiment directory
+    redcap_token : str
+        API token for RedCap project
+
     Methods
     -------
     draw_prisma()
@@ -529,16 +539,7 @@ class ParticipantFlow:
     """
 
     def __init__(self, proj_dir, redcap_token):
-        """Initialize.
-
-        Parameters
-        ----------
-        proj_dir : str, os.PathLike
-            Project's experiment directory
-        redcap_token : str
-            API token for RedCap project
-
-        """
+        """Initialize."""
         print("Initializing ParticipantFlow")
         self._proj_dir = proj_dir
         self._rc_token = redcap_token
@@ -564,7 +565,7 @@ class ParticipantFlow:
             <proj-dir>/analyses_metrics/plot_flow-participant.png
 
         """
-        # Visit0
+        # Visit0 node
         flo = Digraph("participant_flow")
         flo.attr(label="Participant Flow", labelloc="t", fontsize="18")
         flo.node(
@@ -573,7 +574,7 @@ class ParticipantFlow:
             shape="box",
         )
 
-        # Visit1
+        # Visit1 node
         v1_dict = self._v1_subj()
         with flo.subgraph() as c:
             c.attr(rank="same")
@@ -581,7 +582,7 @@ class ParticipantFlow:
                 "1",
                 "Visit1: Enrollment\n"
                 + f"n={len(v1_dict['start'])} {self._get_female(v1_dict['start'])}\l"  # noqa: W605 E501
-                + f"{self._get_age(v1_dict['start'])}\l",
+                + f"{self._get_age(v1_dict['start'])}\l",  # noqa: W605
                 shape="box",
             )
             c.node(
@@ -593,7 +594,7 @@ class ParticipantFlow:
                 shape="box",
             )
 
-        # Build Visit2, Visit3 sections
+        # Build Visit2, Visit3 nodes
         count = 3
         for day in [2, 3]:
             v_dict = self._v23_subj(day)
@@ -602,8 +603,8 @@ class ParticipantFlow:
                 c.node(
                     str(count),
                     f"Visit{day}: Survey & MRI\n"
-                    + f"n={len(v_dict['start'])} {self._get_female(v_dict['start'])}\l"
-                    + f"{self._get_age(v_dict['start'])}\l",
+                    + f"n={len(v_dict['start'])} {self._get_female(v_dict['start'])}\l"  # noqa: W605 E501
+                    + f"{self._get_age(v_dict['start'])}\l",  # noqa: W605
                     shape="box",
                 )
                 count += 1
@@ -623,15 +624,15 @@ class ParticipantFlow:
             c.attr(rank="same")
             c.node(
                 str(count),
-                "Final Participants:\l"
-                + f"n={len(final_dict['final'])} {self._get_female(final_dict['final'])}\l"
-                + f"{self._get_age(final_dict['final'])}\l",
+                "Final Participants:\l"  # noqa: W605
+                + f"n={len(final_dict['final'])} {self._get_female(final_dict['final'])}\l"  # noqa: W605 E501
+                + f"{self._get_age(final_dict['final'])}\l",  # noqa: W605
                 shape="box",
             )
             c.node(
                 str(count + 1),
-                "Complete Data:\l"
-                + f"n={len(final_dict['complete'])} {self._get_female(final_dict['complete'])}\l"
+                "Complete Data:\l"  # noqa: W605
+                + f"n={len(final_dict['complete'])} {self._get_female(final_dict['complete'])}\l"  # noqa: W605 E501
                 + f"{self._get_age(final_dict['complete'])}\l",  # noqa: W605
                 shape="box",
             )
@@ -667,7 +668,8 @@ class ParticipantFlow:
 
     def _v1_subj(self) -> dict:
         """Return visit1 status info."""
-        # Particpants who start V1 -- completed all or completed consent & demo
+        # Particpants who start V1, completed all or
+        # completed consent & demo.
         out_dict = {}
         idx_subj = self._df_compl.index[
             (self._df_compl["day_1_fully_completed"] == 1.0)
@@ -684,13 +686,7 @@ class ParticipantFlow:
         return out_dict
 
     def _stat_change(self, visit: str, status: str) -> list:
-        """Return list of participants of status in visit.
-
-        Notes
-        -----
-        Requires output of report_helper.AddStatus.enroll_status()
-
-        """
+        """Return list of participants of status in visit."""
         # Validate args
         if visit not in ["visit1", "visit2", "visit3"]:
             raise ValueError("Unexpected visit name.")
@@ -746,7 +742,7 @@ class ParticipantFlow:
         return out_dict
 
     def _get_age(self, subj_list: list) -> str:
-        """Title."""
+        """Return age mean, std for subject ID list."""
         idx_demo = self._df_demo.index[
             self._df_demo["src_subject_id"].isin(subj_list)
         ].to_list()
@@ -755,7 +751,7 @@ class ParticipantFlow:
         return f"age={_mean}" + "\u00B1" + f"{_std}Y"
 
     def _get_female(self, subj_list: list) -> str:
-        """Title."""
+        """Return number of female in subject ID list."""
         idx_demo = self._df_demo.index[
             self._df_demo["src_subject_id"].isin(subj_list)
         ].to_list()

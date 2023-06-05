@@ -1,4 +1,10 @@
-"""Build reports and dataframes needed by lab manager."""
+"""Build reports and dataframes needed by lab manager.
+
+DemoAll : aggregate demgraphic info into single dataframe
+ManagerRegular : generate reports regularly submitted
+GenerateGuids : generate, check GUIDs
+
+"""
 import os
 import glob
 import subprocess
@@ -15,6 +21,11 @@ class DemoAll:
     Only includes participants who have signed the consent form,
     have an assigned GUID, and have completed the demographic
     survey.
+
+    Parameters
+    ----------
+    proj_dir : str, os.PathLike
+        Project's parent directory
 
     Attributes
     ----------
@@ -34,14 +45,7 @@ class DemoAll:
     """
 
     def __init__(self, proj_dir):
-        """Read-in data and generate final_demo.
-
-        Attributes
-        ----------
-        _proj_dir : path
-            Location of parent directory for project
-
-        """
+        """Read-in data and generate final_demo."""
         # Read-in pilot, study data and combine dataframes
         print(
             "\nBuilding final_demo from RedCap demographic,"
@@ -132,11 +136,6 @@ class DemoAll:
         multiple, multiple responses (which may not include
         the multiple option), and "other" responses.
 
-        Attributes
-        ----------
-        _race_resp : list
-            Participant responses to race item
-
         """
         # Get attribute for readibility, testing
         df_merge = self._df_merge
@@ -207,16 +206,7 @@ class DemoAll:
         del df_merge
 
     def _get_ethnic_minority(self):
-        """Determine if participant is considered a minority.
-
-        Attributes
-        ----------
-        _subj_ethnic : list
-            Participants' ethnicity status
-        _subj_minor : list
-            Particiapnts' minority status
-
-        """
+        """Determine if participant is considered a minority."""
         # Get ethnicity selection, convert to english
         h_ethnic = self._df_merge["ethnicity"].tolist()
         ethnic_switch = {
@@ -331,6 +321,16 @@ class ManagerRegular:
     construct a dataframe containing the required information
     for the report.
 
+    Parameters
+    ----------
+    query_date : datetime
+        Date for finding report range
+    final_demo : make_reports.build_reports.DemoAll.final_demo
+        pd.DataFrame, compiled demographic info
+    report : str
+        [nih4 | nih12 | duke3]
+        Select desired report
+
     Attributes
     ----------
     df_report : pd.DataFrame, None
@@ -352,30 +352,7 @@ class ManagerRegular:
     """
 
     def __init__(self, query_date, final_demo, report):
-        """Generate requested report.
-
-        Parameters
-        ----------
-        query_date : datetime
-            Date for finding report range
-        final_demo : make_reports.build_reports.DemoAll.final_demo
-            pd.DataFrame, compiled demographic info
-        report : str
-            [nih4 | nih12 | duke3]
-
-        Attributes
-        ----------
-        _final_demo : make_reports.build_reports.DemoAll.final_demo
-            pd.DataFrame, compiled demographic info
-        _query_date : datetime
-            Date for finding report range
-
-        Raises
-        ------
-        ValueError
-            If improper report argument supplied
-
-        """
+        """Generate requested report."""
         print(f"Buiding manager report : {report} ...")
         self._query_date = query_date
         self._final_demo = final_demo
@@ -710,6 +687,15 @@ class GenerateGuids:
     Writes GUIDs as txt file to:
         <proj_dir>/data_survey/redcap_demographics/data_clean
 
+    Parameters
+    ----------
+    proj_dir : path
+        Project's experiment directory
+    user_name : str
+        NDA user name
+    user_pass : str
+        NDA user password
+
     Attributes
     ----------
     df_guid_file : path
@@ -728,27 +714,7 @@ class GenerateGuids:
     """
 
     def __init__(self, proj_dir, user_pass, user_name):
-        """Setup instance and compile demographic information.
-
-        Parameters
-        ----------
-        proj_dir : path
-            Project's experiment directory
-        user_name : str
-            NDA user name
-        user_pass : str
-            NDA user password
-
-        Attributes
-        ----------
-        _proj_dir : path
-            Project's experiment directory
-        _user_name : str
-            NDA user name
-        _user_pass : str
-            NDA user password
-
-        """
+        """Setup instance and compile demographic information."""
         self._proj_dir = proj_dir
         self._user_name = user_name
         self._user_pass = user_pass
@@ -759,13 +725,6 @@ class GenerateGuids:
 
         Mine cleaned RedCap demographics survey and compile needed
         fields for the guid-tool.
-
-        Attributes
-        ----------
-        df_guid_file : path
-            Location of intermediate file for subprocess accessibility
-        _df_guid : pd.DataFrame
-            Formatted for use with guid-tool
 
         Raises
         ------
@@ -853,11 +812,6 @@ class GenerateGuids:
 
         Output of guid-tool is written to:
             <proj_dir>/data_survey/redcap_demographics/data_clean/output_guid_*.txt
-
-        Attributes
-        ----------
-        _guid_file : path
-            Location, file out guid-tool output
 
         Raises
         ------

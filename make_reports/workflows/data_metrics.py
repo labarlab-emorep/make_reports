@@ -1,7 +1,8 @@
 """Methods for generating metrics about the project.
 
-Supports tracking scanning pace, participant demographics,
-and amount of motion in EPI data.
+get_metrics : generate metrics, figures for recruitment
+                demographics, scanning pace, EPI motion,
+                and participant flow PRISMA
 
 """
 # %%

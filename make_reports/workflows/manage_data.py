@@ -5,6 +5,10 @@ task data from the scanner. Split omnibus dataframes into
 survey-specific dataframes, clean, and organize according
 to the EmoRep scheme.
 
+download_surveys : download survey responses from REDCap, Qualtrics
+CleanSurveys : organize, split, and clean survey responses into
+                separate dataframes
+
 """
 # %%
 import os
@@ -58,6 +62,11 @@ class CleanSurveys:
     Cleaned dataframes are written to:
         <proj_dir>/data_survey/<visit>/data_clean
 
+    Parameters
+    ----------
+    proj_dir : path
+        Project's experiment directory
+
     Methods
     -------
     clean_redcap()
@@ -77,19 +86,7 @@ class CleanSurveys:
     """
 
     def __init__(self, proj_dir):
-        """Set helping attributes.
-
-        Parameters
-        ----------
-        proj_dir : path
-            Project's experiment directory
-
-        Attributes
-        ----------
-        _proj_dir : path
-            Project's experiment directory
-
-        """
+        """Initialize."""
         print("Initializing CleanSurveys")
         self._proj_dir = proj_dir
 

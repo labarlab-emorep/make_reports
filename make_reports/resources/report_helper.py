@@ -9,6 +9,7 @@ pilot_list : pilot participants
 redcap_dict : REDCAP survey mappings
 qualtrics_dict : Qualtrics survey mappings
 ParticipantComplete : track participant, data completion status
+AddStatus : add participant complete status to dataframe
 
 """
 import sys
@@ -323,6 +324,12 @@ class ParticipantComplete:
     lists of participants, withdrawn or excluded yields dictionaries
     organized by visit and reason.
 
+    Parameters
+    ----------
+    title : str
+        [lost | excluded | withdrew]
+        Type of status change
+
     Attributes
     ----------
     all : list
@@ -361,12 +368,6 @@ class ParticipantComplete:
         Set list (lost) or dict (excluded, withdrew) attributes
         holding which participants did not complete the study
         and the reason why.
-
-        Parameters
-        ----------
-        title : str
-            [lost | excluded | withdrew]
-            Type of status change
 
         Attributes
         ----------
@@ -438,21 +439,44 @@ class ParticipantComplete:
 
 
 class AddStatus(ParticipantComplete):
-    """Title.
+    """Add participant status for each visit to dataframe.
 
-    Inherits ParticipantComplete
+    Inherits ParticipantComplete.
+
+    Given a dataframe, add columns indicating participants' status
+    in the experiment for each visit. If a status changes from
+    enrolled (say, during Visit2), the subsequent visit status (Visit3)
+    is cleared and left as NaN except in the case of incomplete, which
+    tracks whether or not any data is missing for that subject.
+
+    Tracks statuses : excluded, lost, withdrew, and incomplete
+
+    Parameters
+    ----------
+    df : pd.DataFrame
+        Contains column subj_col with participant IDs
+    subj_col : str
+        Column name containing subject ID
+
+    Methods
+    -------
+    enroll_status(pd.DataFrame, "subject_column_name")
+        Add status info to given dataframe, values of
+        "subject_column_name" but use participant ID without
+        BIDS prefix (e.g. ER0009, not sub-ER0009).
+
+    Example
+    -------
+    as = AddStatus()
+    as.enroll_status(pd.DataFrame, "src_subject_id")
 
     """
 
     def enroll_status(self, df, subj_col):
-        """Title.
+        """Add participant enrollment and completion status.
 
-        Parameters
-        ----------
-        df : pd.DataFrame
-            Contains column subj_col with participant IDs
-        subj_col : str
-            Column name containing subject ID
+        Add columns to dataframe indicating participant enrollment
+        status and data completion for each visit.
 
         Returns
         -------
@@ -478,38 +502,45 @@ class AddStatus(ParticipantComplete):
 
     def _add_lost(self):
         """Add lost status to dataframe."""
+        # Set and access visit attributes with lost lists
         self.status_change("lost")
         for v_num in self._v_list:
             subj_list = getattr(self, f"visit{v_num}")
             if not subj_list:
                 continue
+
+            # Update dataframe visit status for lost
             idx_subj = self._subj_idx(subj_list)
             self._df.loc[idx_subj, f"visit{v_num}_status"] = "lost"
             self._clear_status(v_num, idx_subj)
 
-    def _subj_idx(self, subj_list) -> list:
+    def _subj_idx(self, subj_list: list) -> list:
         """Return indices of subejcts."""
         return self._df.index[
             self._df[self._subj_col].isin(subj_list)
         ].to_list()
 
     def _clear_status(self, v_num: int, idx_subj: list):
-        """Title."""
+        """Remove status of subsequent visits in dataframe."""
         while v_num < 3:
             v_num += 1
             self._df.loc[idx_subj, f"visit{v_num}_status"] = np.NaN
 
     def _add_ewi(self, stat: str):
         """Add excluded, withdrawn, incomplete statuses to dataframe."""
+        # Select method given status
         if stat == "incomplete":
             self.incomplete()
         else:
             self.status_change(stat)
 
+        # Access attributes of visit lists
         for v_num in self._v_list:
             subj_dict = getattr(self, f"visit{v_num}")
             if not subj_dict:
                 continue
+
+            # Unpack dict, update dataframe
             for reas, subj_list in subj_dict.items():
                 idx_subj = self._subj_idx(subj_list)
                 self._df.loc[idx_subj, f"visit{v_num}_status"] = stat
