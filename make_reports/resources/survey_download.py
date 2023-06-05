@@ -1,4 +1,12 @@
-"""Functions for downloading survey data from RedCap and Qualtrics."""
+"""Functions for downloading survey data from RedCap and Qualtrics.
+
+download_mri_log : get MRI visit logs
+download_completion_log : get completion log
+download_prescreening : get prescreening responses
+download_redcap : download REDCap surveys
+download qualtrics : download Qualtrics surveys
+
+"""
 import os
 import json
 import pandas as pd

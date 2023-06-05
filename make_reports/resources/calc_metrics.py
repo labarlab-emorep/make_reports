@@ -1,8 +1,8 @@
 """Calculate metrics for tracking data acquistion.
 
-demographics    : compare proposed to actual demographic numbers
-scan_pace       : plot number of attempted scans by week
-censored_volumes    : plot proportion of volumes exceeding FD threshold
+demographics : compare proposed to actual demographic numbers
+scan_pace : plot number of attempted scans by week
+censored_volumes : plot proportion of volumes exceeding FD threshold
 ParticipantFlow : generate PRISMA flowchart of participants in experiment
 
 """
@@ -29,6 +29,11 @@ class _CalcProp:
     report, and planned demographics have been hardcoded from the grant
     proposal.
 
+    Parameters
+    ----------
+    final_demo : make_reports.build_reports.DemoAll.final_demo
+        pd.DataFrame, compiled demographic info
+
     Attributes
     ----------
     prop_plan : float
@@ -47,14 +52,7 @@ class _CalcProp:
     """
 
     def __init__(self, final_demo):
-        """Initialize.
-
-        Parameters
-        ----------
-        final_demo : make_reports.build_reports.DemoAll.final_demo
-            pd.DataFrame, compiled demographic info
-
-        """
+        """Initialize."""
         print("\tInitializing _CalcProp")
         self._final_demo = final_demo
         self._total_rec = final_demo.shape[0]
@@ -516,6 +514,18 @@ def censored_volumes(proj_dir):
 class ParticipantFlow:
     """Generate PRISMA flowchart of participants in study.
 
+    PRISMA main flow includes recruitment, visits 1-3, and
+    final participant numbers. Offshoots include numbers
+    of participants who withdrew, were excluded, lost-to-
+    follow up, and contributed incomplete data.
+
+    Parameters
+    ----------
+    proj_dir : str, os.PathLike
+        Project's experiment directory
+    redcap_token : str
+        API token for RedCap project
+
     Methods
     -------
     draw_prisma()
@@ -529,40 +539,18 @@ class ParticipantFlow:
     """
 
     def __init__(self, proj_dir, redcap_token):
-        """Initialize.
-
-        Parameters
-        ----------
-        proj_dir : str, os.PathLike
-            Project's experiment directory
-        redcap_token : str
-            API token for RedCap project
-
-        """
+        """Initialize."""
         print("Initializing ParticipantFlow")
         self._proj_dir = proj_dir
         self._rc_token = redcap_token
+        self._status_list = ["lost", "excluded", "withdrew", "incomplete"]
 
-    def _get_recruit(self):
-        """Determine number of participants recruited."""
-        df_pre = survey_download.download_prescreening(self._rc_token)
-        self._num_recruit = df_pre.shape[0]
-
-    def _get_enroll(self):
-        """Determine number of participants enrolled."""
+        # Get record dataframes
+        self._df_compl = self._dl_compl()
         rc_demo = build_reports.DemoAll(self._proj_dir)
-        self._num_enroll = rc_demo.final_demo.shape[0]
-
-    def _dl_compl(self):
-        """Download completion log, determine final number."""
-        self._df_compl = survey_download.download_completion_log(
-            self._rc_token
-        )
-        self._num_final = len(
-            self._df_compl.index[
-                (self._df_compl["day_3_fully_completed"] == 1.0)
-                & (self._df_compl["withdrew_flag___1"] == 0.0)
-            ].tolist()
+        add_stat = report_helper.AddStatus()
+        self._df_demo = add_stat.enroll_status(
+            rc_demo.final_demo, "src_subject_id"
         )
 
     def draw_prisma(self):
@@ -577,61 +565,78 @@ class ParticipantFlow:
             <proj-dir>/analyses_metrics/plot_flow-participant.png
 
         """
-        # Identify Visit0, Visit1, and final numbers
-        self._get_recruit()
-        self._get_enroll()
-        self._dl_compl()
-        v1_sur, v1_excl, v1_lost, v1_with = self._v1_info()
-
-        # Build Visit0, Visit1 sections
+        # Visit0 node
         flo = Digraph("participant_flow")
         flo.attr(label="Participant Flow", labelloc="t", fontsize="18")
         flo.node(
-            "0", f"Recruited Individuals: {self._num_recruit}", shape="box"
+            "0",
+            f"Visit0: Recruitment\nn={self._get_recruit()}",
+            shape="box",
         )
+
+        # Visit1 node
+        v1_dict = self._v1_subj()
         with flo.subgraph() as c:
             c.attr(rank="same")
             c.node(
                 "1",
-                "Visit1\n"
-                + f"Enrolled: {self._num_enroll}\l"  # noqa: W605
-                + f"Surveys: {v1_sur}\l",  # noqa: W605
+                "Visit1: Enrollment\n"
+                + f"n={len(v1_dict['start'])} {self._get_female(v1_dict['start'])}\l"  # noqa: W605 E501
+                + f"{self._get_age(v1_dict['start'])}\l",  # noqa: W605
                 shape="box",
             )
             c.node(
                 "2",
-                f"Excluded: {v1_excl}\l"  # noqa: W605
-                + f"Lost: {v1_lost}\l"  # noqa: W605
-                + f"Withdrawn: {v1_with}\l",  # noqa: W605
+                f"Excluded: {len(v1_dict['excluded'])}\l"  # noqa: W605
+                + f"Incomplete: {len(v1_dict['incomplete'])}\l"  # noqa: W605
+                + f"Lost: {len(v1_dict['lost'])}\l"  # noqa: W605
+                + f"Withdrawn: {len(v1_dict['withdrew'])}\l",  # noqa: W605
                 shape="box",
             )
 
-        # Build Visit2, Visit3 sections
+        # Build Visit2, Visit3 nodes
         count = 3
         for day in [2, 3]:
-            _sur, _mri, _excl, _lost, _with = self._v23_info(day)
+            v_dict = self._v23_subj(day)
             with flo.subgraph() as c:
                 c.attr(rank="same")
                 c.node(
                     str(count),
-                    f"Visit{day}\n"
-                    + f"Surveys: {_sur}\l"  # noqa: W605
-                    + f"MRI: {_mri}\l",  # noqa: W605
+                    f"Visit{day}: Survey & MRI\n"
+                    + f"n={len(v_dict['start'])} {self._get_female(v_dict['start'])}\l"  # noqa: W605 E501
+                    + f"{self._get_age(v_dict['start'])}\l",  # noqa: W605
                     shape="box",
                 )
                 count += 1
                 c.node(
                     str(count),
-                    f"Excluded: {_excl}\l"  # noqa: W605
-                    + f"Lost: {_lost}\l"  # noqa: W605
-                    + f"Withdrawn: {_with}\l",  # noqa: W605
+                    f"Excluded: {len(v_dict['excluded'])}\l"  # noqa: W605
+                    + f"Incomplete: {len(v_dict['incomplete'])}\l"  # noqa: W605 E501
+                    + f"Lost: {len(v_dict['lost'])}\l"  # noqa: W605
+                    + f"Withdrawn: {len(v_dict['withdrew'])}\l",  # noqa: W605
                     shape="box",
                 )
                 count += 1
 
         # Build final and draw edges, write out
-        flo.node(str(count), f"Final: {self._num_final}", shape="box")
-        flo.edges(["01", "12", "13", "34", "35", "56", "57"])
+        final_dict = self._final_subj()
+        with flo.subgraph() as c:
+            c.attr(rank="same")
+            c.node(
+                str(count),
+                "Final Participants:\l"  # noqa: W605
+                + f"n={len(final_dict['final'])} {self._get_female(final_dict['final'])}\l"  # noqa: W605 E501
+                + f"{self._get_age(final_dict['final'])}\l",  # noqa: W605
+                shape="box",
+            )
+            c.node(
+                str(count + 1),
+                "Complete Data:\l"  # noqa: W605
+                + f"n={len(final_dict['complete'])} {self._get_female(final_dict['complete'])}\l"  # noqa: W605 E501
+                + f"{self._get_age(final_dict['complete'])}\l",  # noqa: W605
+                shape="box",
+            )
+        flo.edges(["01", "12", "13", "34", "35", "56", "57", "78"])
         flo.format = "png"
         out_plot = os.path.join(
             self._proj_dir,
@@ -641,42 +646,117 @@ class ParticipantFlow:
         flo.render(out_plot)
         print(f"\tDrew plot : {out_plot}")
 
-    def _v1_info(self) -> tuple:
-        """Return 4 tuple of visit 1 counts."""
-        num_sur = len(
-            self._df_compl.index[
-                (self._df_compl["day_1_fully_completed"] == 1.0)
-                | (self._df_compl["emotion_quest_completed"] == 1.0)
-            ].tolist()
-        )
-        num_excl = len(report_helper.Excluded().visit1)
-        num_with = len(report_helper.Withdrew().visit1)
-        num_lost = len(report_helper.Lost().visit1)
-        return (num_sur, num_excl, num_lost, num_with)
+    def _get_recruit(self) -> int:
+        """Determine number of participants recruited."""
+        df_pre = survey_download.download_prescreening(self._rc_token)
+        return df_pre.shape[0]
 
-    def _v23_info(self, day: int) -> tuple:
-        """Return 5 tuple of visit2, 3 counts."""
-        num_sur = len(
-            self._df_compl.index[
-                (self._df_compl[f"day_{day}_fully_completed"] == 1.0)
-                | (self._df_compl[f"bdi_day{day}_completed"] == 1.0)
-            ].tolist()
-        )
-        num_mri = len(
-            self._df_compl.index[
-                (self._df_compl[f"day_{day}_fully_completed"] == 1.0)
-                | (self._df_compl[f"imaging_day{day}_completed"] == 1.0)
-            ].tolist()
-        )
-        if day == 2:
-            num_excl = len(report_helper.Excluded().visit2)
-            num_with = len(report_helper.Withdrew().visit2)
-            num_lost = len(report_helper.Lost().visit2)
-        elif day == 3:
-            num_excl = len(report_helper.Excluded().visit3)
-            num_with = len(report_helper.Withdrew().visit3)
-            num_lost = len(report_helper.Lost().visit3)
-        return (num_sur, num_mri, num_excl, num_lost, num_with)
+    def _dl_compl(self) -> pd.DataFrame:
+        """Return completion log of enrolled participants."""
+        df_compl = survey_download.download_completion_log(self._rc_token)
+        df_compl = df_compl.loc[
+            (df_compl["day_1_fully_completed"] == 1.0)
+            | (
+                (df_compl["consent_form_completed"] == 1.0)
+                & (df_compl["demographics_completed"] == 1.0)
+            )
+        ].reset_index(drop=True)
+        df_compl["record_id"] = df_compl["record_id"].astype(str)
+        df_compl["record_id"] = df_compl["record_id"].str.zfill(4)
+        df_compl["record_id"] = "ER" + df_compl["record_id"]
+        return df_compl
+
+    def _v1_subj(self) -> dict:
+        """Return visit1 status info."""
+        # Particpants who start V1, completed all or
+        # completed consent & demo.
+        out_dict = {}
+        idx_subj = self._df_compl.index[
+            (self._df_compl["day_1_fully_completed"] == 1.0)
+            | (
+                (self._df_compl["consent_form_completed"] == 1.0)
+                & (self._df_compl["demographics_completed"] == 1.0)
+            )
+        ].to_list()
+        out_dict["start"] = self._df_compl.loc[idx_subj, "record_id"].to_list()
+
+        # Participants with status change
+        for stat in self._status_list:
+            out_dict[stat] = self._stat_change("visit1", stat)
+        return out_dict
+
+    def _stat_change(self, visit: str, status: str) -> list:
+        """Return list of participants of status in visit."""
+        # Validate args
+        if visit not in ["visit1", "visit2", "visit3"]:
+            raise ValueError("Unexpected visit name.")
+        if status not in self._status_list:
+            raise ValueError("Unexpected status name.")
+
+        # Find subjects of visit status
+        idx_subj = self._df_demo.index[
+            self._df_demo[f"{visit}_status"] == status
+        ].to_list()
+        return self._df_demo.loc[idx_subj, "src_subject_id"].to_list()
+
+    def _v23_subj(self, day: int) -> dict:
+        """Return visit 2,3 status info."""
+        # Validate args
+        if day not in [2, 3]:
+            raise ValueError(f"Unexpected day identifier : {day}")
+
+        # Participants who start V2/3 -- completed all or BDI
+        out_dict = {}
+        idx_subj = self._df_compl.index[
+            (self._df_compl[f"day_{day}_fully_completed"] == 1.0)
+            | (self._df_compl[f"bdi_day{day}_completed"] == 1.0)
+        ].tolist()
+        out_dict["start"] = self._df_compl.loc[idx_subj, "record_id"].to_list()
+
+        # Participants with status change
+        for stat in self._status_list:
+            out_dict[stat] = self._stat_change(f"visit{day}", stat)
+        return out_dict
+
+    def _final_subj(self) -> dict:
+        """Return final (enrolled+incomplete) and complete participants."""
+        # Participants still enrolled at end of study
+        out_dict = {}
+        idx_final = self._df_demo.index[
+            (self._df_demo["visit3_status"] == "enrolled")
+            | (self._df_demo["visit3_status"] == "incomplete")
+        ].to_list()
+        out_dict["final"] = self._df_demo.loc[
+            idx_final, "src_subject_id"
+        ].to_list()
+
+        # Participants from whom we have complete data
+        idx_compl = self._df_compl.index[
+            (self._df_compl["day_1_fully_completed"] == 1.0)
+            & (self._df_compl["day_2_fully_completed"] == 1.0)
+            & (self._df_compl["day_3_fully_completed"] == 1.0)
+        ].tolist()
+        out_dict["complete"] = self._df_compl.loc[
+            idx_compl, "record_id"
+        ].to_list()
+        return out_dict
+
+    def _get_age(self, subj_list: list) -> str:
+        """Return age mean, std for subject ID list."""
+        idx_demo = self._df_demo.index[
+            self._df_demo["src_subject_id"].isin(subj_list)
+        ].to_list()
+        _mean = round(self._df_demo.loc[idx_demo, "age"].mean(), 2)
+        _std = round(self._df_demo.loc[idx_demo, "age"].std(), 2)
+        return f"age={_mean}" + "\u00B1" + f"{_std}Y"
+
+    def _get_female(self, subj_list: list) -> str:
+        """Return number of female in subject ID list."""
+        idx_demo = self._df_demo.index[
+            self._df_demo["src_subject_id"].isin(subj_list)
+        ].to_list()
+        num_f = self._df_demo.loc[idx_demo, "sex"].value_counts().Female
+        return f"({num_f}F)"
 
 
 # %%

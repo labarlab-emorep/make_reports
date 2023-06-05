@@ -1,0 +1,21 @@
+{
+    "visit1": {
+        "Time Conflict": [
+            "ER0086",
+            "ER0454",
+            "ER1024"
+        ],
+        "Other": [
+            "ER0400"
+        ]
+    },
+    "visit2": {
+        "EAE": [
+            "ER0103"
+        ],
+        "Time Conflict": [
+            "ER0140"
+        ]
+    },
+    "visit3": {}
+}

@@ -1,4 +1,10 @@
-"""Clean survey data from RedCap and Qualtrics."""
+"""Clean survey data from RedCap and Qualtrics.
+
+CleanRedcap : organize, clean REDCap survey responses
+CleanQualtrics : organize, clean Qualtrics survey responses
+CombineRestRatings : aggregate post-rest responses into dataframe
+
+"""
 import os
 import string
 import glob
@@ -16,8 +22,14 @@ class CleanRedcap:
 
     Find downloaded original/raw RedCap survey responses, and
     convert values into usable dataframe types and formats. Participants
-    who have withdraw consent are included in the cleaned dataframes
-    for NIH/Duke reporting purposes.
+    who have withdrawn consent are included in the Consent, GUID, and
+    demographic dataframes for NIH/Duke reporting purposes but are
+    removed from the BDI dataframes.
+
+    Parameters
+    ----------
+    proj_dir : path
+        Location of parent directory for project
 
     Attributes
     ----------
@@ -34,23 +46,7 @@ class CleanRedcap:
     """
 
     def __init__(self, proj_dir):
-        """Set helper attributes.
-
-        Parameters
-        ----------
-        proj_dir : path
-            Location of parent directory for project
-
-        Attributes
-        ----------
-        _pilot_list : make_reports.report_helper.pilot_list
-            Pilot participants
-        _proj_dir : path
-            Location of parent directory for project
-        _redcap_dict : make_reports.report_helper.redcap_dict
-            Mapping of survey name to directory organization
-
-        """
+        """Initialize."""
         self._proj_dir = proj_dir
         self._redcap_dict = report_helper.redcap_dict()
         self._pilot_list = report_helper.pilot_list()
@@ -65,11 +61,6 @@ class CleanRedcap:
         ----------
         survey_name : str, make_reports.report_helper.redcap_dict key
             Name of RedCap survey
-
-        Attributes
-        ----------
-        _df_raw : pd.DataFrame
-            Original RedCap survey data
 
         Raises
         ------
@@ -413,6 +404,13 @@ class CleanRedcap:
         df_raw["datetime"] = pd.to_datetime(df_raw["datetime"])
         df_raw["datetime"] = df_raw["datetime"].dt.strftime("%Y-%m-%d")
 
+        # Drop participants who have withdrawn consent
+        part_comp = report_helper.ParticipantComplete()
+        part_comp.status_change("withdrew")
+        withdrew_list = [int(x[2:]) for x in part_comp.all]
+        df_raw = df_raw[~df_raw["study_id"].isin(withdrew_list)]
+        df_raw = df_raw.reset_index(drop=True)
+
         # Separate pilot from study data
         idx_pilot = df_raw[
             df_raw["study_id"].isin(self._pilot_list)
@@ -427,8 +425,13 @@ class CleanRedcap:
 class CleanQualtrics:
     """Clean Qualtrics surveys.
 
-     Find downloaded original/raw Qualtrics survey responses, and
-     convert values into usable dataframe tyeps and formats.
+    Find downloaded original/raw Qualtrics survey responses, and
+    convert values into usable dataframe tyeps and formats.
+
+    Parameters
+    ----------
+    proj_dir : path
+        Location of parent directory for project
 
     Attributes
     ----------
@@ -449,29 +452,14 @@ class CleanQualtrics:
     """
 
     def __init__(self, proj_dir):
-        """Set helper attributes.
-
-        Parameters
-        ----------
-        proj_dir : path
-            Location of parent directory for project
-
-        Attributes
-        ----------
-        _pilot_list : make_reports.report_helper.pilot_list
-            Pilot participants
-        _proj_dir : path
-            Location of parent directory for project
-        _qualtrics_dict : make_reports.report_helper.qualtrics_dict
-            Mapping of survey name to directory organization
-        _withdrew_list : make_reports.report_helper.Withdrew().all
-            Participant who have withdrawn from study
-
-        """
+        """Initialize."""
         self._proj_dir = proj_dir
         self._qualtrics_dict = report_helper.qualtrics_dict()
         self._pilot_list = report_helper.pilot_list()
-        self._withdrew_list = report_helper.Withdrew().all
+
+        part_comp = report_helper.ParticipantComplete()
+        part_comp.status_change("withdrew")
+        self._withdrew_list = part_comp.all
 
     def clean_surveys(self, survey_name):
         """Split and clean original Qualtrics survey data.
@@ -482,11 +470,6 @@ class CleanQualtrics:
         ----------
         survey_name : str, make_reports.report_helper.qualtrics_dict key
             Name of Qualtrics survey session
-
-        Attributes
-        ----------
-        _df_raw : pd.DataFrame
-            Original qualtrics survey session data
 
         Raises
         ------
@@ -897,6 +880,11 @@ class CombineRestRatings:
 
     Find and combine subject rest ratings, output by dcm_conversion.
 
+    Parameters
+    ----------
+    proj_dir : path
+        Location of parent directory for project
+
     Attributes
     ----------
     df_sess : pd.DataFrame
@@ -910,19 +898,7 @@ class CombineRestRatings:
     """
 
     def __init__(self, proj_dir):
-        """Setup helper attributes.
-
-        Parameters
-        ----------
-        proj_dir : path
-            Location of parent directory for project
-
-        Attributes
-        ----------
-        _sess_valid : list
-            Valid session days
-
-        """
+        """Initialize."""
         self._sess_valid = ["day2", "day3"]
 
     def get_rest_ratings(self, sess, rawdata_path):
@@ -1022,4 +998,11 @@ class CombineRestRatings:
             df_sess = pd.concat([df_sess, df_beh_trans], ignore_index=True)
             del df_beh, df_beh_trans
 
+        # Remove responses from withdrawn participants
+        part_comp = report_helper.ParticipantComplete()
+        part_comp.status_change("withdrew")
+        df_sess = df_sess[
+            ~df_sess.study_id.str.contains("|".join(part_comp.all))
+        ]
+        df_sess = df_sess.reset_index(drop=True)
         self.df_sess = df_sess

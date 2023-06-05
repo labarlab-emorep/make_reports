@@ -6,6 +6,12 @@ for REDCap and Qualtrics surveys, or task type. The post-scan
 stimulus rating task is treated as an EmoRep task instead of a
 Qualtrics survey.
 
+Visit1Stats : generate stats, plots for visit1 surveys
+Visit23Stats : generate stats, plots for visit2, 3 data and surveys
+RestRatings : generate stats, plots for post-rest ratings task
+StimRatings : generate stats, plots for stimulus ratings task
+EmorepTask : generate stats, plots emorep task
+
 """
 # %%
 import os
@@ -23,6 +29,13 @@ class _DescStat:
     """Supply statistic and plotting methods.
 
     Each method supplies their own examples.
+
+    Parameters
+    ----------
+    df : pd.DataFrame
+        Input dataset
+    col_data : list, optional
+        Column name in df of desired data
 
     Attributes
     ----------
@@ -55,7 +68,7 @@ class _DescStat:
 
     """
 
-    def __init__(self, df: pd.DataFrame, col_data: list = None):
+    def __init__(self, df, col_data=None):
         """Initialize."""
         print("\tInitializing _DescStat")
         self.df = df
@@ -563,6 +576,14 @@ class Visit1Stats(_DescStat):
 
     Inherits _DescStat.
 
+    Parameters
+    ----------
+    csv_path : path
+        Location of cleaned survey CSV, requires columns
+        "study_id" and "<survey_name>_*".
+    survey_name : str
+        Short name of survey, found in column names of CSV
+
     Example
     -------
     stat_obj = Visit1Stats("/path/to/AIM.csv", "AIM")
@@ -575,14 +596,6 @@ class Visit1Stats(_DescStat):
         """Initialize.
 
         Triggers construction of survey dataframe.
-
-        Parameters
-        ----------
-        csv_path : path
-            Location of cleaned survey CSV, requires columns
-            "study_id" and "<survey_name>_*".
-        survey_name : str
-            Short name of survey, found in column names of CSV
 
         Raises
         ------
@@ -628,6 +641,23 @@ class Visit23Stats(_DescStat):
 
     Inherits _DescStat.
 
+    Parameters
+    ----------
+    day2_csv_path : path
+        Location of cleaned visit 2 survey CSV, requires columns
+        "study_id" and "<survey_name>_*".
+    day3_csv_path : path
+        Location of cleaned visit 3 survey CSV, requires columns
+        "study_id" and "<survey_name>_*".
+    survey_name : str
+        Short name of survey, found in column names of CSV
+    fac_col : str
+        Column name for writing fac_a|b
+    fac_a : str
+        Value for identifying day2 data
+    fac_b : str
+        Value for identifying day3 data
+
     Example
     -------
     fac_col = "visit"
@@ -655,23 +685,6 @@ class Visit23Stats(_DescStat):
 
         Triggers construction of concatenated survey dataframe, with
         added "visit" column.
-
-        Parameters
-        ----------
-        day2_csv_path : path
-            Location of cleaned visit 2 survey CSV, requires columns
-            "study_id" and "<survey_name>_*".
-        day3_csv_path : path
-            Location of cleaned visit 3 survey CSV, requires columns
-            "study_id" and "<survey_name>_*".
-        survey_name : str
-            Short name of survey, found in column names of CSV
-        fac_col : str
-            Column name for writing fac_a|b
-        fac_a : str
-            Value for identifying day2 data
-        fac_b : str
-            Value for identifying day3 data
 
         Raises
         ------
@@ -734,6 +747,11 @@ class RestRatings(_DescStat):
 
     Inherits _DescStat.
 
+    Parameters
+    ----------
+    proj_dir : path
+        Location of project's experiment directory
+
     Methods
     -------
     write_stats(out_path)
@@ -752,11 +770,6 @@ class RestRatings(_DescStat):
 
         Trigger construction of long-formatted dataframe of
         resting state emotion frequency responses.
-
-        Parameters
-        ----------
-        proj_dir : path
-            Location of project's experiment directory
 
         """
         self._proj_dir = proj_dir
@@ -820,7 +833,7 @@ class RestRatings(_DescStat):
 
         Parameters
         ----------
-        out_path : path
+        out_path : str, os.PathLike
             Output location and name of statistic table
 
         Returns
@@ -844,6 +857,13 @@ class StimRatings(_DescStat):
     responses.
 
     Inherits _DescStat.
+
+    Parameters
+    ----------
+    proj_dir : path
+        Location of project's experiment directory
+    draw_plot : bool
+        Whether to draw figures
 
     Attributes
     ----------
@@ -870,13 +890,6 @@ class StimRatings(_DescStat):
 
         Trigger construction of long-formatted dataframe of
         resting state emotion frequency responses.
-
-        Parameters
-        ----------
-        proj_dir : path
-            Location of project's experiment directory
-        draw_plot : bool
-            Whether to draw figures
 
         Attributes
         ----------
@@ -1079,6 +1092,13 @@ class EmorepTask(_DescStat):
 
     Inherits _DescStat.
 
+    Parameters
+    ----------
+    proj_dir : path
+        Location of project's experiment directory
+    draw_plot : bool
+        Whether to draw figures
+
     Attributes
     ----------
     out_dir : path
@@ -1104,13 +1124,6 @@ class EmorepTask(_DescStat):
 
         Find all participant BIDS events files, trigger construction
         of dataframe from events files.
-
-        Parameters
-        ----------
-        proj_dir : path
-            Location of project's experiment directory
-        draw_plot : bool
-            Whether to draw figures
 
         Attributes
         ----------
