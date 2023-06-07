@@ -135,20 +135,23 @@ class CleanRedcap:
             else:
                 return pd.to_datetime(f"{date_b}-{date_a}-{date_c}").date()
 
-        # Set switch for extra special cases
-        dob_switch = {"October 6 2000": "2000-10-06"}
+        # Set switch for extra special cases, wrong DOB entered
+        dob_switch = {
+            "October 6 2000": "2000-10-06",
+            "2023-01-05": "1987-07-30",
+        }
 
         # Convert each dob free response or redcap datetime
         dob_clean = []
         for dob in dob_list:
-            if "/" in dob or "-" in dob:
+            if dob in dob_switch:
+                dob_clean.append(pd.to_datetime(dob_switch[dob]).date())
+            elif "/" in dob or "-" in dob:
                 dob_clean.append(
                     pd.to_datetime(dob, infer_datetime_format=True).date()
                 )
             elif dob.isnumeric():
                 dob_clean.append(_num_convert(dob))
-            elif dob in dob_switch:
-                dob_clean.append(pd.to_datetime(dob_switch[dob]).date())
             else:
                 raise TypeError(f"Unrecognized datetime str: {dob}.")
         return dob_clean
