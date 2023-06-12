@@ -3,14 +3,9 @@
         "Compliance": [
             "ER0057"
         ],
-        "Interest": [
-            "ER0166"
-        ],
         "Other": [
             "ER0229",
-            "ER0246",
-            "ER0325",
-            "ER0349"
+            "ER0246"
         ]
     },
     "visit2": {
