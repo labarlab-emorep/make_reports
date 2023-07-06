@@ -312,6 +312,7 @@ class DemoAll:
         """
         include_mask = self.final_demo["interview_date"] < close_date
         self.final_demo = self.final_demo.loc[include_mask]
+        self.final_demo = self.final_demo.reset_index(drop=True)
 
 
 class ManagerRegular:
