@@ -138,7 +138,7 @@ class CleanRedcap:
         # Set switch for extra special cases, wrong DOB entered
         dob_switch = {
             "October 6 2000": "2000-10-06",
-            "2023-01-05": "1987-07-30",
+            "2023-01-05": "1998-07-30",
         }
 
         # Convert each dob free response or redcap datetime
