@@ -1,5 +1,8 @@
 {
     "visit1": {
+        "Eligibility": [
+            "ER0620"
+        ],
         "MRI Compatibility": [
             "ER0411"
         ]
