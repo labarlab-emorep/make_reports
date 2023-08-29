@@ -11,6 +11,7 @@ import os
 import json
 import glob
 import datetime
+import math
 import pandas as pd
 import numpy as np
 import matplotlib.pyplot as plt
@@ -194,7 +195,7 @@ class _CalcProp:
 
 
 # %%
-def demographics(proj_dir, final_demo):
+def demographics(proj_dir, final_demo, plot_var="Count"):
     """Check on demographic recruitment.
 
     Currently only supports a subset of total planned demographics.
@@ -211,6 +212,9 @@ def demographics(proj_dir, final_demo):
         Project's experiment directory
     final_demo : make_reports.build_reports.DemoAll.final_demo
         pd.DataFrame, compiled demographic info
+    plot_var : str, optional
+        [Count | Proportion]
+        Whether to plot count or proportion values
 
     Returns
     -------
@@ -249,25 +253,54 @@ def demographics(proj_dir, final_demo):
         var_name="Type",
         value_name="Proportion",
     )
+    df_plot_all["Count"] = [
+        math.ceil(150 * x) for x in df_plot_all["Proportion"]
+    ]
 
     # Draw and save factor scatter plot
-    ax = sns.catplot(
-        data=df_plot_all, x="Group", y="Proportion", hue="Type", jitter=False
-    )
-    ax.set(
-        title="Planned vs Actual Participant Demographics",
-        ylabel="Proportion of Sample",
-        xlabel=None,
-    )
-    ax.set_xticklabels(rotation=30, horizontalalignment="right")
-    out_file = os.path.join(
-        proj_dir,
-        "analyses/metrics_recruit",
-        "plot_scatter_recruit-goals_all.png",
-    )
-    ax.savefig(out_file)
-    print(f"\tWrote : {out_file}")
-    plt.close(ax.fig)
+    if plot_var == "Proportion":
+        ax = sns.catplot(
+            data=df_plot_all,
+            x="Group",
+            y="Proportion",
+            hue="Type",
+            jitter=False,
+        )
+        ax.set(
+            title="Planned vs Actual Participant Demographics",
+            ylabel="Proportion of Sample",
+            xlabel=None,
+        )
+        ax.set_xticklabels(rotation=30, horizontalalignment="right")
+        out_file = os.path.join(
+            proj_dir,
+            "analyses/metrics_recruit",
+            "plot_recruit-all_barplot.png",
+        )
+        ax.savefig(out_file)
+        print(f"\tWrote : {out_file}")
+        plt.close(ax.fig)
+
+    # Plot real numbers
+    if plot_var == "Count":
+        sns.set(rc={"figure.figsize": (12, 8)})
+        ax = sns.barplot(data=df_plot_all, x="Group", y="Count", hue="Type")
+        ax.bar_label(ax.containers[0])
+        ax.bar_label(ax.containers[1])
+        ax.set(
+            title="Planned vs Actual Participant Demographics",
+            ylabel="Sample Count",
+            xlabel=None,
+        )
+        # plt.xticks(rotation=30, horizontalalignment="right")
+        out_file = os.path.join(
+            proj_dir,
+            "analyses/metrics_recruit",
+            "plot_recruit-all_barplot.png",
+        )
+        ax.figure.savefig(out_file)
+        print(f"\tWrote : {out_file}")
+        plt.close(ax.figure)
 
     # Line up two factor querries
     plot_plan_sex = [
@@ -277,9 +310,11 @@ def demographics(proj_dir, final_demo):
         (["sex", "race"], ["Male", "Black or African-American"]),
         (["sex", "ethnicity"], ["Female", "Hispanic or Latino"]),
         (["sex", "ethnicity"], ["Male", "Hispanic or Latino"]),
+        (["sex", "race"], ["Female", "White"]),
+        (["sex", "race"], ["Male", "White"]),
     ]
 
-    # make a two factor dataframe
+    # Make a two factor dataframe
     df_plot_sex = pd.DataFrame(columns=["Sex", "Group", "Type", "Proportion"])
     for h_col, h_val in plot_plan_sex:
         calc_props.get_demo_props(h_col, h_val)
@@ -298,31 +333,86 @@ def demographics(proj_dir, final_demo):
                 drop=True
             )
             del h_dict, h_row
+    df_plot_sex["Count"] = [
+        math.ceil(150 * x) for x in df_plot_sex["Proportion"]
+    ]
 
     # Draw and save plot
-    ax = sns.catplot(
-        data=df_plot_sex,
-        x="Group",
-        y="Proportion",
-        col="Sex",
-        hue="Type",
-        jitter=False,
-        height=4,
-        aspect=0.6,
-    )
-    ax.set(
-        ylabel="Proportion of Sample",
-        xlabel=None,
-    )
-    ax.set_xticklabels(rotation=30, horizontalalignment="right")
-    out_file = os.path.join(
-        proj_dir,
-        "analyses/metrics_recruit",
-        "plot_scatter_recruit-goals_sex.png",
-    )
-    ax.savefig(out_file)
-    print(f"\tWrote : {out_file}")
-    plt.close(ax.fig)
+    if plot_var == "Proportion":
+        ax = sns.catplot(
+            data=df_plot_sex,
+            x="Group",
+            y="Proportion",
+            col="Sex",
+            hue="Type",
+            jitter=False,
+            height=4,
+            aspect=0.6,
+        )
+        ax.set(
+            ylabel="Proportion of Sample",
+            xlabel=None,
+        )
+        ax.set_xticklabels(rotation=30, horizontalalignment="right")
+        out_file = os.path.join(
+            proj_dir,
+            "analyses/metrics_recruit",
+            "plot_recruit-sex_barplot.png",
+        )
+        ax.savefig(out_file)
+        print(f"\tWrote : {out_file}")
+        plt.close(ax.fig)
+
+    # Plot real numbers, for males
+    if plot_var == "Count":
+        sns.set(rc={"figure.figsize": (10, 8)})
+        ax = sns.barplot(
+            data=df_plot_sex.loc[df_plot_sex["Sex"] == "Male"],
+            x="Group",
+            y="Count",
+            hue="Type",
+        )
+        ax.bar_label(ax.containers[0])
+        ax.bar_label(ax.containers[1])
+        ax.set(
+            title="Planned vs Actual Participant Demographics, Male",
+            ylabel="Sample Count",
+            xlabel=None,
+        )
+        # plt.xticks(rotation=30, horizontalalignment="right")
+        out_file = os.path.join(
+            proj_dir,
+            "analyses/metrics_recruit",
+            "plot_recruit-male_barplot.png",
+        )
+        ax.figure.savefig(out_file)
+        print(f"\tWrote : {out_file}")
+        plt.close(ax.figure)
+
+        # Plot real numbers, for females
+        ax = sns.barplot(
+            data=df_plot_sex.loc[df_plot_sex["Sex"] == "Female"],
+            x="Group",
+            y="Count",
+            hue="Type",
+        )
+        ax.bar_label(ax.containers[0])
+        ax.bar_label(ax.containers[1])
+        ax.set(
+            title="Planned vs Actual Participant Demographics, Female",
+            ylabel="Sample Count",
+            xlabel=None,
+        )
+        # plt.xticks(rotation=30, horizontalalignment="right")
+        out_file = os.path.join(
+            proj_dir,
+            "analyses/metrics_recruit",
+            "plot_recruit-female_barplot.png",
+        )
+        ax.figure.savefig(out_file)
+        print(f"\tWrote : {out_file}")
+        plt.close(ax.figure)
+
     return {"one_factor": df_plot_all, "two_factor": df_plot_sex}
 
 
