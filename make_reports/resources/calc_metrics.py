@@ -441,7 +441,7 @@ def scan_pace(redcap_token, proj_dir):
 
     """
     # Get data, ready for weekly totals
-    df_log = survey_download.download_mri_log(redcap_token)
+    df_log = survey_download.dl_mri_log(redcap_token)
     df_log["datetime"] = df_log["datetime"] - pd.to_timedelta(7, unit="d")
     df_log["count"] = 1
 
@@ -738,12 +738,12 @@ class ParticipantFlow:
 
     def _get_recruit(self) -> int:
         """Determine number of participants recruited."""
-        df_pre = survey_download.download_prescreening(self._rc_token)
+        df_pre = survey_download.dl_prescreening(self._rc_token)
         return df_pre.shape[0]
 
     def _dl_compl(self) -> pd.DataFrame:
         """Return completion log of enrolled participants."""
-        df_compl = survey_download.download_completion_log(self._rc_token)
+        df_compl = survey_download.dl_completion_log(self._rc_token)
         df_compl = df_compl.loc[
             (df_compl["day_1_fully_completed"] == 1.0)
             | (

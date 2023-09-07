@@ -288,14 +288,14 @@ def pilot_list() -> list:
 
 
 def redcap_dict() -> dict:
-    """Return a dict of RedCap surveys."""
+    """Return dict of RedCap survey-directory mappings."""
     # Key : RedCap dataframe, matches reference_files.report_keys_redcap.json
-    # Value : output parent directory name
+    # Value : output parent directory name, False to avoid writing
     return {
-        "demographics": "redcap_demographics",
-        "consent_pilot": "redcap_demographics",
-        "consent_v1.22": "redcap_demographics",
-        "guid": "redcap_demographics",
+        "demographics": False,
+        "consent_pilot": False,
+        "consent_v1.22": False,
+        "guid": "redcap",
         "bdi_day2": "visit_day2",
         "bdi_day3": "visit_day3",
     }
