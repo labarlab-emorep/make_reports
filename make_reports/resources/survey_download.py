@@ -237,7 +237,7 @@ def dl_qualtrics(proj_dir, qualtrics_token, survey_name=None):
     report_org, report_keys = _dl_info("qualtrics", survey_name)
     datacenter_id = report_keys["datacenter_ID"]
 
-    # Download, retuurn, and write desired Qualtrics surveys
+    # Download, return, and write desired Qualtrics surveys
     out_dict = {}
     for sur_name, dir_name in report_org.items():
         post_labels = (

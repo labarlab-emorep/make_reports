@@ -141,7 +141,7 @@ def pull_qualtrics_data(
         request_check_progress = request_check_response.json()["result"][
             "percentComplete"
         ]
-        print(f"\tDownload is {request_check_progress} complete")
+        print(f"\tDownload is {round(request_check_progress, 2)} complete")
         progress_status = request_check_response.json()["result"]["status"]
 
     # Check for export error

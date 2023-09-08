@@ -5,13 +5,13 @@ resting task data from the scanner. Split omnibus dataframes into
 survey-specific dataframes, clean, and organize according
 to the EmoRep scheme.
 
-CleanSurveys : organize, split, and clean survey responses into
+GetSurveys : organize, split, and clean survey responses into
                 separate dataframes
 
 """
 # %%
 import os
-from typing import Union
+from typing import Union, Tuple
 import pandas as pd
 from make_reports.resources import survey_download
 from make_reports.resources import survey_clean
@@ -46,7 +46,16 @@ class _GetRedcap(survey_clean.CleanRedcap):
     """
 
     def _download_redcap(self) -> dict:
-        """Get, write, and return RedCap survey info."""
+        """Get, write, and return RedCap survey info.
+
+        Returns
+        -------
+        dict
+            {survey_name: (str|bool, pd.DataFrame)}, e.g.
+            {"bdi_day2": ("visit_day2", pd.DataFrame)}
+            {"demographics": (False, pd.DataFrame)}
+
+        """
         raw_redcap = survey_download.dl_redcap(
             self._proj_dir, self._redcap_token
         )
@@ -77,7 +86,7 @@ class _GetRedcap(survey_clean.CleanRedcap):
             {pilot|study: {visit: {survey_name: pd.DataFrame}}}
 
         """
-        #
+        # Download and write raw data
         raw_redcap = self._download_redcap()
 
         # Align survey name with survey_clean.CleanRedcap method, visit
@@ -90,16 +99,18 @@ class _GetRedcap(survey_clean.CleanRedcap):
             "bdi_day3": ["clean_bdi_day23", "visit_day3"],
         }
 
-        #
+        # Clean each survey and build clean_redcap attr
         self.clean_redcap = {"pilot": {}, "study": {}}
         for sur_name in raw_redcap:
             visit = clean_map[sur_name][1]
             dir_name, self._df_raw = raw_redcap[sur_name]
 
-            #
+            # Find and execute appropriate clean method
             print(f"\tCleaning RedCap survey : {sur_name}")
             clean_method = getattr(self, clean_map[sur_name][0])
             clean_method()
+
+            # Update clean_redcap
             if visit not in self.clean_redcap["study"].keys():
                 self.clean_redcap["pilot"][visit] = {sur_name: self.df_pilot}
                 self.clean_redcap["study"][visit] = {sur_name: self.df_study}
@@ -107,7 +118,7 @@ class _GetRedcap(survey_clean.CleanRedcap):
                 self.clean_redcap["pilot"][visit][sur_name] = self.df_pilot
                 self.clean_redcap["study"][visit][sur_name] = self.df_study
 
-            #
+            # Avoid writing PHI to disk
             if dir_name:
                 self._write_redcap(self.df_study, sur_name, dir_name, False)
                 self._write_redcap(self.df_pilot, sur_name, dir_name, True)
@@ -115,7 +126,7 @@ class _GetRedcap(survey_clean.CleanRedcap):
     def _write_redcap(
         self, df: pd.DataFrame, sur_name: str, dir_name: str, is_pilot: bool
     ):
-        """Title."""
+        """Determine output path and write dataframe."""
         out_name = "BDI" if "bdi" in sur_name else sur_name
         out_dir = "data_pilot/data_survey" if is_pilot else "data_survey"
         out_file = os.path.join(
@@ -128,20 +139,38 @@ class _GetRedcap(survey_clean.CleanRedcap):
 
 
 class _GetQualtrics(survey_clean.CleanQualtrics):
-    """Title.
+    """Download and clean Qualtrics surveys.
 
     Inherits survey_clean.CleanQualtrics. Intended to be inherited
     by GetSurveys, references attrs set in child.
 
+    Download Qualtrics data and coordinate cleaning methods. Write both
+    raw and cleaned dataframes to disk.
+
+    Methods
+    -------
+    manage_qualtrics()
+        Coordinate download and cleaning,
+        builds attr clean_qualtrics
+
     """
 
     def _download_qualtrics(self):
-        """Title."""
+        """Get, write, and return Qualtrics survey info.
+
+        Returns
+        -------
+        dict
+            {survey_name: (visit, pd.DataFrame)}, e.g.
+            {"Session 2 & 3 Survey_latest": ("visit_day23", pd.DataFrame)}
+
+        """
         raw_qualtrics = survey_download.dl_qualtrics(
             self._proj_dir, self._qualtrics_token
         )
 
-        #
+        # Coordinate writing to disk -- write session2&3 surveys to
+        # visit_day2 to avoid duplication.
         for sur_name in raw_qualtrics:
             dir_name, df = raw_qualtrics[sur_name]
             visit = "visit_day2" if dir_name == "visit_day23" else dir_name
@@ -152,7 +181,10 @@ class _GetQualtrics(survey_clean.CleanQualtrics):
         return raw_qualtrics
 
     def manage_qualtrics(self):
-        """Title.
+        """Get and clean Qualtrics survey info.
+
+        Coordinate Qualtrics survey download, then match survey to cleaning
+        method. Write raw and cleaned dataframes to disk.
 
         Attributes
         ----------
@@ -160,8 +192,10 @@ class _GetQualtrics(survey_clean.CleanQualtrics):
             {pilot|study: {visit: {survey_name: pd.DataFrame}}}
 
         """
+        # Download and write raw survey data
         raw_qualtrics = self._download_qualtrics()
 
+        # Map survey name to survey_clean.CleanQualtrics method
         clean_map = {
             "EmoRep_Session_1": "clean_session_1",
             "Session 2 & 3 Survey": "clean_session_23",
@@ -169,44 +203,52 @@ class _GetQualtrics(survey_clean.CleanQualtrics):
             + "fMRI Study": "clean_postscan_ratings",
         }
 
-        #
+        # Clean surveys and build clean_qualtrics attr
         self.clean_qualtrics = {"pilot": {}, "study": {}}
         for omni_name in raw_qualtrics:
-            self._dir_name, self._df_raw = raw_qualtrics[omni_name]
+            _, self._df_raw = raw_qualtrics[omni_name]
 
-            #
+            # Trigger relevant cleaning method
             clean_method = getattr(self, clean_map[omni_name])
             clean_method()
             self._unpack_qualtrics()
 
     def _unpack_qualtrics(self):
-        """Organized cleaned qualtrics data, trigger writing."""
+        """Organize cleaned qualtrics data, trigger writing."""
         for data_type in self.clean_qualtrics.keys():
             is_pilot = True if data_type == "pilot" else False
             data_dict = getattr(self, f"data_{data_type}")
             for visit, sur_dict in data_dict.items():
                 for sur_name, df in sur_dict.items():
-                    self.clean_qualtrics[data_type][visit] = {sur_name: df}
-                    self._write_qualtrics(df, sur_name, is_pilot)
+                    if visit not in self.clean_qualtrics[data_type].keys():
+                        self.clean_qualtrics[data_type][visit] = {sur_name: df}
+                    else:
+                        self.clean_qualtrics[data_type][visit][sur_name] = df
+                    self._write_qualtrics(df, sur_name, visit, is_pilot)
 
     def _write_qualtrics(
-        self, df: pd.DataFrame, sur_name: str, is_pilot: bool
+        self, df: pd.DataFrame, sur_name: str, visit: str, is_pilot: bool
     ):
-        """Title."""
+        """Determine output path and write dataframe."""
         out_dir = "data_pilot/data_survey" if is_pilot else "data_survey"
         out_file = os.path.join(
             self._proj_dir,
             out_dir,
-            self._dir_name,
+            visit,
             f"df_{sur_name}.csv",
         )
         _write_dfs(df, out_file)
 
 
 class GetSurveys(_GetRedcap, _GetQualtrics):
-    """Title
+    """Download and clean survey data.
 
     Inherits _GetRedcap and _GetQualtrics.
+
+    Download and clean RedCap and Qualtrics survey data, aggregate
+    all rest ratings. Appropriate cleaned and raw dataframes are
+    written to disk, and all cleaned surveys available at each
+    method's respective attribute.
 
     Parameters
     ----------
@@ -257,7 +299,10 @@ class GetSurveys(_GetRedcap, _GetQualtrics):
         self._withdrew_list = part_comp.all
 
     def get_redcap(self, redcap_token):
-        """Title.
+        """Download and clean RedCap survey info.
+
+        Raw and clean dataframes without PHI are written to disk,
+        all cleaned surveys available in clean_redcap attr.
 
         Parameters
         ----------
@@ -274,7 +319,10 @@ class GetSurveys(_GetRedcap, _GetQualtrics):
         self.manage_redcap()
 
     def get_qualtrics(self, qualtrics_token):
-        """Title.
+        """Download and clean Qualtrics survey info.
+
+        Raw and clean dataframes are written to disk, all cleaned
+        surveys available in clean_qualtrics attr.
 
         Parameters
         ----------
@@ -293,9 +341,12 @@ class GetSurveys(_GetRedcap, _GetQualtrics):
     def get_rest(self):
         """Coordinate cleaning of rest ratings survey.
 
+        Cleaned surveys are written to disk and are available
+        in clean_rest attr.
+
         Attributes
         ----------
-        clean_qualtrics : dict
+        clean_rest : dict
             {pilot|study: {visit: {"rest_ratings": pd.DataFrame}}}
 
         """
@@ -304,21 +355,11 @@ class GetSurveys(_GetRedcap, _GetQualtrics):
         # Aggregate rest ratings, for each session day
         self.clean_rest = {"pilot": {}, "study": {}}
         for data_type in self.clean_rest.keys():
-            if data_type == "pilot":
-                raw_dir = os.path.join(
-                    self._proj_dir, "data_pilot/data_scanner_BIDS/rawdata"
-                )
-                out_dir = os.path.join(
-                    self._proj_dir, "data_pilot/data_survey"
-                )
-            else:
-                raw_dir = os.path.join(
-                    self._proj_dir, "data_scanner_BIDS/rawdata"
-                )
-                out_dir = os.path.join(self._proj_dir, "data_survey")
-
+            raw_dir, out_dir = self._rest_paths(data_type)
             for day in ["day2", "day3"]:
                 df_sess = survey_clean.clean_rest_ratings(day, raw_dir)
+
+                # Build clean_rest attr, write out df
                 self.clean_rest[data_type][f"visit_{day}"] = {
                     "rest_ratings": df_sess
                 }
@@ -327,3 +368,15 @@ class GetSurveys(_GetRedcap, _GetQualtrics):
                     f"visit_{day}/df_rest-ratings.csv",
                 )
                 _write_dfs(df_sess, out_file)
+
+    def _rest_paths(self, data_type: str) -> Tuple:
+        """Return paths to rawdata, output directory."""
+        if data_type == "pilot":
+            raw_dir = os.path.join(
+                self._proj_dir, "data_pilot/data_scanner_BIDS/rawdata"
+            )
+            out_dir = os.path.join(self._proj_dir, "data_pilot/data_survey")
+        else:
+            raw_dir = os.path.join(self._proj_dir, "data_scanner_BIDS/rawdata")
+            out_dir = os.path.join(self._proj_dir, "data_survey")
+        return (raw_dir, out_dir)
