@@ -204,7 +204,7 @@ def dl_redcap(proj_dir, redcap_token, survey_name=None):
     for sur_name, dir_name in report_org.items():
 
         # Get survey
-        print(f"\t Downloading RedCap survey : {sur_name}")
+        print(f"\tDownloading RedCap survey : {sur_name}")
         report_id = report_keys[sur_name]
         df = report_helper.pull_redcap_data(redcap_token, report_id)
         out_dict[sur_name] = (dir_name, df)

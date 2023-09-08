@@ -29,10 +29,19 @@ def _write_dfs(df: pd.DataFrame, out_file: Union[str, os.PathLike]):
 
 
 class _GetRedcap(survey_clean.CleanRedcap):
-    """Title.
+    """Download and clean RedCap surveys.
 
     Inherits survey_clean.CleanRedcap. Intended to be inherited
     by GetSurveys, references attrs set in child.
+
+    Download RedCap data and coordinate cleaning methods. Write both
+    raw and cleaned dataframes to disk, except for reports containing PHI.
+
+    Methods
+    -------
+    manage_redcap()
+        Coordinate download and cleaning,
+        builds attr clean_redcap
 
     """
 
@@ -88,10 +97,15 @@ class _GetRedcap(survey_clean.CleanRedcap):
             dir_name, self._df_raw = raw_redcap[sur_name]
 
             #
+            print(f"\tCleaning RedCap survey : {sur_name}")
             clean_method = getattr(self, clean_map[sur_name][0])
             clean_method()
-            self.clean_redcap["pilot"][visit] = {sur_name: self.df_pilot}
-            self.clean_redcap["study"][visit] = {sur_name: self.df_study}
+            if visit not in self.clean_redcap["study"].keys():
+                self.clean_redcap["pilot"][visit] = {sur_name: self.df_pilot}
+                self.clean_redcap["study"][visit] = {sur_name: self.df_study}
+            else:
+                self.clean_redcap["pilot"][visit][sur_name] = self.df_pilot
+                self.clean_redcap["study"][visit][sur_name] = self.df_study
 
             #
             if dir_name:
