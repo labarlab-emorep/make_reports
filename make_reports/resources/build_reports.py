@@ -12,14 +12,14 @@ import distutils.spawn
 import pandas as pd
 import numpy as np
 from datetime import datetime
-from make_reports.workflows import manage_data
+from make_reports.resources import manage_data
 from make_reports.resources import report_helper
 
 
-class DemoAll(manage_data.GetSurveys):
+class DemoAll(manage_data.GetRedcap):
     """Gather demographic information from RedCap surveys.
 
-    Inherits manage_data.GetSurveys.
+    Inherits manage_data.GetRedcap.
 
     Only includes participants who have signed the consent form,
     have an assigned GUID, and have completed the demographic
@@ -57,8 +57,7 @@ class DemoAll(manage_data.GetSurveys):
     def __init__(self, proj_dir, redcap_token):
         """Initialize, build final_demo."""
         print("Initializing DemoAll")
-        super().__init__(proj_dir)
-        self._redcap_token = redcap_token
+        super().__init__(proj_dir, redcap_token)
         self._get_demo()
 
         # Generate final_demo
@@ -67,8 +66,15 @@ class DemoAll(manage_data.GetSurveys):
 
     def _get_demo(self):
         """Get required pilot and study dataframes."""
-        # Download and clean RedCap surveys
-        self.get_redcap(self._redcap_token)
+        # Download and clean relevant RedCap surveys
+        self.get_redcap(
+            survey_list=[
+                "guid",
+                "demographics",
+                "consent_pilot",
+                "consent_v1.22",
+            ]
+        )
 
         # Extract and merge relevant pilot/study dfs
         df_cons_orig = self._get_pilot_study("visit_day1", "consent_pilot")

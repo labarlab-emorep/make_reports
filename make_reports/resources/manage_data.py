@@ -28,7 +28,7 @@ def _write_dfs(df: pd.DataFrame, out_file: Union[str, os.PathLike]):
     print(f"\tWrote : {out_file}")
 
 
-class _GetRedcap(survey_clean.CleanRedcap):
+class GetRedcap(survey_clean.CleanRedcap):
     """Download and clean RedCap surveys.
 
     Inherits survey_clean.CleanRedcap. Intended to be inherited
@@ -45,7 +45,13 @@ class _GetRedcap(survey_clean.CleanRedcap):
 
     """
 
-    def _download_redcap(self) -> dict:
+    def __init__(self, proj_dir, redcap_token):
+        """Initialize."""
+        self._proj_dir = proj_dir
+        self._pilot_list = report_helper.pilot_list()
+        self._redcap_token = redcap_token
+
+    def _download_redcap(self, survey_list) -> dict:
         """Get, write, and return RedCap survey info.
 
         Returns
@@ -57,7 +63,7 @@ class _GetRedcap(survey_clean.CleanRedcap):
 
         """
         raw_redcap = survey_download.dl_redcap(
-            self._proj_dir, self._redcap_token
+            self._proj_dir, self._redcap_token, survey_list
         )
 
         # Write rawdata to csv, skip writing PHI
@@ -74,11 +80,14 @@ class _GetRedcap(survey_clean.CleanRedcap):
             _write_dfs(df, out_file)
         return raw_redcap
 
-    def manage_redcap(self):
+    def get_redcap(self, survey_list=None):
         """Get and clean RedCap survey info.
 
         Coordinate RedCap survey download, then match survey to cleaning
         method. Write certain raw and cleaned dataframes to disk.
+
+        Parameters
+        ----------
 
         Attributes
         ----------
@@ -86,9 +95,6 @@ class _GetRedcap(survey_clean.CleanRedcap):
             {pilot|study: {visit: {survey_name: pd.DataFrame}}}
 
         """
-        # Download and write raw data
-        raw_redcap = self._download_redcap()
-
         # Align survey name with survey_clean.CleanRedcap method, visit
         clean_map = {
             "demographics": ["clean_demographics", "visit_day1"],
@@ -98,6 +104,10 @@ class _GetRedcap(survey_clean.CleanRedcap):
             "bdi_day2": ["clean_bdi_day23", "visit_day2"],
             "bdi_day3": ["clean_bdi_day23", "visit_day3"],
         }
+
+        # Download and write raw data
+        sur_list = list(clean_map.keys()) if not survey_list else survey_list
+        raw_redcap = self._download_redcap(sur_list)
 
         # Clean each survey and build clean_redcap attr
         self.clean_redcap = {"pilot": {}, "study": {}}
@@ -138,11 +148,10 @@ class _GetRedcap(survey_clean.CleanRedcap):
         _write_dfs(df, out_file)
 
 
-class _GetQualtrics(survey_clean.CleanQualtrics):
+class GetQualtrics(survey_clean.CleanQualtrics):
     """Download and clean Qualtrics surveys.
 
-    Inherits survey_clean.CleanQualtrics. Intended to be inherited
-    by GetSurveys, references attrs set in child.
+    Inherits survey_clean.CleanQualtrics.
 
     Download Qualtrics data and coordinate cleaning methods. Write both
     raw and cleaned dataframes to disk.
@@ -154,6 +163,15 @@ class _GetQualtrics(survey_clean.CleanQualtrics):
         builds attr clean_qualtrics
 
     """
+
+    def __init__(self, proj_dir, qualtrics_token):
+        """Initialize."""
+        self._proj_dir = proj_dir
+        self._pilot_list = report_helper.pilot_list()
+        self._qualtrics_token = qualtrics_token
+        part_comp = report_helper.ParticipantComplete()
+        part_comp.status_change("withdrew")
+        self._withdrew_list = part_comp.all
 
     def _download_qualtrics(self):
         """Get, write, and return Qualtrics survey info.
@@ -180,7 +198,7 @@ class _GetQualtrics(survey_clean.CleanQualtrics):
             _write_dfs(df, out_file)
         return raw_qualtrics
 
-    def manage_qualtrics(self):
+    def get_qualtrics(self):
         """Get and clean Qualtrics survey info.
 
         Coordinate Qualtrics survey download, then match survey to cleaning
@@ -240,15 +258,10 @@ class _GetQualtrics(survey_clean.CleanQualtrics):
         _write_dfs(df, out_file)
 
 
-class GetSurveys(_GetRedcap, _GetQualtrics):
+class GetRest:
     """Download and clean survey data.
 
-    Inherits _GetRedcap and _GetQualtrics.
 
-    Download and clean RedCap and Qualtrics survey data, aggregate
-    all rest ratings. Appropriate cleaned and raw dataframes are
-    written to disk, and all cleaned surveys available at each
-    method's respective attribute.
 
     Parameters
     ----------
@@ -257,38 +270,17 @@ class GetSurveys(_GetRedcap, _GetQualtrics):
 
     Attributes
     ----------
-    clean_redcap : dict
-        All cleaned RedCap survey data
-        {pilot|study: {visit: {survey_name: pd.DataFrame}}}
-    clean_qualtrics : dict
-        All cleaned Qualtrics survey data
-        {pilot|study: {visit: {survey_name: pd.DataFrame}}}
     clean_rest : dict
         All cleaned rest ratings
         {pilot|study: {visit: {"rest_ratings": pd.DataFrame}}}
 
     Methods
     -------
-    get_redcap(redcap_token)
-        Download and clean all RedCap surveys, write certain to disk,
-        generates clean_redcap.
-    get_qualtrics(qualtrics_token)
-        Download, clean, and write Qualtrics surveys to disk, generates
-        clean_qualtrics.
-    get_rest()
-        Aggregate and clean rest ratings, write to disk, generates
-        clean_rest.
+
 
     Example
     -------
-    get_sur = GetSurveys("/path/to/project/dir")
-    get_sur.get_redcap("token")
-    get_sur.get_qualtrics("token")
-    get_sur.get_rest()
 
-    data_qualtrics = get_sur.clean_qualtrics
-    data_redcap = get_sur.clean_redcap
-    data_rest = get_sur.clean_rest
 
     """
 
@@ -296,50 +288,6 @@ class GetSurveys(_GetRedcap, _GetQualtrics):
         """Initialize."""
         print("Initializing CleanSurveys")
         self._proj_dir = proj_dir
-        self._pilot_list = report_helper.pilot_list()
-        part_comp = report_helper.ParticipantComplete()
-        part_comp.status_change("withdrew")
-        self._withdrew_list = part_comp.all
-
-    def get_redcap(self, redcap_token):
-        """Download and clean RedCap survey info.
-
-        Raw and clean dataframes without PHI are written to disk,
-        all cleaned surveys available in clean_redcap attr.
-
-        Parameters
-        ----------
-        redcap_token : str
-            Personal access token for RedCap
-
-        Attributes
-        ----------
-        clean_redcap : dict
-            {pilot|study: {visit: {survey_name: pd.DataFrame}}}
-
-        """
-        self._redcap_token = redcap_token
-        self.manage_redcap()
-
-    def get_qualtrics(self, qualtrics_token):
-        """Download and clean Qualtrics survey info.
-
-        Raw and clean dataframes are written to disk, all cleaned
-        surveys available in clean_qualtrics attr.
-
-        Parameters
-        ----------
-        qualtrics_token : str
-            Personal access token for Qualtrics
-
-        Attributes
-        ----------
-        clean_qualtrics : dict
-            {pilot|study: {visit: {survey_name: pd.DataFrame}}}
-
-        """
-        self._qualtrics_token = qualtrics_token
-        self.manage_qualtrics()
 
     def get_rest(self):
         """Coordinate cleaning of rest ratings survey.

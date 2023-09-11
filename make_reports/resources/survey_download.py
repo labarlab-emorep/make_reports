@@ -176,7 +176,7 @@ def _dl_info(database, survey_name=None):
     return (report_org, report_keys)
 
 
-def dl_redcap(proj_dir, redcap_token, survey_name=None):
+def dl_redcap(proj_dir, redcap_token, survey_list):
     """Download EmoRep survey data from RedCap.
 
     Parameters
@@ -185,8 +185,8 @@ def dl_redcap(proj_dir, redcap_token, survey_name=None):
         Location of parent directory for project
     redcap_token : str
         API token for RedCap
-    survey_name : str
-        RedCap survey name (optional)
+    survey_list : list
+        RedCap survey names
 
     Returns
     -------
@@ -196,19 +196,25 @@ def dl_redcap(proj_dir, redcap_token, survey_name=None):
         {"demographics": (False, pd.DataFrame)}
 
     """
-    print("\nPulling RedCap surveys ...")
+    #
+    valid_list = [
+        "demographics",
+        "consent_pilot",
+        "consent_v1.22",
+        "guid",
+        "bdi_day2",
+        "bdi_day3",
+    ]
+    for chk in survey_list:
+        if chk not in valid_list:
+            raise ValueError(f"Survey name '{chk}' not valid")
 
-    # Get survey names, keys, directory mapping
-    report_org, report_keys = _dl_info("redcap", survey_name)
+    #
     out_dict = {}
-    for sur_name, dir_name in report_org.items():
-
-        # Get survey
-        print(f"\tDownloading RedCap survey : {sur_name}")
-        report_id = report_keys[sur_name]
-        df = report_helper.pull_redcap_data(redcap_token, report_id)
-        out_dict[sur_name] = (dir_name, df)
-
+    for sur_name in survey_list:
+        rep_org, rep_key = _dl_info("redcap", survey_name=sur_name)
+        df = report_helper.pull_redcap_data(redcap_token, rep_key[sur_name])
+        out_dict[sur_name] = (rep_org[sur_name], df)
     return out_dict
 
 
