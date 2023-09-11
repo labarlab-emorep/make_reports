@@ -23,17 +23,21 @@ from make_reports.resources import report_helper
 
 
 # %%
-class _CalcProp:
+class _CalcProp(build_reports.DemoAll):
     """Calculate planned and actual demographic proportions.
+
+    Inherits build_reports.DemoAll
 
     Actual demographic proportions are derived from REDCap's demographic
     report, and planned demographics have been hardcoded from the grant
     proposal.
 
-    Parameters
+    Paramaters
     ----------
-    final_demo : make_reports.build_reports.DemoAll.final_demo
-        pd.DataFrame, compiled demographic info
+    proj_dir : str, os.PathLike
+        Project's experiment directory
+    redcap_token : str
+        API token for RedCap project
 
     Attributes
     ----------
@@ -44,19 +48,19 @@ class _CalcProp:
 
     Example
     -------
-    final_demo = make_reports.build_reports.DemoAll.final_demo
-    cp_obj = calc_metrics._CalcProp(final_demo)
+    cp_obj = calc_metrics._CalcProp(*args)
     cp_obj.get_demo_props(["sex"], ["Male"])
     actual_proportion = cp_obj.prop_actual
     planned_proportion = cp_obj.prop_plan
 
     """
 
-    def __init__(self, final_demo):
+    def __init__(self, proj_dir, redcap_token):
         """Initialize."""
         print("\tInitializing _CalcProp")
-        self._final_demo = final_demo
-        self._total_rec = final_demo.shape[0]
+        super().__init__(proj_dir, redcap_token)
+        self.remove_withdrawn()
+        self._total_rec = self.final_demo.shape[0]
         self._planned_demo()
 
     def get_demo_props(self, names, values):
@@ -81,8 +85,7 @@ class _CalcProp:
 
         Example
         -------
-        final_demo = make_reports.build_reports.DemoAll.final_demo
-        cp_obj = calc_metrics._CalcProp(final_demo)
+        cp_obj = calc_metrics._CalcProp(*args)
         cp_obj.get_demo_props(["sex"], ["Male"])
         cp_obj.get_demo_props(["sex", "race"], ["Female", "Asian"])
 
@@ -124,8 +127,8 @@ class _CalcProp:
         idx_plan = self._df_plan.index[
             self._df_plan[self._names[0]] == self._values[0]
         ]
-        idx_final = self._final_demo.index[
-            self._final_demo[self._names[0]] == self._values[0]
+        idx_final = self.final_demo.index[
+            self.final_demo[self._names[0]] == self._values[0]
         ].tolist()
         return (idx_plan, idx_final)
 
@@ -135,9 +138,9 @@ class _CalcProp:
             (self._df_plan[self._names[0]] == self._values[0])
             & (self._df_plan[self._names[1]] == self._values[1])
         ]
-        idx_final = self._final_demo.index[
-            (self._final_demo[self._names[0]] == self._values[0])
-            & (self._final_demo[self._names[1]] == self._values[1])
+        idx_final = self.final_demo.index[
+            (self.final_demo[self._names[0]] == self._values[0])
+            & (self.final_demo[self._names[1]] == self._values[1])
         ].tolist()
         return (idx_plan, idx_final)
 
@@ -195,7 +198,7 @@ class _CalcProp:
 
 
 # %%
-def demographics(proj_dir, final_demo, plot_var="Count"):
+def demographics(proj_dir, redcap_token, plot_var="Count", ref_num=150):
     """Check on demographic recruitment.
 
     Currently only supports a subset of total planned demographics.
@@ -210,11 +213,13 @@ def demographics(proj_dir, final_demo, plot_var="Count"):
     ----------
     proj_dir : path
         Project's experiment directory
-    final_demo : make_reports.build_reports.DemoAll.final_demo
-        pd.DataFrame, compiled demographic info
+    redcap_token : str
+        API token for RedCap project
     plot_var : str, optional
         [Count | Proportion]
         Whether to plot count or proportion values
+    ref_num : int, optional
+        Reference denominator
 
     Returns
     -------
@@ -235,7 +240,7 @@ def demographics(proj_dir, final_demo, plot_var="Count"):
 
     # Make a single factor dataframe
     plot_dict = {}
-    calc_props = _CalcProp(final_demo)
+    calc_props = _CalcProp(proj_dir, redcap_token)
     for h_col, h_val in plot_plan_all:
         calc_props.get_demo_props([h_col], [h_val])
         plot_dict[h_val] = {
@@ -254,7 +259,7 @@ def demographics(proj_dir, final_demo, plot_var="Count"):
         value_name="Proportion",
     )
     df_plot_all["Count"] = [
-        math.ceil(150 * x) for x in df_plot_all["Proportion"]
+        math.ceil(ref_num * x) for x in df_plot_all["Proportion"]
     ]
 
     # Draw and save factor scatter plot
@@ -334,7 +339,7 @@ def demographics(proj_dir, final_demo, plot_var="Count"):
             )
             del h_dict, h_row
     df_plot_sex["Count"] = [
-        math.ceil(150 * x) for x in df_plot_sex["Proportion"]
+        math.ceil(ref_num * x) for x in df_plot_sex["Proportion"]
     ]
 
     # Draw and save plot
@@ -601,8 +606,10 @@ def censored_volumes(proj_dir):
 
 
 # %%
-class ParticipantFlow:
+class ParticipantFlow(build_reports.DemoAll, report_helper.AddStatus):
     """Generate PRISMA flowchart of participants in study.
+
+    Inherits build_reports.DemoAll, report_helper.AddStatus.
 
     PRISMA main flow includes recruitment, visits 1-3, and
     final participant numbers. Offshoots include numbers
@@ -631,17 +638,12 @@ class ParticipantFlow:
     def __init__(self, proj_dir, redcap_token):
         """Initialize."""
         print("Initializing ParticipantFlow")
-        self._proj_dir = proj_dir
-        self._rc_token = redcap_token
+        super().__init__(proj_dir, redcap_token)
         self._status_list = ["lost", "excluded", "withdrew", "incomplete"]
 
         # Get record dataframes
         self._df_compl = self._dl_compl()
-        rc_demo = build_reports.DemoAll(self._proj_dir)
-        add_stat = report_helper.AddStatus()
-        self._df_demo = add_stat.enroll_status(
-            rc_demo.final_demo, "src_subject_id"
-        )
+        self._df_demo = self.enroll_status(self.final_demo, "src_subject_id")
 
     def draw_prisma(self):
         """Generate PRISMA flowchart of participants in study.
@@ -738,12 +740,12 @@ class ParticipantFlow:
 
     def _get_recruit(self) -> int:
         """Determine number of participants recruited."""
-        df_pre = survey_download.dl_prescreening(self._rc_token)
+        df_pre = survey_download.dl_prescreening(self._redcap_token)
         return df_pre.shape[0]
 
     def _dl_compl(self) -> pd.DataFrame:
         """Return completion log of enrolled participants."""
-        df_compl = survey_download.dl_completion_log(self._rc_token)
+        df_compl = survey_download.dl_completion_log(self._redcap_token)
         df_compl = df_compl.loc[
             (df_compl["day_1_fully_completed"] == 1.0)
             | (

@@ -5,6 +5,7 @@ resting task data from the scanner. Split omnibus dataframes into
 survey-specific dataframes, clean, and organize according
 to the EmoRep scheme.
 
+TODO
 GetSurveys : organize, split, and clean survey responses into
                 separate dataframes
 
@@ -259,9 +260,7 @@ class GetQualtrics(survey_clean.CleanQualtrics):
 
 
 class GetRest:
-    """Download and clean survey data.
-
-
+    """Aggregate rest-rating survey responses.
 
     Parameters
     ----------
@@ -276,7 +275,8 @@ class GetRest:
 
     Methods
     -------
-
+    get_rest()
+        Get and clean all rest-rating responses
 
     Example
     -------
