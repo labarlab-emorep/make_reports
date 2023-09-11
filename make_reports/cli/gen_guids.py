@@ -5,12 +5,12 @@ of GUIDs using the NDA's guid-tool for linux. Compare generated
 GUIDs to those in RedCap survey.
 
 Generated GUIDs are written to:
-    <proj_dir>/data_survey/redcap_demographics/data_clean/output_guid_*.txt
+    <proj_dir>/data_survey/redcap/output_guid_*.txt
 
-Example
--------
-gen_guids --user-name nmuncy
-gen_guids --user-name nmuncy --find-mismatch
+Examples
+-------_
+gen_guids -n nmuncy -t $PAT_REDCAP_EMOREP
+gen_guids -n nmuncy -t $PAT_REDCAP_EMOREP --find-mismatch
 
 """
 import sys
@@ -50,7 +50,14 @@ def _get_args():
 
     required_args = parser.add_argument_group("Required Arguments")
     required_args.add_argument(
-        "--user-name", type=str, required=True, help="NDA user name"
+        "-n", "--user-name", type=str, required=True, help="NDA user name"
+    )
+    required_args.add_argument(
+        "-t",
+        "--redcap-token",
+        type=str,
+        default=None,
+        help="API token for RedCap project",
     )
 
     if len(sys.argv) <= 1:
@@ -66,6 +73,7 @@ def main():
     proj_dir = args.proj_dir
     user_name = args.user_name
     find_mismatch = args.find_mismatch
+    redcap_token = args.redcap_token
 
     # Get, check for password
     user_pass = getpass(
@@ -84,7 +92,7 @@ def main():
     # Start workflows
     print("\nStarting workflow ...")
     required_reports.generate_guids(
-        proj_dir, user_name, user_pass, find_mismatch
+        proj_dir, user_name, user_pass, find_mismatch, redcap_token
     )
 
 

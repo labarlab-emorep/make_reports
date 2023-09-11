@@ -12,7 +12,7 @@ import glob
 from datetime import datetime
 import pandas as pd
 from make_reports.resources import build_reports
-from make_reports.workflows import manage_data
+from make_reports.resources import manage_data
 
 
 # %%
@@ -199,7 +199,9 @@ def make_ndar_reports(ndar_reports, proj_dir, close_date):
         del rep_obj
 
 
-def generate_guids(proj_dir, user_name, user_pass, find_mismatch):
+def generate_guids(
+    proj_dir, user_name, user_pass, find_mismatch, redcap_token
+):
     """Compile needed demographic info and make GUIDs.
 
     Also supports checking newly generated GUIDs against those entered
@@ -219,27 +221,14 @@ def generate_guids(proj_dir, user_name, user_pass, find_mismatch):
     find_mismatch : bool
         Whether to check for mismatches between REDCap
         and generated GUIDs
-
-    Notes
-    -----
-    Attempts to trigger CleanSurveys.clean_redcap if a cleaned dataframe for
-    demographic info is not detected.
+    redcap_token : str
+        Personal access token for RedCap
 
     """
-    # Check for clean RedCap data, generate if needed
-    chk_demo = os.path.join(
-        proj_dir,
-        "data_survey/redcap_demographics/data_clean",
-        "df_demographics.csv",
-    )
-    if not os.path.exists(chk_demo):
-        print("Missing clean RedCap demographics, cleaning ...")
-        cl_data = manage_data.CleanSurveys(proj_dir)
-        cl_data.clean_redcap()
-        print("\tDone.")
-
     # Trigger build reports class and method, clean intermediate
-    guid_obj = build_reports.GenerateGuids(proj_dir, user_pass, user_name)
+    guid_obj = build_reports.GenerateGuids(
+        proj_dir, user_pass, user_name, redcap_token
+    )
     guid_obj.make_guids()
     os.remove(guid_obj.df_guid_file)
 

@@ -30,7 +30,7 @@ class DemoAll(manage_data.GetRedcap):
     proj_dir : str, os.PathLike
         Project's parent directory
     redcap_token : str
-            Personal access token for RedCap
+        Personal access token for RedCap
 
     Attributes
     ----------
@@ -651,8 +651,10 @@ class ManagerRegular:
         self.df_report.loc[idx_unkn, "Race"] = "Unknown"
 
 
-class GenerateGuids:
+class GenerateGuids(manage_data.GetRedcap):
     """Generate GUIDs for EmoRep.
+
+    Inherits manage_data.GetRedcap.
 
     Use existing RedCap demographic information to produce
     a batch of GUIDs via NDA's guid-tool.
@@ -668,6 +670,8 @@ class GenerateGuids:
         NDA user name
     user_pass : str
         NDA user password
+    redcap_token : str
+        Personal access token for RedCap
 
     Attributes
     ----------
@@ -686,38 +690,22 @@ class GenerateGuids:
 
     """
 
-    def __init__(self, proj_dir, user_pass, user_name):
+    def __init__(self, proj_dir, user_pass, user_name, redcap_token):
         """Setup instance and compile demographic information."""
-        self._proj_dir = proj_dir
+        super().__init__(proj_dir, redcap_token)
         self._user_name = user_name
         self._user_pass = user_pass
         self._get_demo()
 
     def _get_demo(self):
-        """Make a dataframe with fields required by guid-tool.
-
-        Mine cleaned RedCap demographics survey and compile needed
-        fields for the guid-tool.
-
-        Raises
-        ------
-        FileNotFoundError
-            Cleaned RedCap demographic information not found
-
-        """
+        """Make a dataframe with fields required by guid-tool."""
         print("Compiling RedCap demographic info ...")
 
-        # Check for, read-in demographic info
-        chk_demo = os.path.join(
-            self._proj_dir,
-            "data_survey/redcap_demographics/data_clean",
-            "df_demographics.csv",
-        )
-        if not os.path.exists(chk_demo):
-            raise FileNotFoundError(
-                f"Missing expected demographic info : {chk_demo}"
-            )
-        df_demo = pd.read_csv(chk_demo)
+        # Get demographic info
+        self.get_redcap(survey_list=["demographics"])
+        df_demo = self.clean_redcap["study"]["visit_day1"][
+            "demographics"
+        ].copy(deep=True)
 
         # Remap, extract relevant columns
         demo_cols = [
@@ -746,6 +734,7 @@ class GenerateGuids:
         del df_demo
 
         # Split date-of-birth and make needed columns
+        df_guid["dob_datetime"] = df_guid["dob_datetime"].astype(str)
         dt_list = df_guid["dob_datetime"].tolist()
         mob_list = []
         dob_list = []
@@ -769,16 +758,14 @@ class GenerateGuids:
         ] = "No"
 
         # Write out intermediate dataframe
-        # TODO validate required fields
         self.df_guid_file = os.path.join(
             os.path.join(
                 self._proj_dir,
-                "data_survey/redcap_demographics/data_clean",
+                "data_survey/redcap",
                 "tmp_df_for_guid_tool.csv",
             )
         )
         df_guid.to_csv(self.df_guid_file, index=False, na_rep="")
-        self._df_guid = df_guid
 
     def make_guids(self):
         """Generate GUIDs via guid-tool.
@@ -856,16 +843,8 @@ class GenerateGuids:
         print("Comparing RedCap to generated GUIDs ...")
 
         # Get cleaned RedCap GUID survey
-        guid_redcap = os.path.join(
-            self._proj_dir,
-            "data_survey/redcap_demographics/data_clean",
-            "df_guid.csv",
-        )
-        if not os.path.exists(guid_redcap):
-            raise FileNotFoundError(
-                f"Missing required GUID info : {guid_redcap}"
-            )
-        df_guid_rc = pd.read_csv(guid_redcap)
+        self.get_redcap(survey_list=["guid"])
+        df_guid_rc = self.clean_redcap["study"]["visit_day0"]["guid"]
 
         # Get generated GUIDs
         try:
