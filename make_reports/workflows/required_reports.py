@@ -10,13 +10,12 @@ gen_guids : generate or check GUIDs
 import os
 import glob
 from datetime import datetime
-import pandas as pd
 from make_reports.resources import build_reports
 from make_reports.resources import manage_data
 
 
 # %%
-def make_regular_reports(regular_reports, query_date, proj_dir):
+def make_regular_reports(regular_reports, query_date, proj_dir, redcap_token):
     """Make reports for the lab manager.
 
     Coordinate the use of build_reports.ManagerRegular to generate
@@ -31,27 +30,18 @@ def make_regular_reports(regular_reports, query_date, proj_dir):
         Desired report names e.g. ["nih4", "nih12"]
     query_date : str, datetime
         Date for finding report range
-    proj_dir : path
+    proj_dir : str, os.PathLike
         Project's experiment directory
+    redcap_token : str
+        Personal access token for RedCap
 
     Raises
     ------
     ValueError
-        redcap api token not supplied
-        report requested is not found in valid_mr_args
-        query_date occures before 2022-03-31
+        - invalid requested report name
+        - query_date occures before 2022-03-31
 
     """
-    # Check for clean RedCap data, generate if needed
-    redcap_clean = glob.glob(
-        f"{proj_dir}/data_survey/redcap_demographics/data_clean/*.csv"
-    )
-    if len(redcap_clean) != 4:
-        print("No clean data found in RedCap, cleaning ...")
-        cl_data = manage_data.CleanSurveys(proj_dir)
-        cl_data.clean_redcap()
-        print("\tDone.")
-
     # Validate regular_reports arguments
     valid_mr_args = ["nih12", "nih4", "duke3"]
     for report in regular_reports:
@@ -72,25 +62,19 @@ def make_regular_reports(regular_reports, query_date, proj_dir):
     if not os.path.exists(manager_dir):
         os.makedirs(manager_dir)
 
-    # Query RedCap demographic info
-    redcap_demo = build_reports.DemoAll(proj_dir)
-
     # Generate reports
+    make_rep = build_reports.ManagerRegular(query_date, proj_dir, redcap_token)
     for report in regular_reports:
-        mr = build_reports.ManagerRegular(
-            query_date, redcap_demo.final_demo, report
-        )
+        make_rep.make_report(report)
 
         # Setup file name, write csv
-        start_date = mr.range_start.strftime("%Y-%m-%d")
-        end_date = mr.range_end.strftime("%Y-%m-%d")
+        start_date = make_rep.range_start.strftime("%Y-%m-%d")
+        end_date = make_rep.range_end.strftime("%Y-%m-%d")
         out_file = os.path.join(
             manager_dir, f"report_{report}_{start_date}_{end_date}.csv"
         )
-        if isinstance(mr.df_report, pd.DataFrame):
-            print(f"\tWriting : {out_file}")
-            mr.df_report.to_csv(out_file, index=False, na_rep="")
-        del mr
+        print(f"\tWriting : {out_file}")
+        make_rep.df_report.to_csv(out_file, index=False, na_rep="")
 
 
 def make_ndar_reports(ndar_reports, proj_dir, close_date):

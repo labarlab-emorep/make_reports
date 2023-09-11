@@ -44,13 +44,17 @@ class DemoAll(manage_data.GetRedcap):
         Used for regular manager reports and common NDAR fields
     remove_withdrawn()
         Remove participants from final_demo that have withdrawn consent
-    submission_cycle(close_date: datetime)
+    submission_cycle(datetime)
         Remove participants from final_demo after a certain date
 
     Example
     -------
     get_demo = DemoAll("/path/to/proj", "token")
-    df_demo = get_demo.final_demo
+    df_demo_all = get_demo.final_demo
+
+    get_demo.remove_withdrawn()
+    get_demo.submission_cycle(2023-06-31)
+    df_nda = get_demo.final_demo
 
     """
 
@@ -287,8 +291,10 @@ class DemoAll(manage_data.GetRedcap):
         self.final_demo = self.final_demo.reset_index(drop=True)
 
 
-class ManagerRegular:
+class ManagerRegular(DemoAll):
     """Make reports regularly submitted by lab manager.
+
+    Inherits DemoAll.
 
     Query data from the appropriate period for the period, and
     construct a dataframe containing the required information
@@ -298,11 +304,10 @@ class ManagerRegular:
     ----------
     query_date : datetime
         Date for finding report range
-    final_demo : make_reports.build_reports.DemoAll.final_demo
-        pd.DataFrame, compiled demographic info
-    report : str
-        [nih4 | nih12 | duke3]
-        Select desired report
+    proj_dir : str, os.PathLike
+        Project's experiment directory
+    redcap_token : str
+        Personal access token for RedCap
 
     Attributes
     ----------
@@ -315,6 +320,8 @@ class ManagerRegular:
 
     Methods
     -------
+    make_report(report)
+        Entrypoint, trigger appropriate report method
     make_duke3()
         Generate report submitted to Duke every 3 months
     make_nih4()
@@ -322,17 +329,31 @@ class ManagerRegular:
     make_nih12()
         Generate report submitted to NIH every 12 months
 
+    Examples
+    --------
+    make_rep = ManagerRegular(*args)
+    make_rep.make_report("nih12")
+    df_report = make_rep.df_report
+
     """
 
-    def __init__(self, query_date, final_demo, report):
+    def __init__(self, query_date, proj_dir, redcap_token):
         """Generate requested report."""
-        print(f"Buiding manager report : {report} ...")
+        super().__init__(proj_dir, redcap_token)
         self._query_date = query_date
-        self._final_demo = final_demo
 
+    def make_report(self, report):
+        """Generate requested report.
+
+        Parameters
+        ----------
+        report : str
+            [nih4 | nih12 | duke3]
+            Select desired report
+
+        """
         # Trigger appropriate method
-        valid_reports = ["nih12", "nih4", "duke3"]
-        if report not in valid_reports:
+        if report not in ["nih12", "nih4", "duke3"]:
             raise ValueError(f"Inappropriate report requested : {report}")
         report_method = getattr(self, f"make_{report}")
         report_method()
@@ -407,11 +428,11 @@ class ManagerRegular:
 
         # Mask the dataframe for the dates of interest
         range_bool = (
-            self._final_demo["interview_date"] >= self.range_start
-        ) & (self._final_demo["interview_date"] <= self.range_end)
+            self.final_demo["interview_date"] >= self.range_start
+        ) & (self.final_demo["interview_date"] <= self.range_end)
 
         # Subset final_demo according to mask
-        self._df_range = self._final_demo.loc[range_bool]
+        self._df_range = self.final_demo.loc[range_bool].copy(deep=True)
         print(f"\tReport range : {self.range_start} - {self.range_end}")
 
     def make_nih4(self):
