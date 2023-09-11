@@ -12,11 +12,14 @@ import distutils.spawn
 import pandas as pd
 import numpy as np
 from datetime import datetime
+from make_reports.workflows import manage_data
 from make_reports.resources import report_helper
 
 
-class DemoAll:
+class DemoAll(manage_data.GetSurveys):
     """Gather demographic information from RedCap surveys.
+
+    Inherits manage_data.GetSurveys.
 
     Only includes participants who have signed the consent form,
     have an assigned GUID, and have completed the demographic
@@ -26,6 +29,8 @@ class DemoAll:
     ----------
     proj_dir : str, os.PathLike
         Project's parent directory
+    redcap_token : str
+            Personal access token for RedCap
 
     Attributes
     ----------
@@ -42,75 +47,36 @@ class DemoAll:
     submission_cycle(close_date: datetime)
         Remove participants from final_demo after a certain date
 
+    Example
+    -------
+    get_demo = DemoAll("/path/to/proj", "token")
+    df_demo = get_demo.final_demo
+
     """
 
-    def __init__(self, proj_dir):
-        """Read-in data and generate final_demo."""
-        # Read-in pilot, study data and combine dataframes
-        print(
-            "\nBuilding final_demo from RedCap demographic,"
-            + " guid, consent reports ..."
-        )
-        self._proj_dir = proj_dir
-        self._read_data()
+    def __init__(self, proj_dir, redcap_token):
+        """Initialize, build final_demo."""
+        print("Initializing DemoAll")
+        super().__init__(proj_dir)
+        self._redcap_token = redcap_token
+        self._get_demo()
 
         # Generate final_demo
         print("\tCompiling needed demographic info ...")
         self.make_complete()
 
-    def _read_data(self):
-        """Get required pilot and study dataframes.
+    def _get_demo(self):
+        """Get required pilot and study dataframes."""
+        # Download and clean RedCap surveys
+        self.get_redcap(self._redcap_token)
 
-        Attributes
-        ----------
-        df_merge : pd.DataFrame
-            Participant data from consent, demographic, and GUID surveys
+        # Extract and merge relevant pilot/study dfs
+        df_cons_orig = self._get_pilot_study("visit_day1", "consent_pilot")
+        df_cons_new = self._get_pilot_study("visit_day1", "consent_v1.22")
+        df_demo = self._get_pilot_study("visit_day1", "demographics")
+        df_guid = self._get_pilot_study("visit_day0", "guid")
 
-        """
-        # Set key, df mapping
-        map_dict = {
-            "cons_orig": "df_consent_pilot.csv",
-            "cons_new": "df_consent_v1.22.csv",
-            "demo": "df_demographics.csv",
-            "guid": "df_guid.csv",
-        }
-
-        # Read in study reports
-        redcap_clean = os.path.join(
-            self._proj_dir, "data_survey", "redcap_demographics", "data_clean"
-        )
-        clean_dict = {}
-        for h_key, h_df in map_dict.items():
-            clean_dict[h_key] = pd.read_csv(os.path.join(redcap_clean, h_df))
-
-        # Read in pilot reports
-        redcap_pilot = os.path.join(
-            self._proj_dir,
-            "data_pilot/data_survey",
-            "redcap_demographics",
-            "data_clean",
-        )
-        pilot_dict = {}
-        for h_key, h_df in map_dict.items():
-            pilot_dict[h_key] = pd.read_csv(os.path.join(redcap_pilot, h_df))
-
-        # Merge study, pilot dataframes
-        df_cons_orig = pd.concat(
-            [pilot_dict["cons_orig"], clean_dict["cons_orig"]],
-            ignore_index=True,
-        )
-        df_cons_new = pd.concat(
-            [pilot_dict["cons_new"], clean_dict["cons_new"]], ignore_index=True
-        )
-        df_demo = pd.concat(
-            [pilot_dict["demo"], clean_dict["demo"]], ignore_index=True
-        )
-        df_guid = pd.concat(
-            [pilot_dict["guid"], clean_dict["guid"]], ignore_index=True
-        )
-        del pilot_dict, clean_dict
-
-        # Update consent_v1.22 column names from original and merge
+        # Update consent_v1.22 column names from pilot and merge
         cols_new = df_cons_new.columns.tolist()
         cols_orig = df_cons_orig.columns.tolist()
         cols_replace = {}
@@ -120,14 +86,23 @@ class DemoAll:
         df_consent = pd.concat([df_cons_orig, df_cons_new], ignore_index=True)
         df_consent = df_consent.drop_duplicates(subset=["record_id"])
         df_consent = df_consent.sort_values(by=["record_id"])
+        df_consent = df_consent.drop(["date_of_birth"], axis=1)
         del df_cons_new, df_cons_orig
 
         # Merge dataframes, use merge how=inner (default) to keep
         # only participants who have data in all dataframes.
-        df_merge = pd.merge(df_consent, df_guid, on="record_id")
-        df_merge = pd.merge(df_merge, df_demo, on="record_id")
-        self._df_merge = df_merge
-        del df_guid, df_demo, df_consent, df_merge
+        self._df_merge = pd.merge(df_consent, df_guid, on="record_id")
+        self._df_merge = pd.merge(self._df_merge, df_demo, on="record_id")
+
+    def _get_pilot_study(self, visit: str, sur_name: str) -> pd.DataFrame:
+        """Merge study, pilot dataframes."""
+        return pd.concat(
+            [
+                self.clean_redcap["pilot"][visit][sur_name],
+                self.clean_redcap["study"][visit][sur_name],
+            ],
+            ignore_index=True,
+        )
 
     def _get_race(self):
         """Get participant race response.
@@ -238,31 +213,25 @@ class DemoAll:
             regular manager reports.
 
         """
-        # Capture attribute for easy testing
-        df_merge = self._df_merge
-
         # Get GUID, study IDs
-        subj_guid = df_merge["guid"].tolist()
-        subj_study = df_merge["study_id"].tolist()
+        subj_guid = self._df_merge["guid"].tolist()
+        subj_study = self._df_merge["study_id"].tolist()
 
         # Get consent date
-        df_merge["datetime"] = pd.to_datetime(df_merge["date"])
-        df_merge["datetime"] = df_merge["datetime"].dt.date
-        subj_consent_date = df_merge["datetime"].tolist()
+        self._df_merge["datetime"] = pd.to_datetime(self._df_merge["date"])
+        self._df_merge["datetime"] = self._df_merge["datetime"].dt.date
+        subj_consent_date = self._df_merge["datetime"].tolist()
 
         # Get age, sex
-        subj_age = df_merge["age"].tolist()
-        h_sex = df_merge["gender"].tolist()
+        subj_age = self._df_merge["age"].tolist()
+        h_sex = self._df_merge["gender"].tolist()
         sex_switch = {1.0: "Male", 2.0: "Female", 3.0: "Neither"}
         subj_sex = [sex_switch[x] for x in h_sex]
 
         # Get DOB, age in months, education
-        subj_dob = df_merge["dob"]
-        subj_dob_dt = [
-            datetime.strptime(x, "%Y-%m-%d").date() for x in subj_dob
-        ]
-        subj_age_mo = report_helper.calc_age_mo(subj_dob_dt, subj_consent_date)
-        subj_educate = df_merge["years_education"]
+        subj_dob = self._df_merge["dob"]
+        subj_age_mo = report_helper.calc_age_mo(subj_dob, subj_consent_date)
+        subj_educate = self._df_merge["years_education"]
 
         # Get race, ethnicity, minority status
         self._get_race()
@@ -283,9 +252,6 @@ class DemoAll:
             "years_education": subj_educate,
         }
         self.final_demo = pd.DataFrame(out_dict, columns=out_dict.keys())
-        # add_stat = report_helper.AddStatus()
-        # self.final_demo = add_stat.enroll_status(final_demo)
-        del df_merge
 
     def remove_withdrawn(self):
         """Remove participants from final_demo who have withdrawn consent."""

@@ -259,10 +259,13 @@ class GetSurveys(_GetRedcap, _GetQualtrics):
     ----------
     clean_redcap : dict
         All cleaned RedCap survey data
+        {pilot|study: {visit: {survey_name: pd.DataFrame}}}
     clean_qualtrics : dict
         All cleaned Qualtrics survey data
+        {pilot|study: {visit: {survey_name: pd.DataFrame}}}
     clean_rest : dict
         All cleaned rest ratings
+        {pilot|study: {visit: {"rest_ratings": pd.DataFrame}}}
 
     Methods
     -------
