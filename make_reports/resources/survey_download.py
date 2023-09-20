@@ -123,14 +123,14 @@ def dl_prescreening(redcap_token):
     return df_out
 
 
-def _dl_info(database, survey_name=None):
+def _dl_info(database, survey_name):
     """Gather API survey IDs and organization mapping.
 
     Parameters
     ----------
     database : str
         [redcap | qualtrics]
-    survey_name : str, optional
+    survey_name : str
         Individual survey name from database
 
     Returns
@@ -157,14 +157,14 @@ def _dl_info(database, survey_name=None):
     h_map = h_meth()
 
     # Check if survey_name is valid
-    if survey_name and survey_name not in h_map.keys():
+    if survey_name not in h_map.keys():
         raise ValueError(
             f"Survey name {survey_name} was not found in "
             + f"make_reports.report_helper.{database}_dict."
         )
 
     # Determine which surveys to download based on user input
-    report_org = {survey_name: h_map[survey_name]} if survey_name else h_map
+    report_org = {survey_name: h_map[survey_name]}
 
     # Check that surveys have a key
     for h_key in report_org:
@@ -196,7 +196,7 @@ def dl_redcap(proj_dir, redcap_token, survey_list):
         {"demographics": (False, pd.DataFrame)}
 
     """
-    #
+    # Validate survey list
     valid_list = [
         "demographics",
         "consent_pilot",
@@ -209,16 +209,16 @@ def dl_redcap(proj_dir, redcap_token, survey_list):
         if chk not in valid_list:
             raise ValueError(f"Survey name '{chk}' not valid")
 
-    #
+    # Download, return data
     out_dict = {}
     for sur_name in survey_list:
-        rep_org, rep_key = _dl_info("redcap", survey_name=sur_name)
+        rep_org, rep_key = _dl_info("redcap", sur_name)
         df = report_helper.pull_redcap_data(redcap_token, rep_key[sur_name])
         out_dict[sur_name] = (rep_org[sur_name], df)
     return out_dict
 
 
-def dl_qualtrics(proj_dir, qualtrics_token, survey_name=None):
+def dl_qualtrics(proj_dir, qualtrics_token, survey_list):
     """Download EmoRep survey data from Qualtrics.
 
     Parameters
@@ -227,8 +227,8 @@ def dl_qualtrics(proj_dir, qualtrics_token, survey_name=None):
         Location of parent directory for project
     qualtrics_token : str
         API token for Qualtrics
-    survey_name : str, optional
-        Qualtrics survey name
+    survey_name : list
+        Qualtrics survey names
 
     Returns
     -------
@@ -238,20 +238,31 @@ def dl_qualtrics(proj_dir, qualtrics_token, survey_name=None):
 
     """
     print("\nPulling Qualtrics surveys ...")
+    valid_list = [
+        "EmoRep_Session_1",
+        "Session 2 & 3 Survey",
+        "FINAL - EmoRep Stimulus Ratings - fMRI Study",
+    ]
+    for chk in survey_list:
+        if chk not in valid_list:
+            raise ValueError(f"Survey name '{chk}' not valid")
 
     # Get survey names, keys, directory mapping
-    report_org, report_keys = _dl_info("qualtrics", survey_name)
-    datacenter_id = report_keys["datacenter_ID"]
-
-    # Download, return, and write desired Qualtrics surveys
     out_dict = {}
-    for sur_name, dir_name in report_org.items():
+    for sur_name in survey_list:
+
+        # Setup for data pull
+        report_org, report_keys = _dl_info("qualtrics", sur_name)
+        datacenter_id = report_keys["datacenter_ID"]
+        dir_name = report_org[sur_name]
         post_labels = (
             True
             if sur_name == "FINAL - EmoRep Stimulus Ratings - fMRI Study"
             else False
         )
         survey_id = report_keys[sur_name]
+
+        # Get data
         df = report_helper.pull_qualtrics_data(
             sur_name,
             survey_id,
@@ -259,8 +270,6 @@ def dl_qualtrics(proj_dir, qualtrics_token, survey_name=None):
             qualtrics_token,
             post_labels,
         )
-
-        # Account for visit/directory identifier
         if type(dir_name) == list:
             out_dict[sur_name] = ("visit_day23", df)
         else:

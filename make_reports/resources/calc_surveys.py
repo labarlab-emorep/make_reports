@@ -28,8 +28,6 @@ import matplotlib.pyplot as plt
 class _DescStat:
     """Supply statistic and plotting methods.
 
-    Each method supplies their own examples.
-
     Parameters
     ----------
     df : pd.DataFrame

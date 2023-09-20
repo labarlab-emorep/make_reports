@@ -5,9 +5,9 @@ resting task data from the scanner. Split omnibus dataframes into
 survey-specific dataframes, clean, and organize according
 to the EmoRep scheme.
 
-TODO
-GetSurveys : organize, split, and clean survey responses into
-                separate dataframes
+GetRedcap : download, clean, write, and return RedCap report data
+GetQualtrics : download, clean, write, and return Qualtrics survey data
+GetRest : aggregate, clean, write, and return rest rating responses
 
 """
 # %%
@@ -32,17 +32,39 @@ def _write_dfs(df: pd.DataFrame, out_file: Union[str, os.PathLike]):
 class GetRedcap(survey_clean.CleanRedcap):
     """Download and clean RedCap surveys.
 
-    Inherits survey_clean.CleanRedcap. Intended to be inherited
-    by GetSurveys, references attrs set in child.
+    Inherits survey_clean.CleanRedcap.
 
     Download RedCap data and coordinate cleaning methods. Write both
     raw and cleaned dataframes to disk, except for reports containing PHI.
 
+    Parameters
+    ----------
+    proj_dir : str, os.PathLike
+        Location of project parent directory
+    redcap_token : str
+        API token for RedCap
+
+    Attributes
+    ----------
+    clean_redcap : dict
+        All cleaned RedCap reports, organized by pilot/study
+        participant and visit.
+        {pilot|study: {visit: {survey_name: pd.DataFrame}}}
+
     Methods
     -------
-    manage_redcap()
+    get_redcap()
         Coordinate download and cleaning,
         builds attr clean_redcap
+
+    Example
+    -------
+    gr = GetRedcap(*args)
+    gr.get_redcap()
+    rc_dict = gr.clean_redcap
+
+    gr.get_redcap(["bdi_day2", "bdi_day3"])
+    rc_bdi_dict = gr.clean_redcap
 
     """
 
@@ -52,7 +74,7 @@ class GetRedcap(survey_clean.CleanRedcap):
         self._pilot_list = report_helper.pilot_list()
         self._redcap_token = redcap_token
 
-    def _download_redcap(self, survey_list) -> dict:
+    def _download_redcap(self, survey_list: list) -> dict:
         """Get, write, and return RedCap survey info.
 
         Returns
@@ -89,6 +111,9 @@ class GetRedcap(survey_clean.CleanRedcap):
 
         Parameters
         ----------
+        survey_list : list, optional
+            RedCap report names, available names = demographics,
+            consent_pilot, consent_v1.22, guid, bdi_day2, bdi_day3
 
         Attributes
         ----------
@@ -106,9 +131,16 @@ class GetRedcap(survey_clean.CleanRedcap):
             "bdi_day3": ["clean_bdi_day23", "visit_day3"],
         }
 
-        # Download and write raw data
-        sur_list = list(clean_map.keys()) if not survey_list else survey_list
-        raw_redcap = self._download_redcap(sur_list)
+        # Download and write raw data, account for user input
+        if survey_list:
+            for chk_sur in survey_list:
+                if chk_sur not in clean_map.keys():
+                    raise ValueError(
+                        f"Unexpected RedCap report name : {chk_sur}"
+                    )
+        else:
+            survey_list = list(clean_map.keys())
+        raw_redcap = self._download_redcap(survey_list)
 
         # Clean each survey and build clean_redcap attr
         self.clean_redcap = {"pilot": {}, "study": {}}
@@ -121,7 +153,7 @@ class GetRedcap(survey_clean.CleanRedcap):
             clean_method = getattr(self, clean_map[sur_name][0])
             clean_method()
 
-            # Update clean_redcap
+            # Update clean_redcap attr
             if visit not in self.clean_redcap["study"].keys():
                 self.clean_redcap["pilot"][visit] = {sur_name: self.df_pilot}
                 self.clean_redcap["study"][visit] = {sur_name: self.df_study}
@@ -157,11 +189,31 @@ class GetQualtrics(survey_clean.CleanQualtrics):
     Download Qualtrics data and coordinate cleaning methods. Write both
     raw and cleaned dataframes to disk.
 
+    Parameters
+    ----------
+    proj_dir : str, os.PathLike
+        Location of project parent directory
+    qualtrics_token : str
+        API token for Qualtrics
+
+    Attributes
+    ----------
+    clean_qualtrics : dict
+        All cleaned Qualtrics reports, organized by pilot/study
+        participant and visit.
+        {pilot|study: {visit: {survey_name: pd.DataFrame}}}
+
     Methods
     -------
-    manage_qualtrics()
+    get_qualtrics()
         Coordinate download and cleaning,
         builds attr clean_qualtrics
+
+    Example
+    -------
+    gq = GetQualtrics(*args)
+    gq.get_qualtrics()
+    q_dict = gq.clean_qualtrics
 
     """
 
@@ -174,7 +226,7 @@ class GetQualtrics(survey_clean.CleanQualtrics):
         part_comp.status_change("withdrew")
         self._withdrew_list = part_comp.all
 
-    def _download_qualtrics(self):
+    def _download_qualtrics(self, survey_list: list) -> dict:
         """Get, write, and return Qualtrics survey info.
 
         Returns
@@ -185,7 +237,7 @@ class GetQualtrics(survey_clean.CleanQualtrics):
 
         """
         raw_qualtrics = survey_download.dl_qualtrics(
-            self._proj_dir, self._qualtrics_token
+            self._proj_dir, self._qualtrics_token, survey_list
         )
 
         # Coordinate writing to disk -- write session2&3 surveys to
@@ -199,11 +251,17 @@ class GetQualtrics(survey_clean.CleanQualtrics):
             _write_dfs(df, out_file)
         return raw_qualtrics
 
-    def get_qualtrics(self):
+    def get_qualtrics(self, survey_list=None):
         """Get and clean Qualtrics survey info.
 
         Coordinate Qualtrics survey download, then match survey to cleaning
         method. Write raw and cleaned dataframes to disk.
+
+        Parameters
+        ----------
+        survey_list : list, optional
+            RedCap report names, available names = EmoRep_Session_1,
+            Session 2 & 3 Survey, FINAL - EmoRep Stimulus Ratings - fMRI Study
 
         Attributes
         ----------
@@ -211,9 +269,6 @@ class GetQualtrics(survey_clean.CleanQualtrics):
             {pilot|study: {visit: {survey_name: pd.DataFrame}}}
 
         """
-        # Download and write raw survey data
-        raw_qualtrics = self._download_qualtrics()
-
         # Map survey name to survey_clean.CleanQualtrics method
         clean_map = {
             "EmoRep_Session_1": "clean_session_1",
@@ -221,6 +276,17 @@ class GetQualtrics(survey_clean.CleanQualtrics):
             "FINAL - EmoRep Stimulus Ratings - "
             + "fMRI Study": "clean_postscan_ratings",
         }
+
+        # Download and write raw survey data
+        if survey_list:
+            for chk_sur in survey_list:
+                if chk_sur not in clean_map.keys():
+                    raise ValueError(
+                        f"Unexpected Qualtrics report name : {chk_sur}"
+                    )
+        else:
+            survey_list = list(clean_map.keys())
+        raw_qualtrics = self._download_qualtrics(survey_list)
 
         # Clean surveys and build clean_qualtrics attr
         self.clean_qualtrics = {"pilot": {}, "study": {}}
@@ -280,13 +346,14 @@ class GetRest:
 
     Example
     -------
-
+    gr = GetRest(*args)
+    gr.get_rest()
+    rest_dict = gr.clean_rest
 
     """
 
     def __init__(self, proj_dir):
         """Initialize."""
-        print("Initializing CleanSurveys")
         self._proj_dir = proj_dir
 
     def get_rest(self):

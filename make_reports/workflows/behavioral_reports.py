@@ -110,8 +110,8 @@ class CalcRedcapQualtricsStats:
     def match_survey_visits(self):
         """Match surveys with their respective method.
 
-        Identify the appropriate method for each requested
-        survey name and then trigger the method.
+        Entrypoint. Identify the appropriate method for each
+        requested survey name and then trigger the method.
 
         """
 
