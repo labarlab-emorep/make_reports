@@ -154,12 +154,15 @@ class GetRedcap(survey_clean.CleanRedcap):
             clean_method()
 
             # Update clean_redcap attr
+            key_name = (
+                "BDI" if sur_name in ["bdi_day2", "bdi_day3"] else sur_name
+            )
             if visit not in self.clean_redcap["study"].keys():
-                self.clean_redcap["pilot"][visit] = {sur_name: self.df_pilot}
-                self.clean_redcap["study"][visit] = {sur_name: self.df_study}
+                self.clean_redcap["pilot"][visit] = {key_name: self.df_pilot}
+                self.clean_redcap["study"][visit] = {key_name: self.df_study}
             else:
-                self.clean_redcap["pilot"][visit][sur_name] = self.df_pilot
-                self.clean_redcap["study"][visit][sur_name] = self.df_study
+                self.clean_redcap["pilot"][visit][key_name] = self.df_pilot
+                self.clean_redcap["study"][visit][key_name] = self.df_study
 
             # Avoid writing PHI to disk
             if dir_name:
@@ -214,6 +217,9 @@ class GetQualtrics(survey_clean.CleanQualtrics):
     gq = GetQualtrics(*args)
     gq.get_qualtrics()
     q_dict = gq.clean_qualtrics
+
+    gq.get_qualtrics(["EmoRep_Session_1"])
+    q_s1_dict = gq.clean_qualtrics
 
     """
 

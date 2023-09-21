@@ -625,7 +625,7 @@ class CleanQualtrics:
             {visit: {survey_name: pd.DataFrame}}
 
         """
-        print("\tCleaning survey data : post_scan_ratings")
+        print("\tCleaning survey data : post_scan_ratings ...")
 
         # Remove header rows, test IDs, txtFile NaNs, and restarted
         # sessions (Finished=False).
@@ -698,7 +698,7 @@ class CleanQualtrics:
         df_study_day3 = self._df_study[~sess_mask]
 
         # Make ouput attributes, just use df_pilot as filler
-        self.data_clean = {
+        self.data_study = {
             "visit_day2": {"post_scan_ratings": df_study_day2},
             "visit_day3": {"post_scan_ratings": df_study_day3},
         }
@@ -734,8 +734,6 @@ class CleanQualtrics:
 
     def _fill_resp(self, sub, sess, stim_list):
         """Find participant responses and fill dataframe."""
-        print(f"\t\tGetting data for : {sub} {sess} ...")
-
         # Subset df_raw for subject, session data. Remove empty columns.
         df_sub = self._df_raw.loc[
             (self._df_raw["SubID"] == sub)
