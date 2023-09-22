@@ -34,15 +34,25 @@ import pydicom
 from make_reports.resources import report_helper
 
 
+def _drop_subjectkey_nan(df: pd.DataFrame) -> pd.DataFrame:
+    """Replace NaN str and drop empty subjectkey rows."""
+    df = df.replace("NaN", np.nan)
+    return df.dropna(subset=["subjectkey"])
+
+
 class NdarAffim01:
     """Make affim01 report for NDAR submission.
 
     Parameters
     ----------
-    proj_dir : path
+    proj_dir : str, os.PathLike
         Project's experiment directory
     final_demo : make_reports.build_reports.DemoAll.final_demo
         pd.DataFrame, compiled demographic info
+    df_pilot : pd.DataFrame
+        Pilot AIM data
+    df_study : pd.DataFrame
+        Study AIM data
 
     Attributes
     ----------
@@ -58,7 +68,7 @@ class NdarAffim01:
 
     """
 
-    def __init__(self, proj_dir, final_demo):
+    def __init__(self, proj_dir, final_demo, df_pilot, df_study):
         """Read in survey data and make report.
 
         Get cleaned AIM Qualtrics survey from visit_day1, and
@@ -71,30 +81,11 @@ class NdarAffim01:
 
         """
         print("Buiding NDA report : affim01 ...")
-        # Read in template
+        # Read in template, concat dfs
         self.nda_label, self._nda_cols = report_helper.mine_template(
             "affim01_template.csv"
         )
-
-        # Get clean survey data
-        df_pilot = pd.read_csv(
-            os.path.join(
-                proj_dir,
-                "data_pilot/data_survey",
-                "visit_day1/data_clean",
-                "df_AIM.csv",
-            )
-        )
-        df_study = pd.read_csv(
-            os.path.join(
-                proj_dir,
-                "data_survey",
-                "visit_day1/data_clean",
-                "df_AIM.csv",
-            )
-        )
         df_aim = pd.concat([df_pilot, df_study], ignore_index=True)
-        del df_pilot, df_study
 
         # Rename columns, drop NaN rows
         df_aim = df_aim.rename(columns={"study_id": "src_subject_id"})
@@ -103,8 +94,7 @@ class NdarAffim01:
         self._df_aim = df_aim[df_aim["aim_1"].notna()]
 
         # Get final demographics, make report
-        final_demo = final_demo.replace("NaN", np.nan)
-        self._final_demo = final_demo.dropna(subset=["subjectkey"])
+        self._final_demo = _drop_subjectkey_nan(final_demo)
         self.make_aim()
 
     def make_aim(self):
