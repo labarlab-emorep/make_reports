@@ -284,12 +284,12 @@ class MakeNdarReports(_GetData, _BuildArgs):
             "affim01": ["NdarAffim01", "AIM"],
             "als01": ["NdarAls01", "ALS"],
             "bdi01": ["NdarBdi01", "BDI"],
-            "brd01": ["NdarBrd01", None],
+            "brd01": ["NdarBrd01", "post_scan_ratings"],
             "emrq01": ["NdarEmrq01", "ERQ"],
             "image03": ["NdarImage03", None],
             "panas01": ["NdarPanas01", "PANAS"],
             "pswq01": ["NdarPswq01", "PSWQ"],
-            "restsurv01": ["NdarRest01", None],
+            "restsurv01": ["NdarRest01", "rest_ratings"],
             "rrs01": ["NdarRrs01", "RRS"],
             "stai01": ["NdarStai01" "STAI"],
             "tas01": ["NdarTas01", "TAS"],
@@ -318,7 +318,9 @@ class MakeNdarReports(_GetData, _BuildArgs):
     def _build_report(self):
         """Title."""
         # Build class args
-        args = [self._proj_dir, self.df_demo]
+        args = [self.df_demo]
+        if self._report in ["brd01", "image03"]:
+            args = args + [self._proj_dir]
         class_name, df_name = self._nda_switch[self._report]
         if df_name:
             args = args + self.build_args(df_name)

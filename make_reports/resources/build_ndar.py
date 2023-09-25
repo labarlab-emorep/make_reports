@@ -1,5 +1,7 @@
 """Build datsets and data hosts for NDAR uploads.
 
+TODO
+
 Each class is self-contained, requiring only demographic info input. Many
 classes are highly similar and a more generic class structure could have
 done the necessary work for several NDAR reports, but here each report
@@ -49,6 +51,15 @@ class _CleanDemo:
         )
 
 
+def _local_path() -> str:
+    """Return path to local files for ndar upload."""
+    return (
+        "/run/user/1001/gvfs/smb-share:server"
+        + "=ccn-keoki.win.duke.edu,share=experiments2/EmoRep/"
+        + "Exp2_Compute_Emotion/ndar_upload/data_beh"
+    )
+
+
 class NdarAffim01(_CleanDemo):
     """Make affim01 report for NDAR submission.
 
@@ -56,8 +67,6 @@ class NdarAffim01(_CleanDemo):
 
     Parameters
     ----------
-    proj_dir : str, os.PathLike
-        Project's experiment directory
     df_demo : make_reports.build_reports.DemoAll.final_demo
         pd.DataFrame, compiled demographic info
     df_pilot : pd.DataFrame
@@ -79,7 +88,7 @@ class NdarAffim01(_CleanDemo):
 
     """
 
-    def __init__(self, proj_dir, df_demo, df_pilot, df_study):
+    def __init__(self, df_demo, df_pilot, df_study):
         """Read in survey data and make report.
 
         Attributes
@@ -144,8 +153,6 @@ class NdarAls01(_CleanDemo):
 
     Parameters
     ----------
-    proj_dir : path
-        Project's experiment directory
     df_demo : make_reports.build_reports.DemoAll.final_demo
         pd.DataFrame, compiled demographic info
     df_pilot : pd.DataFrame
@@ -167,7 +174,7 @@ class NdarAls01(_CleanDemo):
 
     """
 
-    def __init__(self, proj_dir, df_demo, df_pilot, df_study):
+    def __init__(self, df_demo, df_pilot, df_study):
         """Read in survey data and make report.
 
         Attributes
@@ -270,8 +277,6 @@ class NdarBdi01(_CleanDemo):
 
     Parameters
     ----------
-    proj_dir : path
-        Project's experiment directory
     df_demo : make_reports.build_reports.DemoAll.final_demo
         pd.DataFrame, compiled demographic info
     df_pilot_day2 : pd.DataFrame
@@ -299,7 +304,6 @@ class NdarBdi01(_CleanDemo):
 
     def __init__(
         self,
-        proj_dir,
         df_demo,
         df_pilot_day2,
         df_study_day2,
@@ -318,7 +322,6 @@ class NdarBdi01(_CleanDemo):
         """
         # Get needed column values from report template
         print("Buiding NDA report : bdi01 ...")
-        self._proj_dir = proj_dir
         self._df_demo = df_demo
         self.nda_label, self._nda_cols = report_helper.mine_template(
             "bdi01_template.csv"
@@ -446,15 +449,25 @@ class NdarBdi01(_CleanDemo):
         return df_nda
 
 
-class NdarBrd01:
+class NdarBrd01(_CleanDemo):
     """Make brd01 report for NDAR submission.
+
+    Inherits _CleanDemo.
 
     Parameters
     ----------
-    proj_dir : path
-        Project's experiment directory
     df_demo : make_reports.build_reports.DemoAll.final_demo
         pd.DataFrame, compiled demographic info
+    proj_dir : path
+        Project's experiment directory, unused
+    df_pilot_day2 : pd.DataFrame
+        Pilot post-scan ratings data from ses-day2
+    df_study_day2 : pd.DataFrame
+        Study post-scan ratings data from ses-day2
+    df_pilot_day3 : pd.DataFrame
+        Pilot post-scan ratings data from ses-day3
+    df_study_day3 : pd.DataFrame
+        Study post-scan ratings data from ses-day3
 
     Attributes
     ----------
@@ -470,7 +483,15 @@ class NdarBrd01:
 
     """
 
-    def __init__(self, proj_dir, df_demo):
+    def __init__(
+        self,
+        df_demo,
+        proj_dir,
+        df_pilot_day2,
+        df_study_day2,
+        df_pilot_day3,
+        df_study_day3,
+    ):
         """Read in survey data and make report.
 
         Get finalized demographic information, set orienting
@@ -485,78 +506,27 @@ class NdarBrd01:
             NDA report template label
 
         """
-        # Get needed column values from report template
+        # Get needed column values from report template, start output df
         print("Buiding NDA report : brd01 ...")
+        self._df_demo = df_demo
+        self._proj_dir = proj_dir
         self.nda_label, nda_cols = report_helper.mine_template(
             "brd01_template.csv"
         )
-
-        # Start empty report for filling
         self.df_report = pd.DataFrame(columns=nda_cols)
 
-        # Set helper paths
-        self._proj_dir = proj_dir
-        self._local_path = (
-            "/run/user/1001/gvfs/smb-share:server"
-            + "=ccn-keoki.win.duke.edu,share=experiments2/EmoRep/"
-            + "Exp2_Compute_Emotion/ndar_upload/data_beh"
-        )
-
         # Get final demographics
-        df_demo = df_demo.replace("NaN", np.nan)
-        df_demo["sex"] = df_demo["sex"].replace(
-            ["Male", "Female", "Neither"], ["M", "F", "O"]
-        )
-        self._df_demo = df_demo.dropna(subset=["subjectkey"])
+        self._drop_subjectkey_nan()
+        self._remap_sex()
 
         # Fill df_report for each session
-        self.make_brd("day2")
-        self.make_brd("day3")
+        self.make_brd("day2", df_pilot_day2, df_study_day2)
+        self.make_brd("day3", df_pilot_day3, df_study_day3)
         self.df_report = self.df_report.sort_values(
             by=["src_subject_id", "visit"]
         )
 
-    def _get_subj_demo(self, survey_date, sub):
-        """Gather required participant demographic information.
-
-        Find participant demographic info and calculate age-in-months
-        at time of scan.
-
-        Parameters
-        ----------
-        survey_date : datetime
-            Time survey took place
-        sub : str
-            Subject identifier
-
-        Returns
-        -------
-        dict
-            Keys = brd01 column names
-            Values = demographic info
-
-        """
-        # Identify participant date of birth, sex, and GUID
-        df_demo = self._df_demo
-        idx_subj = df_demo.index[df_demo["src_subject_id"] == sub].tolist()[0]
-        subj_guid = df_demo.iloc[idx_subj]["subjectkey"]
-        subj_id = df_demo.iloc[idx_subj]["src_subject_id"]
-        subj_sex = df_demo.iloc[idx_subj]["sex"]
-        subj_dob = datetime.strptime(df_demo.iloc[idx_subj]["dob"], "%Y-%m-%d")
-
-        # Calculate age in months
-        interview_age = report_helper.calc_age_mo([subj_dob], [survey_date])[0]
-        interview_date = datetime.strftime(survey_date, "%m/%d/%Y")
-
-        return {
-            "subjectkey": subj_guid,
-            "src_subject_id": subj_id,
-            "interview_date": interview_date,
-            "interview_age": interview_age,
-            "sex": subj_sex,
-        }
-
-    def make_brd(self, sess):
+    def make_brd(self, sess, df_pilot, df_study):
         """Make brd01 report for session.
 
         Get Qualtrics survey data for post scan ratings,
@@ -567,6 +537,10 @@ class NdarBrd01:
         sess : str
             [day2 | day3]
             Session identifier
+        df_pilot : pd.DataFrame
+            Pilot post-scan ratings data
+        df_study : pd.DataFrame
+            Study post-scan ratings data
 
         Raises
         ------
@@ -579,27 +553,10 @@ class NdarBrd01:
         if sess not in sess_list:
             raise ValueError(f"Incorrect visit day : {sess}")
 
-        # Get clean survey data
-        df_pilot = pd.read_csv(
-            os.path.join(
-                self._proj_dir,
-                "data_pilot/data_survey",
-                f"visit_{sess}/data_clean",
-                "df_post_scan_ratings.csv",
-            )
-        )
-        df_study = pd.read_csv(
-            os.path.join(
-                self._proj_dir,
-                "data_survey",
-                f"visit_{sess}/data_clean",
-                "df_post_scan_ratings.csv",
-            )
-        )
-
-        # Combine pilot and study data, updated subj id column, set attribute
+        # Combine pilot and study data, updated subj id column
         df_brd = pd.concat([df_pilot, df_study], ignore_index=True)
         df_brd = df_brd.rename(columns={"study_id": "src_subject_id"})
+        df_brd["datetime"] = pd.to_datetime(df_brd["datetime"])
 
         # Setup hosting directory
         host_dir = os.path.join(self._proj_dir, "ndar_upload/data_beh")
@@ -627,17 +584,13 @@ class NdarBrd01:
                 print(f"\tMaking host file : {out_path}")
                 df_sub.to_csv(out_path, index=False, na_rep="")
 
-            # Determine date survey was taken, get demographic info
-            h_date = df_sub.loc[0, "datetime"]
-            survey_date = datetime.strptime(h_date, "%Y-%m-%d")
-            demo_info = self._get_subj_demo(survey_date, sub)
-
             # Set values required by brd01
             brd01_info = {
                 "visit": sess[-1],
-                "data_file1": os.path.join(self._local_path, out_file),
+                "data_file1": os.path.join(_local_path(), out_file),
             }
-            brd01_info.update(demo_info)
+            survey_date = df_sub.loc[0, "datetime"]
+            brd01_info.update(self._get_subj_demo(survey_date, sub))
 
             # Add brd info to report
             new_row = pd.DataFrame(brd01_info, index=[0])
@@ -646,14 +599,52 @@ class NdarBrd01:
             ).reset_index(drop=True)
             del new_row
 
+    def _get_subj_demo(self, survey_date, sub):
+        """Gather required participant demographic information.
+
+        Find participant demographic info and calculate age-in-months
+        at time of scan.
+
+        Parameters
+        ----------
+        survey_date : datetime
+            Time survey took place
+        sub : str
+            Subject identifier
+
+        Returns
+        -------
+        dict
+            Keys = brd01 column names
+            Values = demographic info
+
+        """
+        # Identify participant date of birth, sex, and GUID
+        idx_subj = self._df_demo.index[
+            self._df_demo["src_subject_id"] == sub
+        ].tolist()[0]
+        subj_guid = self._df_demo.iloc[idx_subj]["subjectkey"]
+        subj_id = self._df_demo.iloc[idx_subj]["src_subject_id"]
+        subj_sex = self._df_demo.iloc[idx_subj]["sex"]
+        subj_dob = self._df_demo.iloc[idx_subj]["dob"]
+
+        # Calculate age in months
+        interview_age = report_helper.calc_age_mo([subj_dob], [survey_date])[0]
+        interview_date = datetime.strftime(survey_date, "%m/%d/%Y")
+        return {
+            "subjectkey": subj_guid,
+            "src_subject_id": subj_id,
+            "interview_date": interview_date,
+            "interview_age": interview_age,
+            "sex": subj_sex,
+        }
+
 
 class NdarDemoInfo01:
     """Make demo_info01 report for NDAR submission.
 
     Parameters
     ----------
-    proj_dir : path
-        Project's experiment directory, unused
     df_demo : make_reports.build_reports.DemoAll.final_demo
         pd.DataFrame, compiled demographic info
 
@@ -671,7 +662,7 @@ class NdarDemoInfo01:
 
     """
 
-    def __init__(self, proj_dir, df_demo):
+    def __init__(self, df_demo):
         """Read in demographic info and make report.
 
         Read-in data, setup empty df_report, and coordinate
