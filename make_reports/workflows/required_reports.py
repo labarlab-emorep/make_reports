@@ -106,16 +106,16 @@ class _GetData:
 
         # Get redcap, qualtrics, and rest ratings
         if "bdi01" in self._report_names:
-            self.get_red()
+            self._get_red()
         self._get_qual()
         if "restsurv01" in self._report_names:
             self._get_rest()
 
-    def get_red(self):
+    def _get_red(self):
         """Add RedCap BDI to data_dict."""
         redcap_data = manage_data.GetRedcap(self._proj_dir, self._redcap_token)
         redcap_data.get_redcap(survey_list=["bdi_day2", "bdi_day3"])
-        self._merge_dict(redcap_data.clean_bdi_day23)
+        self._merge_dict(redcap_data.clean_redcap)
 
     def _get_qual(self):
         """Title."""
