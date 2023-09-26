@@ -112,8 +112,9 @@ class GetRedcap(survey_clean.CleanRedcap):
         Parameters
         ----------
         survey_list : list, optional
-            RedCap report names, available names = demographics,
-            consent_pilot, consent_v1.22, guid, bdi_day2, bdi_day3
+            If None, pull all reports. Available report names:
+            demographics, consent_pilot, consent_v1.22, guid,
+            bdi_day2, bdi_day3
 
         Attributes
         ----------

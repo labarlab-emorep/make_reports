@@ -134,23 +134,35 @@ class CleanRedcap:
         """
         # Convert education level to years
         educate_switch = {2: 12, 3: 13, 4: 14, 5: 16, 6: 17, 7: 18, 8: 20}
+        year_str_switch = {
+            "1984": 20,
+            "PhD degree (18 years of school in total)": 18,
+            "Undergraduate Degree": 16,
+        }
 
         # Get education level, and self-report of years educated
         edu_year = self._df_raw["years_education"].tolist()
         edu_level = self._df_raw["level_education"].tolist()
         record_id = self._df_raw["record_id"].tolist()
 
-        # Convert into years (deal with self-reports)
+        # Convert education into years
         subj_educate = []
-        for h_year, h_level, h_id in zip(edu_year, edu_level, record_id):
-            # Patch for 1984 education issue
-            if h_year == "1984":
-                subj_educate.append(educate_switch[8])
+        for _year, _level, _id in zip(edu_year, edu_level, record_id):
+
+            # Patch education level issues, deal with self-reports
+            if _year in year_str_switch.keys():
+                edu_value = year_str_switch[_year]
             else:
                 try:
-                    subj_educate.append(int(h_year))
+                    edu_value = int(_year)
                 except ValueError:
-                    subj_educate.append(educate_switch[h_level])
+                    edu_value = educate_switch[_level]
+
+            # Adjust for self-report years vs education level
+            if edu_value <= 12 and _level >= 3:
+                edu_value = educate_switch[_level]
+
+            subj_educate.append(edu_value)
         return subj_educate
 
     def _clean_city_state(self):
@@ -249,8 +261,13 @@ class CleanRedcap:
         self._df_raw["dob"] = dob_clean
 
         # Fix years of education
-        yrs_edu = self._get_educ_years()
-        self._df_raw["years_education"] = yrs_edu
+        # self._df_raw["years_education"] = self._df_raw[
+        #     "years_education"
+        # ].astype("Int64")
+        # self._df_raw["level_education"] = self._df_raw[
+        #     "level_education"
+        # ].astype("Int64")
+        self._df_raw["years_education"] = self._get_educ_years()
 
         # Fix City, State of birth
         self._clean_city_state()
@@ -270,6 +287,9 @@ class CleanRedcap:
             "middle_name"
         ].astype("str").isin(special_list)
         df_raw.loc[sp_mask, ["middle_name"]] = np.nan
+
+        # Drop participants
+        df_raw = self._drop_subj(df_raw)
 
         # Separate pilot from study data
         pilot_list = [int(x[-1]) for x in self._pilot_list]
@@ -301,6 +321,9 @@ class CleanRedcap:
         )
         df_raw = self._df_raw[self._df_raw[col_drop].notna()]
 
+        # Drop participants
+        df_raw = self._drop_subj(df_raw)
+
         # Separate pilot from study data
         pilot_list = [int(x[-1]) for x in self._pilot_list]
         idx_pilot = df_raw[df_raw["record_id"].isin(pilot_list)].index.tolist()
@@ -326,6 +349,9 @@ class CleanRedcap:
         """
         # Drop rows without guid
         df_raw = self._df_raw[self._df_raw["guid"].notna()]
+
+        # Drop participants
+        df_raw = self._drop_subj(df_raw)
 
         # Separate pilot from study data
         idx_pilot = df_raw[
@@ -364,6 +390,9 @@ class CleanRedcap:
         df_raw = df_raw[df_raw["study_id"].notna()]
         df_raw = df_raw[df_raw["BDI_1"].notna()]
 
+        # Drop participants
+        df_raw = self._drop_subj(df_raw)
+
         # Enforce datetime format
         col_rename = (
             "bdi_visit_2_timestamp"
@@ -395,6 +424,13 @@ class CleanRedcap:
         self.df_pilot = df_raw.loc[idx_pilot]
         self.df_study = df_raw.loc[idx_study]
         self._res_idx()
+
+    def _drop_subj(self, df: pd.DataFrame) -> pd.DataFrame:
+        """Drop certain subjects from dataframe."""
+        drop_list = [80]
+        for subj in drop_list:
+            df = report_helper.drop_participant(subj, df, "record_id")
+        return df
 
 
 class CleanQualtrics:
@@ -466,6 +502,9 @@ class CleanQualtrics:
             {"RecipientLastName": subj_cols[0], "StartDate": subj_cols[1]},
             axis=1,
             inplace=True,
+        )
+        self._df_raw = report_helper.drop_participant(
+            "ER0080", self._df_raw, "study_id"
         )
         col_names = self._df_raw.columns
 
@@ -545,6 +584,9 @@ class CleanQualtrics:
             },
             axis=1,
             inplace=True,
+        )
+        self._df_raw = report_helper.drop_participant(
+            "ER0080", self._df_raw, "study_id"
         )
         col_names = self._df_raw.columns
 
@@ -659,6 +701,9 @@ class CleanQualtrics:
             self._df_raw = self._df_raw.drop(drop_cols, axis=1)
 
         # Extract subject, session, and stimulus type columns
+        self._df_raw = report_helper.drop_participant(
+            "ER0080", self._df_raw, "SubID"
+        )
         sub_list = self._df_raw["SubID"].tolist()
         sess_list = self._df_raw["SessionID"].tolist()
 

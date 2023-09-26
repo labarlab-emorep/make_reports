@@ -24,6 +24,34 @@ import importlib.resources as pkg_resources
 from make_reports import reference_files
 
 
+def drop_participant(subj, df, subj_col):
+    """Drop participant from dataframe.
+
+    Remove a participant row from survey dataframe, for instance
+    ER0080 who reenrolled as ER1002.
+
+    Parameters
+    ----------
+    subj : str
+        ID of participant to remove (rows) from df
+    df : pd.DataFrame
+        Survey dataframe
+    subj_col : str
+        Column name of df containing subject ID
+
+    Returns
+    -------
+    pd.DataFrame
+        Input df with subject rows dropped
+
+    """
+    if subj_col not in df.columns:
+        raise ValueError(f"Expected dataframe to contain column : {subj_col}")
+    df_drop = df.copy()
+    df_drop.drop(df_drop[df_drop[subj_col] == subj].index, inplace=True)
+    return df_drop.reset_index(drop=True)
+
+
 def pull_redcap_data(
     redcap_token, report_id, content="report", return_format="csv"
 ):
