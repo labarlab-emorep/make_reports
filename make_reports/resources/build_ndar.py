@@ -383,8 +383,7 @@ class NdarBdi01(_CleanDemo):
 
         """
         # Check sess value
-        sess_list = ["day2", "day3"]
-        if sess not in sess_list:
+        if sess not in ["day2", "day3"]:
             raise ValueError(f"Incorrect visit day : {sess}")
 
         # Get session data, convert response values to int
@@ -541,8 +540,7 @@ class NdarBrd01(_CleanDemo):
 
         """
         # Check sess value
-        sess_list = ["day2", "day3"]
-        if sess not in sess_list:
+        if sess not in ["day2", "day3"]:
             raise ValueError(f"Incorrect visit day : {sess}")
 
         # Combine pilot and study data, updated subj id column
@@ -1602,8 +1600,10 @@ class NdarImage03:
         return (new_row, phys_exists)
 
 
-class NdarPanas01:
+class NdarPanas01(_CleanDemo):
     """Make panas01 report for NDAR submission.
+
+    Inherits _CleanDemo.
 
     Parameters
     ----------
@@ -1611,12 +1611,8 @@ class NdarPanas01:
         pd.DataFrame, compiled demographic info
     proj_dir : str, os.PathLike
         Project's experiment directory
-    df_pilot_day2 : pd.DataFrame
-        Pilot PANAS data from ses-day2
     df_study_day2 : pd.DataFrame
         Study PANAS data from ses-day2
-    df_pilot_day3 : pd.DataFrame
-        Pilot PANAS data from ses-day3
     df_study_day3 : pd.DataFrame
         Study PANAS data from ses-day3
 
@@ -1638,9 +1634,7 @@ class NdarPanas01:
         self,
         df_demo,
         proj_dir,
-        df_pilot_day2,
         df_study_day2,
-        df_pilot_day3,
         df_study_day3,
     ):
         """Read in survey data and make report.
@@ -1665,16 +1659,19 @@ class NdarPanas01:
             "panas01_template.csv"
         )
 
-        # Get pilot, study data for both day2, day3
+        # Get pilot, organize study data for day2, day3
         df_pilot = self._get_pilot()
-        self._get_clean()
+        self._df_study_day2 = df_study_day2.rename(
+            columns={"study_id": "src_subject_id"}
+        )
+        self._df_study_day3 = df_study_day3.rename(
+            columns={"study_id": "src_subject_id"}
+        )
+        self._df_study_day3.columns = self._df_study_day2.columns.values
 
         # Get final demographics
-        df_demo = df_demo.replace("NaN", np.nan)
-        df_demo["sex"] = df_demo["sex"].replace(
-            ["Male", "Female", "Neither"], ["M", "F", "O"]
-        )
-        self._df_demo = df_demo
+        self._drop_subjectkey_nan()
+        self._remap_sex()
 
         # Make reports for each visit
         df_nda_day2 = self.make_panas("day2")
@@ -1778,48 +1775,6 @@ class NdarPanas01:
         df_pilot["comments_misc"] = "PILOT PARTICIPANT"
         return df_pilot
 
-    def _get_clean(self):
-        """Find and combine cleaned PANAS data.
-
-        Get pilot, study data for day2, day3.
-
-        Attributes
-        ----------
-        _df_panas_day2 : pd.DataFrame
-            Cleaned visit_day2 PANAS Qualtrics survey
-        _df_panas_day3 : pd.DataFrame
-            Cleaned visit_day3 PANAS Qualtrics survey
-
-        """
-        # Get visit_day2 data
-        df_panas_day2 = pd.read_csv(
-            os.path.join(
-                self._proj_dir,
-                "data_survey",
-                "visit_day2/data_clean",
-                "df_PANAS.csv",
-            )
-        )
-        df_panas_day2 = df_panas_day2.rename(
-            columns={"study_id": "src_subject_id"}
-        )
-        self._df_panas_day2 = df_panas_day2
-
-        # Get visit_day3 data
-        df_panas_day3 = pd.read_csv(
-            os.path.join(
-                self._proj_dir,
-                "data_survey",
-                "visit_day3/data_clean",
-                "df_PANAS.csv",
-            )
-        )
-        df_panas_day3 = df_panas_day3.rename(
-            columns={"study_id": "src_subject_id"}
-        )
-        df_panas_day3.columns = df_panas_day2.columns.values
-        self._df_panas_day3 = df_panas_day3
-
     def make_panas(self, sess):
         """Make an NDAR compliant report for visit.
 
@@ -1842,13 +1797,10 @@ class NdarPanas01:
             If sess is not day2 or day3
 
         """
-        # Check sess value
-        sess_list = ["day2", "day3"]
-        if sess not in sess_list:
+        # Check sess value, get data
+        if sess not in ["day2", "day3"]:
             raise ValueError(f"Incorrect visit day : {sess}")
-
-        # Get session data
-        df_panas = getattr(self, f"_df_panas_{sess}")
+        df_panas = getattr(self, f"_df_study_{sess}")
 
         # Convert response values to int, set answer_type
         p_cols = [x for x in df_panas.columns if "PANAS_" in x]
@@ -1878,15 +1830,15 @@ class NdarPanas01:
             "PANAS_19": "jittery_q18",
             "PANAS_20": "afraid_q20",
         }
-        df_panas_remap = df_panas.rename(columns=map_item)
-        df_panas_remap = self._calc_metrics(df_panas_remap)
+        df_panas = df_panas.rename(columns=map_item)
+        df_panas = self._calc_metrics(df_panas)
 
         # Add visit
-        df_panas_remap["visit"] = sess
+        df_panas["visit"] = sess
 
         # Combine demo and panas dataframes, get survey age
         df_nda = self._df_demo[["subjectkey", "src_subject_id", "sex"]].copy()
-        df_panas_demo = pd.merge(df_panas_remap, df_nda, on="src_subject_id")
+        df_panas_demo = pd.merge(df_panas, df_nda, on="src_subject_id")
         df_panas_demo = report_helper.get_survey_age(
             df_panas_demo, self._df_demo, "src_subject_id"
         )

@@ -221,6 +221,8 @@ class _BuildArgs:
         df_study_2 = self.data_dict["study"]["visit_day2"][self.df_name]
         df_pilot_3 = self.data_dict["pilot"]["visit_day3"][self.df_name]
         df_study_3 = self.data_dict["study"]["visit_day3"][self.df_name]
+
+        # PANAS and post_scan_ratings do not have data in qualtrics
         if self.df_name in ["PANAS", "post_scan_ratings"]:
             return [df_study_2, df_study_3]
         else:
