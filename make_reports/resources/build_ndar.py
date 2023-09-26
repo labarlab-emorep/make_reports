@@ -2096,15 +2096,19 @@ class NdarPhysio:
         self.df_report = df_report
 
 
-class NdarPswq01:
+class NdarPswq01(_CleanDemo):
     """Make pswq01 report for NDAR submission.
+
+    Inherits _CleanDemo.
 
     Parameters
     ----------
-    proj_dir : path
-        Project's experiment directory
     df_demo : make_reports.build_reports.DemoAll.final_demo
         pd.DataFrame, compiled demographic info
+    df_pilot : pd.DataFrame
+        Pilot PSWQ data
+    df_study : pd.DataFrame
+        Study PSWQ data
 
     Attributes
     ----------
@@ -2120,7 +2124,7 @@ class NdarPswq01:
 
     """
 
-    def __init__(self, proj_dir, df_demo):
+    def __init__(self, df_demo, df_pilot, df_study):
         """Read in survey data and make report.
 
         Get cleaned PSWQ Qualtrics survey from visit_day1, and
@@ -2133,41 +2137,18 @@ class NdarPswq01:
 
         """
         print("Buiding NDA report : pswq01 ...")
-        # Read in template
+        # Read in template, concatenate survey data
+        self._df_demo = df_demo
         self.nda_label, self._nda_cols = report_helper.mine_template(
             "pswq01_template.csv"
         )
-
-        # Get clean survey data
-        df_pilot = pd.read_csv(
-            os.path.join(
-                proj_dir,
-                "data_pilot/data_survey",
-                "visit_day1/data_clean",
-                "df_PSWQ.csv",
-            )
-        )
-        df_study = pd.read_csv(
-            os.path.join(
-                proj_dir,
-                "data_survey",
-                "visit_day1/data_clean",
-                "df_PSWQ.csv",
-            )
-        )
         df_pswq = pd.concat([df_pilot, df_study], ignore_index=True)
-        del df_pilot, df_study
-
-        # Rename columns, drop NaN rows
         df_pswq = df_pswq.replace("NaN", np.nan)
         self._df_pswq = df_pswq[df_pswq["PSWQ_1"].notna()]
 
         # Get final demographics, make report
-        df_demo = df_demo.replace("NaN", np.nan)
-        df_demo["sex"] = df_demo["sex"].replace(
-            ["Male", "Female", "Neither"], ["M", "F", "O"]
-        )
-        self._df_demo = df_demo.dropna(subset=["subjectkey"])
+        self._drop_subjectkey_nan()
+        self._remap_sex()
         self.make_pswq()
 
     def make_pswq(self):
@@ -2182,19 +2163,23 @@ class NdarPswq01:
 
         """
         # Update column names, make data integer
-        df_pswq = self._df_pswq.rename(columns=str.lower)
-        df_pswq.columns = df_pswq.columns.str.replace("_", "")
-        pswq_cols = [x for x in df_pswq.columns if "pswq" in x]
-        df_pswq[pswq_cols] = df_pswq[pswq_cols].astype("Int64")
-        df_pswq = df_pswq.rename(columns={"studyid": "src_subject_id"})
+        self._df_pswq = self._df_pswq.rename(columns=str.lower)
+        self._df_pswq.columns = self._df_pswq.columns.str.replace("_", "")
+        pswq_cols = [x for x in self._df_pswq.columns if "pswq" in x]
+        self._df_pswq[pswq_cols] = self._df_pswq[pswq_cols].astype("Int64")
+        self._df_pswq = self._df_pswq.rename(
+            columns={"studyid": "src_subject_id"}
+        )
 
         # Calculate sum
-        df_pswq["pswq_total"] = df_pswq[pswq_cols].sum(axis=1)
-        df_pswq["pswq_total"] = df_pswq["pswq_total"].astype("Int64")
+        self._df_pswq["pswq_total"] = self._df_pswq[pswq_cols].sum(axis=1)
+        self._df_pswq["pswq_total"] = self._df_pswq["pswq_total"].astype(
+            "Int64"
+        )
 
         # Combine demographic and erq dataframes
         df_nda = self._df_demo[["subjectkey", "src_subject_id", "sex"]]
-        df_pswq_nda = pd.merge(df_pswq, df_nda, on="src_subject_id")
+        df_pswq_nda = pd.merge(self._df_pswq, df_nda, on="src_subject_id")
         df_pswq_nda = report_helper.get_survey_age(
             df_pswq_nda, self._df_demo, "src_subject_id"
         )
