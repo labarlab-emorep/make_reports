@@ -213,7 +213,9 @@ class _BuildArgs:
         """Title."""
         df_pilot = self.data_dict["pilot"]["visit_day1"][self.df_name]
         df_study = self.data_dict["study"]["visit_day1"][self.df_name]
-        return [df_pilot, df_study]
+
+        # RRS does not have pilot data in qualtrics
+        return [df_pilot, df_study] if self.df_name != "RRS" else [df_study]
 
     def _v23_pilot_study(self) -> list:
         """Title."""
@@ -324,7 +326,7 @@ class MakeNdarReports(_GetData, _BuildArgs):
         """Title."""
         # Build class args
         args = [self.df_demo]
-        if self._report in ["brd01", "image03", "panas01"]:
+        if self._report in ["brd01", "image03", "panas01", "rrs01"]:
             args = args + [self._proj_dir]
         class_name, df_name = self._nda_switch[self._report]
         if df_name:

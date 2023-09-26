@@ -453,6 +453,9 @@ class NdarBrd01(_CleanDemo):
 
     Inherits _CleanDemo.
 
+    TODO pilot data exists in proj_dir/data_pilot/ndar_resources,
+    this could be incorporated as was done with NdarPanas01.
+
     Parameters
     ----------
     df_demo : make_reports.build_reports.DemoAll.final_demo
@@ -1605,6 +1608,9 @@ class NdarPanas01(_CleanDemo):
 
     Inherits _CleanDemo.
 
+    Receives clean study data and find pilot data in
+    proj_dir/data_pilot/ndar_resources.
+
     Parameters
     ----------
     df_demo : make_reports.build_reports.DemoAll.final_demo
@@ -2197,13 +2203,13 @@ class NdarPswq01(_CleanDemo):
         self.df_report = df_report
 
 
-class NdarRest01:
+class NdarRest01(_CleanDemo):
     """Make restsurv01 report for NDAR submission.
+
+    Inherits _CleanDemo.
 
     Parameters
     ----------
-    proj_dir : path
-        Project's experiment directory
     df_demo : make_reports.build_reports.DemoAll.final_demo
         pd.DataFrame, compiled demographic info
 
@@ -2213,6 +2219,14 @@ class NdarRest01:
         Report of rest data that complies with NDAR data definitions
     nda_label : list
         NDA report template label
+    df_pilot_day2 : pd.DataFrame
+        Pilot rest ratings data from ses-day2
+    df_study_day2 : pd.DataFrame
+        Study rest ratings data from ses-day2
+    df_pilot_day3 : pd.DataFrame
+        Pilot rest ratings data from ses-day3
+    df_study_day3 : pd.DataFrame
+        Study rest ratings data from ses-day3
 
     Methods
     -------
@@ -2221,7 +2235,14 @@ class NdarRest01:
 
     """
 
-    def __init__(self, proj_dir, df_demo):
+    def __init__(
+        self,
+        df_demo,
+        df_pilot_day2,
+        df_study_day2,
+        df_pilot_day3,
+        df_study_day3,
+    ):
         """Read in survey data and make report.
 
         Get cleaned rest rating surveys from visit_day2 and
@@ -2238,20 +2259,19 @@ class NdarRest01:
         """
         # Get needed column values from report template
         print("Buiding NDA report : restsurv01 ...")
-        self._proj_dir = proj_dir
+        self._df_demo = df_demo
         self.nda_label, self._nda_cols = report_helper.mine_template(
             "restsurv01_template.csv"
         )
 
         # Get pilot, study data for both day2, day3
-        self._get_clean()
+        self._get_clean(
+            df_pilot_day2, df_study_day2, df_pilot_day3, df_study_day3
+        )
 
         # Get final demographics
-        df_demo = df_demo.replace("NaN", np.nan)
-        df_demo["sex"] = df_demo["sex"].replace(
-            ["Male", "Female", "Neither"], ["M", "F", "O"]
-        )
-        self._df_demo = df_demo.dropna(subset=["subjectkey"])
+        self._drop_subjectkey_nan()
+        self._remap_sex()
 
         # Make nda reports for each session
         df_nda_day2 = self.make_rest("day2")
@@ -2269,30 +2289,14 @@ class NdarRest01:
         df_report.loc[idx_pilot, "comments_misc"] = "PILOT PARTICIPANT"
         self.df_report = df_report[df_report["interview_date"].notna()]
 
-    def _get_clean(self):
+    def _get_clean(
+        self, df_pilot_day2, df_study_day2, df_pilot_day3, df_study_day3
+    ):
         """Find and combine cleaned rest rating data.
 
         Get pilot, study data for day2, day3.
 
         """
-        # Get clean survey data
-        df_pilot_day2 = pd.read_csv(
-            os.path.join(
-                self._proj_dir,
-                "data_pilot/data_survey",
-                "visit_day2/data_clean",
-                "df_rest-ratings.csv",
-            )
-        )
-        df_study_day2 = pd.read_csv(
-            os.path.join(
-                self._proj_dir,
-                "data_survey",
-                "visit_day2/data_clean",
-                "df_rest-ratings.csv",
-            )
-        )
-
         # Combine pilot and study data, drop resp_alpha rows
         df_rest_day2 = pd.concat(
             [df_pilot_day2, df_study_day2], ignore_index=True
@@ -2310,23 +2314,7 @@ class NdarRest01:
         )
         self._df_rest_day2 = df_rest_day2
 
-        # Repeat above for day3
-        df_pilot_day3 = pd.read_csv(
-            os.path.join(
-                self._proj_dir,
-                "data_pilot/data_survey",
-                "visit_day3/data_clean",
-                "df_rest-ratings.csv",
-            )
-        )
-        df_study_day3 = pd.read_csv(
-            os.path.join(
-                self._proj_dir,
-                "data_survey",
-                "visit_day3/data_clean",
-                "df_rest-ratings.csv",
-            )
-        )
+        # Repeat for day3
         df_rest_day3 = pd.concat(
             [df_pilot_day3, df_study_day3], ignore_index=True
         )
@@ -2365,8 +2353,7 @@ class NdarRest01:
 
         """
         # Check sess value
-        sess_list = ["day2", "day3"]
-        if sess not in sess_list:
+        if sess not in ["day2", "day3"]:
             raise ValueError(f"Incorrect visit day : {sess}")
 
         # Get session data
@@ -2417,15 +2404,19 @@ class NdarRest01:
         return df_nda
 
 
-class NdarRrs01:
+class NdarRrs01(_CleanDemo):
     """Make rrs01 report for NDAR submission.
+
+    Inherits _CleanDemo.
 
     Parameters
     ----------
-    proj_dir : path
-        Project's experiment directory
     df_demo : make_reports.build_reports.DemoAll.final_demo
         pd.DataFrame, compiled demographic info
+    proj_dir : str, os.PathLike
+        Project's experiment directory
+    df_study : pd.DataFrame
+        Study RRS data
 
     Attributes
     ----------
@@ -2441,7 +2432,7 @@ class NdarRrs01:
 
     """
 
-    def __init__(self, proj_dir, df_demo):
+    def __init__(self, df_demo, proj_dir, df_study):
         """Read in survey data and make report.
 
         Get cleaned RRS Qualtrics survey from visit_day1, and
@@ -2457,24 +2448,23 @@ class NdarRrs01:
         """
         print("Buiding NDA report : rrs01 ...")
         # Read in template
+        self._df_demo = df_demo
+        self._proj_dir = proj_dir
+        self._df_study = df_study
         self.nda_label, self._nda_cols = report_helper.mine_template(
             "rrs01_template.csv"
         )
-        self._proj_dir = proj_dir
 
         # Get final demographics
-        df_demo = df_demo.replace("NaN", np.nan)
-        df_demo["sex"] = df_demo["sex"].replace(
-            ["Male", "Female", "Neither"], ["M", "F", "O"]
-        )
-        self._df_demo = df_demo.dropna(subset=["subjectkey"])
+        self._drop_subjectkey_nan()
+        self._remap_sex()
 
         # Make pilot, study dataframes
         df_pilot = self._get_pilot()
-        df_study = self.make_rrs()
+        df_rrs = self.make_rrs()
 
         # Combine into final report
-        df_report = pd.concat([df_pilot, df_study], ignore_index=True)
+        df_report = pd.concat([df_pilot, df_rrs], ignore_index=True)
         self.df_report = df_report[df_report["interview_date"].notna()]
 
     def _get_pilot(self):
@@ -2525,33 +2515,27 @@ class NdarRrs01:
             Report of study RRS data that complies with NDAR data definitions
 
         """
-        # Get clean survey data
-        df_rrs = pd.read_csv(
-            os.path.join(
-                self._proj_dir,
-                "data_survey",
-                "visit_day1/data_clean",
-                "df_RRS.csv",
-            )
-        )
-
         # Rename columns, drop NaN rows
-        df_rrs = df_rrs.rename(columns={"study_id": "src_subject_id"})
-        df_rrs = df_rrs.replace("NaN", np.nan)
-        df_rrs = df_rrs[df_rrs["RRS_1"].notna()]
+        self._df_study = self._df_study.rename(
+            columns={"study_id": "src_subject_id"}
+        )
+        self._df_study = self._df_study.replace("NaN", np.nan)
+        self._df_study = self._df_study[self._df_study["RRS_1"].notna()]
 
         # Update column names, make data integer
-        df_rrs = df_rrs.rename(columns=str.lower)
-        rrs_cols = [x for x in df_rrs.columns if "rrs" in x]
-        df_rrs[rrs_cols] = df_rrs[rrs_cols].astype("Int64")
+        self._df_study = self._df_study.rename(columns=str.lower)
+        rrs_cols = [x for x in self._df_study.columns if "rrs" in x]
+        self._df_study[rrs_cols] = self._df_study[rrs_cols].astype("Int64")
 
         # Calculate sum
-        df_rrs["rrs_total"] = df_rrs[rrs_cols].sum(axis=1)
-        df_rrs["rrs_total"] = df_rrs["rrs_total"].astype("Int64")
+        self._df_study["rrs_total"] = self._df_study[rrs_cols].sum(axis=1)
+        self._df_study["rrs_total"] = self._df_study["rrs_total"].astype(
+            "Int64"
+        )
 
         # Combine demographic and rrs dataframes
         df_nda = self._df_demo[["subjectkey", "src_subject_id", "sex"]]
-        df_rrs_nda = pd.merge(df_rrs, df_nda, on="src_subject_id")
+        df_rrs_nda = pd.merge(self._df_study, df_nda, on="src_subject_id")
         df_rrs_nda = report_helper.get_survey_age(
             df_rrs_nda, self._df_demo, "src_subject_id"
         )
