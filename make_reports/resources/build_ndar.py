@@ -458,14 +458,10 @@ class NdarBrd01(_CleanDemo):
     ----------
     df_demo : make_reports.build_reports.DemoAll.final_demo
         pd.DataFrame, compiled demographic info
-    proj_dir : path
-        Project's experiment directory, unused
-    df_pilot_day2 : pd.DataFrame
-        Pilot post-scan ratings data from ses-day2
+    proj_dir : str, os.PathLike
+        Project's experiment directory
     df_study_day2 : pd.DataFrame
         Study post-scan ratings data from ses-day2
-    df_pilot_day3 : pd.DataFrame
-        Pilot post-scan ratings data from ses-day3
     df_study_day3 : pd.DataFrame
         Study post-scan ratings data from ses-day3
 
@@ -487,9 +483,7 @@ class NdarBrd01(_CleanDemo):
         self,
         df_demo,
         proj_dir,
-        df_pilot_day2,
         df_study_day2,
-        df_pilot_day3,
         df_study_day3,
     ):
         """Read in survey data and make report.
@@ -520,13 +514,13 @@ class NdarBrd01(_CleanDemo):
         self._remap_sex()
 
         # Fill df_report for each session
-        self.make_brd("day2", df_pilot_day2, df_study_day2)
-        self.make_brd("day3", df_pilot_day3, df_study_day3)
+        self.make_brd("day2", df_study_day2)
+        self.make_brd("day3", df_study_day3)
         self.df_report = self.df_report.sort_values(
             by=["src_subject_id", "visit"]
         )
 
-    def make_brd(self, sess, df_pilot, df_study):
+    def make_brd(self, sess, df_study):
         """Make brd01 report for session.
 
         Get Qualtrics survey data for post scan ratings,
@@ -537,8 +531,6 @@ class NdarBrd01(_CleanDemo):
         sess : str
             [day2 | day3]
             Session identifier
-        df_pilot : pd.DataFrame
-            Pilot post-scan ratings data
         df_study : pd.DataFrame
             Study post-scan ratings data
 
@@ -554,7 +546,7 @@ class NdarBrd01(_CleanDemo):
             raise ValueError(f"Incorrect visit day : {sess}")
 
         # Combine pilot and study data, updated subj id column
-        df_brd = pd.concat([df_pilot, df_study], ignore_index=True)
+        df_brd = df_study.copy()
         df_brd = df_brd.rename(columns={"study_id": "src_subject_id"})
         df_brd["datetime"] = pd.to_datetime(df_brd["datetime"])
 
@@ -744,15 +736,19 @@ class NdarDemoInfo01:
             self.df_report[h_col] = h_value
 
 
-class NdarEmrq01:
+class NdarEmrq01(_CleanDemo):
     """Make emrq01 report for NDAR submission.
+
+    Inherits _CleanDemo.
 
     Parameters
     ----------
-    proj_dir : path
-        Project's experiment directory
     df_demo : make_reports.build_reports.DemoAll.final_demo
         pd.DataFrame, compiled demographic info
+    df_pilot : pd.DataFrame
+        Pilot ALS data
+    df_study : pd.DataFrame
+        Study ALS data
 
     Attributes
     ----------
@@ -768,7 +764,7 @@ class NdarEmrq01:
 
     """
 
-    def __init__(self, proj_dir, df_demo):
+    def __init__(self, df_demo, df_pilot, df_study):
         """Read in survey data and make report.
 
         Get cleaned ERQ Qualtrics survey from visit_day1, and
@@ -782,29 +778,11 @@ class NdarEmrq01:
         """
         print("Buiding NDA report : emrq01 ...")
         # Read in template
+        self._df_demo = df_demo
         self.nda_label, self._nda_cols = report_helper.mine_template(
             "emrq01_template.csv"
         )
-
-        # Get clean survey data
-        df_pilot = pd.read_csv(
-            os.path.join(
-                proj_dir,
-                "data_pilot/data_survey",
-                "visit_day1/data_clean",
-                "df_ERQ.csv",
-            )
-        )
-        df_study = pd.read_csv(
-            os.path.join(
-                proj_dir,
-                "data_survey",
-                "visit_day1/data_clean",
-                "df_ERQ.csv",
-            )
-        )
         df_emrq = pd.concat([df_pilot, df_study], ignore_index=True)
-        del df_pilot, df_study
 
         # Rename columns, drop NaN rows
         df_emrq = df_emrq.rename(columns={"study_id": "src_subject_id"})
@@ -812,8 +790,8 @@ class NdarEmrq01:
         self._df_emrq = df_emrq[df_emrq["ERQ_1"].notna()]
 
         # Get final demographics, make report
-        df_demo = df_demo.replace("NaN", np.nan)
-        self._df_demo = df_demo.dropna(subset=["subjectkey"])
+        self._drop_subjectkey_nan()
+        self._remap_sex()
         self.make_emrq()
 
     def make_emrq(self):
@@ -845,9 +823,6 @@ class NdarEmrq01:
 
         # Combine demographic and erq dataframes
         df_nda = self._df_demo[["subjectkey", "src_subject_id", "sex"]].copy()
-        df_nda["sex"] = df_nda["sex"].replace(
-            ["Male", "Female", "Neither"], ["M", "F", "O"]
-        )
         df_emrq_nda = pd.merge(df_emrq, df_nda, on="src_subject_id")
         df_emrq_nda = report_helper.get_survey_age(
             df_emrq_nda, self._df_demo, "src_subject_id"
@@ -1632,10 +1607,18 @@ class NdarPanas01:
 
     Parameters
     ----------
-    proj_dir : path
-        Project's experiment directory
     df_demo : make_reports.build_reports.DemoAll.final_demo
         pd.DataFrame, compiled demographic info
+    proj_dir : str, os.PathLike
+        Project's experiment directory
+    df_pilot_day2 : pd.DataFrame
+        Pilot PANAS data from ses-day2
+    df_study_day2 : pd.DataFrame
+        Study PANAS data from ses-day2
+    df_pilot_day3 : pd.DataFrame
+        Pilot PANAS data from ses-day3
+    df_study_day3 : pd.DataFrame
+        Study PANAS data from ses-day3
 
     Attributes
     ----------
@@ -1651,7 +1634,15 @@ class NdarPanas01:
 
     """
 
-    def __init__(self, proj_dir, df_demo):
+    def __init__(
+        self,
+        df_demo,
+        proj_dir,
+        df_pilot_day2,
+        df_study_day2,
+        df_pilot_day3,
+        df_study_day3,
+    ):
         """Read in survey data and make report.
 
         Get cleaned PANAS Qualtrics survey from visit_day2 and
@@ -1668,6 +1659,7 @@ class NdarPanas01:
         """
         # Get needed column values from report template
         print("Buiding NDA report : panas01 ...")
+        self._df_demo = df_demo
         self._proj_dir = proj_dir
         self.nda_label, self._nda_cols = report_helper.mine_template(
             "panas01_template.csv"
