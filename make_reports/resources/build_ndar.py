@@ -37,39 +37,46 @@ from make_reports.resources import report_helper
 
 
 class _CleanDemo:
-    """Title.
+    """Clean demographic dataframe.
+
+    Clean make_reports.build_reports.DemoAll.final_demo for NDAR report
+    generation and compliance.
 
     Parameters
     ----------
-    df_demo
-    drop_subjectkey
-    drop_nan
-    remap_sex
+    df_demo : make_reports.build_reports.DemoAll.final_demo
+        pd.DataFrame, compiled demographic info
+    drop_subjectkey : bool, optional
+        Drop rows that have NaN in subjectkey col
+    fix_nan : bool, optional
+        Replace "NaN" str with np.nan
+    remap_sex : bool, optional
+        Replace Male, Female, Neither in sex col with M, F, O
 
     """
 
     def __init__(
-        self, df_demo, drop_subjectkey=True, drop_nan=True, remap_sex=True
+        self, df_demo, drop_subjectkey=True, fix_nan=True, remap_sex=True
     ):
-        """Title."""
+        """Set _df_demo attr, trigger cleaning methods."""
         self._df_demo = df_demo
         if drop_subjectkey:
             self._drop_subjectkey()
-        if drop_nan:
-            self._drop_nan()
+        if fix_nan:
+            self._fix_nan()
         if remap_sex:
             self._remap_sex()
 
     def _drop_subjectkey(self):
-        """Replace NaN str and drop empty subjectkey rows in df_demo."""
+        """Drop rows that have NaN in subjectkey col."""
         self._df_demo.dropna(subset=["subjectkey"])
 
-    def _drop_nan(self):
-        """Title."""
+    def _fix_nan(self):
+        """Replace "NaN" str with np.nan."""
         self._df_demo = self._df_demo.replace("NaN", np.nan)
 
     def _remap_sex(self):
-        """Replace Male, Female, Neither with M, F, O in df_demo."""
+        """Replace Male, Female, Neither in sex col with M, F, O."""
         self._df_demo["sex"] = self._df_demo["sex"].replace(
             ["Male", "Female", "Neither"], ["M", "F", "O"]
         )
@@ -2582,15 +2589,27 @@ class NdarRrs01(_CleanDemo):
         return df_study_report
 
 
-class NdarStai01:
+class NdarStai01(_CleanDemo):
     """Make stai01 report for NDAR submission.
+
+    Inherits _CleanDemo.
 
     Parameters
     ----------
-    proj_dir : path
-        Project's experiment directory
     df_demo : make_reports.build_reports.DemoAll.final_demo
         pd.DataFrame, compiled demographic info
+    df_pilot_day1 : pd.DataFrame
+        Pilot STAI Trait data from visit_day1
+    df_study_day1 : pd.DataFrame
+        Study STAI Trait data from visit_day1
+    df_pilot_day2 : pd.DataFrame
+        Pilot STAI State data from ses-day2
+    df_study_day2 : pd.DataFrame
+        Study STAI State data from ses-day2
+    df_pilot_day3 : pd.DataFrame
+        Pilot STAI State data from ses-day3
+    df_study_day3 : pd.DataFrame
+        Study STAI State data from ses-day3
 
     Attributes
     ----------
@@ -2609,7 +2628,16 @@ class NdarStai01:
 
     """
 
-    def __init__(self, proj_dir, df_demo):
+    def __init__(
+        self,
+        df_demo,
+        df_pilot_day1,
+        df_study_day1,
+        df_pilot_day2,
+        df_study_day2,
+        df_pilot_day3,
+        df_study_day3,
+    ):
         """Read in survey data and make report.
 
         Get cleaned STAI Qualtrics survey from visits, and
@@ -2626,23 +2654,21 @@ class NdarStai01:
         """
         print("Buiding NDA report : stai01 ...")
         # Read in template
+        super().__init__(df_demo)
         self.nda_label, self._nda_cols = report_helper.mine_template(
             "stai01_template.csv"
         )
-        self._proj_dir = proj_dir
-
-        # Get final demographics, make report
-        df_demo = df_demo.replace("NaN", np.nan)
-        df_demo["sex"] = df_demo["sex"].replace(
-            ["Male", "Female", "Neither"], ["M", "F", "O"]
-        )
-        self._df_demo = df_demo.dropna(subset=["subjectkey"])
 
         # Generate trait report
+        self._df_pilot_day1 = df_pilot_day1
+        self._df_study_day1 = df_study_day1
         df_trait = self.make_stai_trait()
 
         # Generate state reports for day2, day3
-        self._get_state()
+        self._df_pilot_day2 = df_pilot_day2
+        self._df_study_day2 = df_study_day2
+        self._df_pilot_day3 = df_pilot_day3
+        self._df_study_day3 = df_study_day3
         df_nda_day2 = self.make_stai_state("day2")
         df_nda_day3 = self.make_stai_state("day3")
 
@@ -2653,109 +2679,14 @@ class NdarStai01:
         df_report = df_report.sort_values(by=["src_subject_id", "visit"])
         self.df_report = df_report[df_report["interview_date"].notna()]
 
-    def _get_trait(self):
-        """Compile trait (visit1) responses.
-
-        Returns
-        -------
-        pd.DataFrame
-            Pilot and study stai state responses
-
-        """
-        # Get clean survey data
-        df_pilot = pd.read_csv(
-            os.path.join(
-                self._proj_dir,
-                "data_pilot/data_survey",
-                "visit_day1/data_clean",
-                "df_STAI_Trait.csv",
-            )
-        )
-        df_study = pd.read_csv(
-            os.path.join(
-                self._proj_dir,
-                "data_survey",
-                "visit_day1/data_clean",
-                "df_STAI_Trait.csv",
-            )
-        )
-        df_stai_trait = pd.concat([df_pilot, df_study], ignore_index=True)
-        del df_pilot, df_study
-
-        # Rename columns, drop NaN rows
-        df_stai_trait = df_stai_trait.rename(
-            columns={"study_id": "src_subject_id"}
-        )
-        df_stai_trait = df_stai_trait.replace("NaN", np.nan)
-        df_stai_trait = df_stai_trait[df_stai_trait["STAI_Trait_1"].notna()]
-        return df_stai_trait
-
-    def _get_state(self):
-        """Compile state (visit2, visit3) responses.
-
-        Attributes
-        ----------
-        _df_stai_state_day2 : pd.DataFrame
-            Pilot and study stai state responses for day2
-        _df_stai_state_day3 : pd.DataFrame
-            Pilot and study stai state responses for day3
-
-        """
-        # Get clean survey data
-        df_pilot = pd.read_csv(
-            os.path.join(
-                self._proj_dir,
-                "data_pilot/data_survey",
-                "visit_day2/data_clean",
-                "df_STAI_State.csv",
-            )
-        )
-        df_study = pd.read_csv(
-            os.path.join(
-                self._proj_dir,
-                "data_survey",
-                "visit_day2/data_clean",
-                "df_STAI_State.csv",
-            )
-        )
-        df_stai_state2 = pd.concat([df_pilot, df_study], ignore_index=True)
-        del df_pilot, df_study
-
-        # Rename columns, drop NaN rows
-        df_stai_state2 = df_stai_state2.rename(
-            columns={"study_id": "src_subject_id"}
-        )
-        df_stai_state2 = df_stai_state2.replace("NaN", np.nan)
-        df_stai_state2 = df_stai_state2[df_stai_state2["STAI_State_1"].notna()]
-        self._df_stai_state_day2 = df_stai_state2
-
-        # Repeat for visit 3
-        df_pilot = pd.read_csv(
-            os.path.join(
-                self._proj_dir,
-                "data_pilot/data_survey",
-                "visit_day3/data_clean",
-                "df_STAI_State.csv",
-            )
-        )
-        df_study = pd.read_csv(
-            os.path.join(
-                self._proj_dir,
-                "data_survey",
-                "visit_day3/data_clean",
-                "df_STAI_State.csv",
-            )
-        )
-        df_stai_state3 = pd.concat([df_pilot, df_study], ignore_index=True)
-        del df_pilot, df_study
-
-        # Rename columns, drop NaN rows
-        df_stai_state3 = df_stai_state3.rename(
-            columns={"study_id": "src_subject_id"}
-        )
-        df_stai_state3 = df_stai_state3.replace("NaN", np.nan)
-        df_stai_state3 = df_stai_state3[df_stai_state3["STAI_State_1"].notna()]
-        self._df_stai_state_day3 = df_stai_state3
+    def _clean_df(self, df: pd.DataFrame, col_name: str) -> pd.DataFrame:
+        """Clean col names, NaNs, empty col_name rows, and col types."""
+        df = df.rename(columns={"study_id": "src_subject_id"})
+        df = df.replace("NaN", np.nan)
+        df = df[df[col_name].notna()]
+        stai_cols = [x for x in df.columns if "STAI" in x]
+        df[stai_cols] = df[stai_cols].astype("Int64")
+        return df
 
     def make_stai_trait(self):
         """Combine dataframes to generate trait report.
@@ -2769,10 +2700,11 @@ class NdarStai01:
             NDAR data definitions
 
         """
-        # Make data integer
-        df_stai_trait = self._get_trait()
-        stai_cols = [x for x in df_stai_trait.columns if "STAI" in x]
-        df_stai_trait[stai_cols] = df_stai_trait[stai_cols].astype("Int64")
+        # Concat dfs
+        df_stai_trait = pd.concat(
+            [self._df_pilot_day1, self._df_study_day1], ignore_index=True
+        )
+        df_stai_trait = self._clean_df(df_stai_trait, "STAI_Trait_1")
 
         # Remap column names
         map_item = {
@@ -2797,21 +2729,19 @@ class NdarStai01:
             "STAI_Trait_19": "stai39",
             "STAI_Trait_20": "stai40",
         }
-        df_stai_trait_remap = df_stai_trait.rename(columns=map_item)
+        df_stai_trait = df_stai_trait.rename(columns=map_item)
 
         # Get trait sum
-        trait_cols = [x for x in df_stai_trait_remap.columns if "stai" in x]
-        df_stai_trait_remap["staiy_trait"] = df_stai_trait_remap[
-            trait_cols
-        ].sum(axis=1)
-        df_stai_trait_remap["staiy_trait"] = df_stai_trait_remap[
-            "staiy_trait"
-        ].astype("Int64")
+        trait_cols = [x for x in df_stai_trait.columns if "stai" in x]
+        df_stai_trait["staiy_trait"] = df_stai_trait[trait_cols].sum(axis=1)
+        df_stai_trait["staiy_trait"] = df_stai_trait["staiy_trait"].astype(
+            "Int64"
+        )
 
         # Combine demographic and stai dataframes
         df_nda = self._df_demo[["subjectkey", "src_subject_id", "sex"]]
         df_stai_trait_nda = pd.merge(
-            df_stai_trait_remap, df_nda, on="src_subject_id"
+            df_stai_trait, df_nda, on="src_subject_id"
         )
         df_stai_trait_nda = report_helper.get_survey_age(
             df_stai_trait_nda, self._df_demo, "src_subject_id"
@@ -2846,16 +2776,14 @@ class NdarStai01:
 
         """
         # Check sess value
-        sess_list = ["day2", "day3"]
-        if sess not in sess_list:
+        if sess not in ["day2", "day3"]:
             raise ValueError(f"Incorrect visit day : {sess}")
 
         # Get session data
-        df_stai_state = getattr(self, f"_df_stai_state_{sess}")
-
-        # Make data integer
-        stai_cols = [x for x in df_stai_state.columns if "STAI" in x]
-        df_stai_state[stai_cols] = df_stai_state[stai_cols].astype("Int64")
+        df_pilot = getattr(self, f"_df_pilot_{sess}")
+        df_study = getattr(self, f"_df_study_{sess}")
+        df_stai_state = pd.concat([df_pilot, df_study], ignore_index=True)
+        df_stai_state = self._clean_df(df_stai_state, "STAI_State_1")
 
         # Remap column names
         map_item = {

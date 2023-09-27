@@ -191,38 +191,37 @@ class _BuildArgs:
 
     """
 
-    def build_args(self, df_name: str) -> list:
+    def build_args(self) -> list:
         """Title."""
         #
-        self.df_name = df_name
         v1_list = ["AIM", "ALS", "ERQ", "PSWQ", "RRS", "TAS"]
         v23_list = ["BDI", "PANAS", "rest_ratings", "post_scan_ratings"]
         v123_list = ["STAI"]
-        if df_name not in v1_list + v23_list + v123_list:
-            raise ValueError(f"Unexpected df name : {df_name}")
+        if self._df_name not in v1_list + v23_list + v123_list:
+            raise ValueError(f"Unexpected df name : {self._df_name}")
 
-        if df_name in v1_list:
+        if self._df_name in v1_list:
             arg_list = self._v1_pilot_study()
-        elif df_name in v23_list:
+        elif self._df_name in v23_list:
             arg_list = self._v23_pilot_study()
-        elif df_name in v123_list:
+        elif self._df_name in v123_list:
             arg_list = self._v123_pilot_study()
         return arg_list
 
     def _v1_pilot_study(self) -> list:
         """Title."""
-        df_pilot = self.data_dict["pilot"]["visit_day1"][self.df_name]
-        df_study = self.data_dict["study"]["visit_day1"][self.df_name]
+        df_pilot = self.data_dict["pilot"]["visit_day1"][self._df_name]
+        df_study = self.data_dict["study"]["visit_day1"][self._df_name]
 
         # RRS does not have pilot data in qualtrics
         return [df_pilot, df_study] if self.df_name != "RRS" else [df_study]
 
     def _v23_pilot_study(self) -> list:
         """Title."""
-        df_pilot_2 = self.data_dict["pilot"]["visit_day2"][self.df_name]
-        df_study_2 = self.data_dict["study"]["visit_day2"][self.df_name]
-        df_pilot_3 = self.data_dict["pilot"]["visit_day3"][self.df_name]
-        df_study_3 = self.data_dict["study"]["visit_day3"][self.df_name]
+        df_pilot_2 = self.data_dict["pilot"]["visit_day2"][self._df_name]
+        df_study_2 = self.data_dict["study"]["visit_day2"][self._df_name]
+        df_pilot_3 = self.data_dict["pilot"]["visit_day3"][self._df_name]
+        df_study_3 = self.data_dict["study"]["visit_day3"][self._df_name]
 
         # PANAS and post_scan_ratings do not have pilot data in qualtrics
         if self.df_name in ["PANAS", "post_scan_ratings"]:
@@ -285,20 +284,20 @@ class MakeNdarReports(_GetData, _BuildArgs):
 
     @property
     def _nda_switch(self):
-        """Map ndar report name to build_ndar class and dataset name."""
+        """Map requested report to build_ndar class and dataset name."""
         return {
-            "demo_info01": ["NdarDemoInfo01", None],
             "affim01": ["NdarAffim01", "AIM"],
             "als01": ["NdarAls01", "ALS"],
             "bdi01": ["NdarBdi01", "BDI"],
             "brd01": ["NdarBrd01", "post_scan_ratings"],
+            "demo_info01": ["NdarDemoInfo01", None],
             "emrq01": ["NdarEmrq01", "ERQ"],
             "image03": ["NdarImage03", None],
             "panas01": ["NdarPanas01", "PANAS"],
             "pswq01": ["NdarPswq01", "PSWQ"],
             "restsurv01": ["NdarRest01", "rest_ratings"],
             "rrs01": ["NdarRrs01", "RRS"],
-            "stai01": ["NdarStai01" "STAI"],
+            "stai01": ["NdarStai01", "STAI"],
             "tas01": ["NdarTas01", "TAS"],
         }
 
@@ -324,13 +323,13 @@ class MakeNdarReports(_GetData, _BuildArgs):
 
     def _build_report(self):
         """Title."""
-        # Build class args
+        # Build args for build_ndar class
         args = [self.df_demo]
         if self._report in ["brd01", "image03", "panas01", "rrs01"]:
             args = args + [self._proj_dir]
-        class_name, df_name = self._nda_switch[self._report]
-        if df_name:
-            args = args + self.build_args(df_name)
+        class_name, self._df_name = self._nda_switch[self._report]
+        if self._df_name:
+            args = args + self.build_args()
 
         # Get appropriate class for report, generate report.
         mod = __import__(
