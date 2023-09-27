@@ -84,6 +84,11 @@ def _local_path() -> str:
     )
 
 
+def _task_id() -> dict:
+    """Return old, new EmoRep Task IDs."""
+    return {"old": 1683, "new": 2113}
+
+
 class NdarAffim01(_CleanDemo):
     """Make affim01 report for NDAR submission.
 
@@ -469,8 +474,8 @@ class NdarBrd01(_CleanDemo):
 
     Inherits _CleanDemo.
 
-    TODO pilot data exists in proj_dir/data_pilot/ndar_resources,
-    this could be incorporated as was done with NdarPanas01.
+    Receives clean study data and finds pilot data in
+    proj_dir/data_pilot/ndar_resources.
 
     Parameters
     ----------
@@ -522,12 +527,13 @@ class NdarBrd01(_CleanDemo):
         print("Buiding NDA report : brd01 ...")
         super().__init__(df_demo)
         self._proj_dir = proj_dir
-        self.nda_label, nda_cols = report_helper.mine_template(
+        self.nda_label, self._nda_cols = report_helper.mine_template(
             "brd01_template.csv"
         )
-        self.df_report = pd.DataFrame(columns=nda_cols)
+        self.df_report = pd.DataFrame(columns=self._nda_cols)
 
         # Fill df_report for each session
+        self._get_pilot()
         self.make_brd("day2", df_study_day2)
         self.make_brd("day3", df_study_day3)
         self.df_report = self.df_report.sort_values(
@@ -568,6 +574,9 @@ class NdarBrd01(_CleanDemo):
         if not os.path.exists(host_dir):
             os.makedirs(host_dir)
 
+        # Get task ids
+        id_dict = _task_id()
+
         # Mine each participant's data
         sub_list = df_brd["src_subject_id"].unique().tolist()
         sub_demo = self._df_demo["src_subject_id"].tolist()
@@ -592,7 +601,11 @@ class NdarBrd01(_CleanDemo):
             # Set values required by brd01
             brd01_info = {
                 "visit": sess[-1],
+                "experiment_description": "(see design details of "
+                + f"experiment_ID {id_dict['new']})",
+                "stimuli_detail": "post-scan stimulus rating",
                 "data_file1": os.path.join(_local_path(), out_file),
+                "experiment_id": id_dict["new"],
             }
             survey_date = df_sub.loc[0, "datetime"]
             brd01_info.update(self._get_subj_demo(survey_date, sub))
@@ -603,6 +616,31 @@ class NdarBrd01(_CleanDemo):
                 [self.df_report.loc[:], new_row]
             ).reset_index(drop=True)
             del new_row
+
+    def _get_pilot(self):
+        """Get pilot data from previous NDAR submission."""
+        # Read-in dataframe of pilot participants
+        pilot_report = os.path.join(
+            self._proj_dir,
+            "data_pilot/ndar_resources",
+            "brd01_dataset.csv",
+        )
+        if not os.path.exists(pilot_report):
+            raise FileNotFoundError(
+                f"Expected to find pilot brd at {pilot_report}"
+            )
+        df_pilot = pd.read_csv(pilot_report)
+
+        # Clean up df
+        df_pilot = df_pilot[1:]
+        df_pilot.columns = self._nda_cols
+        df_pilot["experiment_id"] = df_pilot["experiment_id"].astype("Int64")
+        df_pilot["comments_misc"] = "PILOT PARTICIPANT"
+
+        # Add to self.df_report
+        self.df_report = pd.concat([self.df_report, df_pilot]).reset_index(
+            drop=True
+        )
 
     def _get_subj_demo(self, survey_date, sub):
         """Gather required participant demographic information.
@@ -1431,7 +1469,7 @@ class NdarImage03:
         """
         # Determine if participant is pilot, set experiment ID
         pilot_list = report_helper.pilot_list()
-        exp_dict = {"old": 1683, "new": 2113}
+        exp_dict = _task_id()
         exp_id = (
             exp_dict["old"]
             if self._subj_nda in pilot_list
@@ -1618,7 +1656,7 @@ class NdarPanas01(_CleanDemo):
 
     Inherits _CleanDemo.
 
-    Receives clean study data and find pilot data in
+    Receives clean study data and finds pilot data in
     proj_dir/data_pilot/ndar_resources.
 
     Parameters
