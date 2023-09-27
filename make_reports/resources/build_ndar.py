@@ -37,12 +37,36 @@ from make_reports.resources import report_helper
 
 
 class _CleanDemo:
-    """Title."""
+    """Title.
 
-    def _drop_subjectkey_nan(self):
+    Parameters
+    ----------
+    df_demo
+    drop_subjectkey
+    drop_nan
+    remap_sex
+
+    """
+
+    def __init__(
+        self, df_demo, drop_subjectkey=True, drop_nan=True, remap_sex=True
+    ):
+        """Title."""
+        self._df_demo = df_demo
+        if drop_subjectkey:
+            self._drop_subjectkey()
+        if drop_nan:
+            self._drop_nan()
+        if remap_sex:
+            self._remap_sex()
+
+    def _drop_subjectkey(self):
         """Replace NaN str and drop empty subjectkey rows in df_demo."""
-        self._df_demo = self._df_demo.replace("NaN", np.nan)
         self._df_demo.dropna(subset=["subjectkey"])
+
+    def _drop_nan(self):
+        """Title."""
+        self._df_demo = self._df_demo.replace("NaN", np.nan)
 
     def _remap_sex(self):
         """Replace Male, Female, Neither with M, F, O in df_demo."""
@@ -99,7 +123,7 @@ class NdarAffim01(_CleanDemo):
         """
         print("Buiding NDA report : affim01 ...")
         # Read in template, concat dfs
-        self._df_demo = df_demo
+        super().__init__(df_demo)
         self.nda_label, self._nda_cols = report_helper.mine_template(
             "affim01_template.csv"
         )
@@ -111,9 +135,7 @@ class NdarAffim01(_CleanDemo):
         df_aim = df_aim.replace("NaN", np.nan)
         self._df_aim = df_aim[df_aim["aim_1"].notna()]
 
-        # Get final demographics, make report
-        self._drop_subjectkey_nan()
-        self._remap_sex()
+        # Make report
         self.make_aim()
 
     def make_aim(self):
@@ -185,7 +207,7 @@ class NdarAls01(_CleanDemo):
         """
         print("Buiding NDA report : als01 ...")
         # Read in template, concat dfs
-        self._df_demo = df_demo
+        super().__init__(df_demo)
         self.nda_label, self._nda_cols = report_helper.mine_template(
             "als01_template.csv"
         )
@@ -196,9 +218,7 @@ class NdarAls01(_CleanDemo):
         df_als = df_als.replace("NaN", np.nan)
         self._df_als = df_als[df_als["ALS_1"].notna()]
 
-        # Get final demographics, make report
-        self._drop_subjectkey_nan()
-        self._remap_sex()
+        # Make report
         self.make_als()
 
     def make_als(self):
@@ -322,7 +342,7 @@ class NdarBdi01(_CleanDemo):
         """
         # Get needed column values from report template
         print("Buiding NDA report : bdi01 ...")
-        self._df_demo = df_demo
+        super().__init__(df_demo)
         self.nda_label, self._nda_cols = report_helper.mine_template(
             "bdi01_template.csv"
         )
@@ -330,10 +350,6 @@ class NdarBdi01(_CleanDemo):
         # Combine pilot and study data, updated subj id column, set attribute
         self._df_bdi_day2 = self._make_df(df_pilot_day2, df_study_day2)
         self._df_bdi_day3 = self._make_df(df_pilot_day3, df_study_day3)
-
-        # Get final demographics
-        self._drop_subjectkey_nan()
-        self._remap_sex()
 
         # Make nda reports for each session
         df_nda_day2 = self.make_bdi("day2")
@@ -504,16 +520,12 @@ class NdarBrd01(_CleanDemo):
         """
         # Get needed column values from report template, start output df
         print("Buiding NDA report : brd01 ...")
-        self._df_demo = df_demo
+        super().__init__(df_demo)
         self._proj_dir = proj_dir
         self.nda_label, nda_cols = report_helper.mine_template(
             "brd01_template.csv"
         )
         self.df_report = pd.DataFrame(columns=nda_cols)
-
-        # Get final demographics
-        self._drop_subjectkey_nan()
-        self._remap_sex()
 
         # Fill df_report for each session
         self.make_brd("day2", df_study_day2)
@@ -779,7 +791,7 @@ class NdarEmrq01(_CleanDemo):
         """
         print("Buiding NDA report : emrq01 ...")
         # Read in template
-        self._df_demo = df_demo
+        super().__init__(df_demo)
         self.nda_label, self._nda_cols = report_helper.mine_template(
             "emrq01_template.csv"
         )
@@ -790,9 +802,7 @@ class NdarEmrq01(_CleanDemo):
         df_emrq = df_emrq.replace("NaN", np.nan)
         self._df_emrq = df_emrq[df_emrq["ERQ_1"].notna()]
 
-        # Get final demographics, make report
-        self._drop_subjectkey_nan()
-        self._remap_sex()
+        # Make report
         self.make_emrq()
 
     def make_emrq(self):
@@ -1659,7 +1669,7 @@ class NdarPanas01(_CleanDemo):
         """
         # Get needed column values from report template
         print("Buiding NDA report : panas01 ...")
-        self._df_demo = df_demo
+        super().__init__(df_demo)
         self._proj_dir = proj_dir
         self.nda_label, self._nda_cols = report_helper.mine_template(
             "panas01_template.csv"
@@ -1674,10 +1684,6 @@ class NdarPanas01(_CleanDemo):
             columns={"study_id": "src_subject_id"}
         )
         self._df_study_day3.columns = self._df_study_day2.columns.values
-
-        # Get final demographics
-        self._drop_subjectkey_nan()
-        self._remap_sex()
 
         # Make reports for each visit
         df_nda_day2 = self.make_panas("day2")
@@ -2144,7 +2150,7 @@ class NdarPswq01(_CleanDemo):
         """
         print("Buiding NDA report : pswq01 ...")
         # Read in template, concatenate survey data
-        self._df_demo = df_demo
+        super().__init__(df_demo)
         self.nda_label, self._nda_cols = report_helper.mine_template(
             "pswq01_template.csv"
         )
@@ -2152,9 +2158,7 @@ class NdarPswq01(_CleanDemo):
         df_pswq = df_pswq.replace("NaN", np.nan)
         self._df_pswq = df_pswq[df_pswq["PSWQ_1"].notna()]
 
-        # Get final demographics, make report
-        self._drop_subjectkey_nan()
-        self._remap_sex()
+        # Make report
         self.make_pswq()
 
     def make_pswq(self):
@@ -2259,7 +2263,7 @@ class NdarRest01(_CleanDemo):
         """
         # Get needed column values from report template
         print("Buiding NDA report : restsurv01 ...")
-        self._df_demo = df_demo
+        super().__init__(df_demo)
         self.nda_label, self._nda_cols = report_helper.mine_template(
             "restsurv01_template.csv"
         )
@@ -2268,10 +2272,6 @@ class NdarRest01(_CleanDemo):
         self._get_clean(
             df_pilot_day2, df_study_day2, df_pilot_day3, df_study_day3
         )
-
-        # Get final demographics
-        self._drop_subjectkey_nan()
-        self._remap_sex()
 
         # Make nda reports for each session
         df_nda_day2 = self.make_rest("day2")
@@ -2448,16 +2448,12 @@ class NdarRrs01(_CleanDemo):
         """
         print("Buiding NDA report : rrs01 ...")
         # Read in template
-        self._df_demo = df_demo
+        super().__init__(df_demo)
         self._proj_dir = proj_dir
         self._df_study = df_study
         self.nda_label, self._nda_cols = report_helper.mine_template(
             "rrs01_template.csv"
         )
-
-        # Get final demographics
-        self._drop_subjectkey_nan()
-        self._remap_sex()
 
         # Make pilot, study dataframes
         df_pilot = self._get_pilot()
@@ -2877,15 +2873,19 @@ class NdarStai01:
         return df_nda
 
 
-class NdarTas01:
+class NdarTas01(_CleanDemo):
     """Make tas01 report for NDAR submission.
+
+    Inherits _CleanDemo.
 
     Parameters
     ----------
-    proj_dir : path
-        Project's experiment directory
     df_demo : make_reports.build_reports.DemoAll.final_demo
         pd.DataFrame, compiled demographic info
+    df_pilot : pd.DataFrame
+        Pilot TAS data
+    df_study : pd.DataFrame
+        Study TAS data
 
     Attributes
     ----------
@@ -2901,7 +2901,7 @@ class NdarTas01:
 
     """
 
-    def __init__(self, proj_dir, df_demo):
+    def __init__(self, df_demo, df_pilot, df_study):
         """Read in survey data and make report.
 
         Get cleaned TAS Qualtrics survey from visit_day1, and
@@ -2914,42 +2914,19 @@ class NdarTas01:
 
         """
         print("Buiding NDA report : tas01 ...")
-        # Read in template
+        # Read in template, concat dfs
+        super().__init__(df_demo)
         self.nda_label, self._nda_cols = report_helper.mine_template(
             "tas01_template.csv"
         )
-
-        # Get clean survey data
-        df_pilot = pd.read_csv(
-            os.path.join(
-                proj_dir,
-                "data_pilot/data_survey",
-                "visit_day1/data_clean",
-                "df_TAS.csv",
-            )
-        )
-        df_study = pd.read_csv(
-            os.path.join(
-                proj_dir,
-                "data_survey",
-                "visit_day1/data_clean",
-                "df_TAS.csv",
-            )
-        )
         df_tas = pd.concat([df_pilot, df_study], ignore_index=True)
-        del df_pilot, df_study
 
         # Rename columns, drop NaN rows
         df_tas = df_tas.rename(columns={"study_id": "src_subject_id"})
         df_tas = df_tas.replace("NaN", np.nan)
         self._df_tas = df_tas[df_tas["TAS_1"].notna()]
 
-        # Get final demographics, make report
-        df_demo = df_demo.replace("NaN", np.nan)
-        df_demo["sex"] = df_demo["sex"].replace(
-            ["Male", "Female", "Neither"], ["M", "F", "O"]
-        )
-        self._df_demo = df_demo.dropna(subset=["subjectkey"])
+        # Make report
         self.make_tas()
 
     def make_tas(self):
@@ -2964,16 +2941,18 @@ class NdarTas01:
 
         """
         # Make data integer, calculate sum, and rename columns
-        df_tas = self._df_tas
-        tas_cols = [x for x in df_tas.columns if "TAS" in x]
-        df_tas[tas_cols] = df_tas[tas_cols].astype("Int64")
-        df_tas["tas_totalscore"] = df_tas[tas_cols].sum(axis=1)
-        df_tas["tas_totalscore"] = df_tas["tas_totalscore"].astype("Int64")
-        df_tas.columns = df_tas.columns.str.replace("TAS", "tas20")
+        self._df_tas = self._df_tas
+        tas_cols = [x for x in self._df_tas.columns if "TAS" in x]
+        self._df_tas[tas_cols] = self._df_tas[tas_cols].astype("Int64")
+        self._df_tas["tas_totalscore"] = self._df_tas[tas_cols].sum(axis=1)
+        self._df_tas["tas_totalscore"] = self._df_tas["tas_totalscore"].astype(
+            "Int64"
+        )
+        self._df_tas.columns = self._df_tas.columns.str.replace("TAS", "tas20")
 
         # Combine demographic and stai dataframes
         df_nda = self._df_demo[["subjectkey", "src_subject_id", "sex"]]
-        df_tas_nda = pd.merge(df_tas, df_nda, on="src_subject_id")
+        df_tas_nda = pd.merge(self._df_tas, df_nda, on="src_subject_id")
         df_tas_nda = report_helper.get_survey_age(
             df_tas_nda, self._df_demo, "src_subject_id"
         )
