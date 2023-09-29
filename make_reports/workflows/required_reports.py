@@ -264,7 +264,7 @@ class MakeNdarReports(_GetData, _BuildArgs):
         Names of desired NDA reports e.g. ["demo_info01", "affim01"]
     proj_dir : path
         Project's experiment directory
-    close_date : datetime
+    close_date : datetime.date
         Submission cycle close date
     redcap_token : str
         Personal access token for RedCap
@@ -323,10 +323,15 @@ class MakeNdarReports(_GetData, _BuildArgs):
 
     def _build_report(self):
         """Title."""
-        # Build args for build_ndar class
+        # Build args. All classes take df_demo as arg 1. Supply project_dir
+        # to certain classes, give image03 close_date.
         args = [self.df_demo]
         if self._report in ["brd01", "image03", "panas01", "rrs01"]:
             args = args + [self._proj_dir]
+        if self._report in ["image03"]:
+            args = args + [self._close_date]
+
+        # Identify class name and get data if needed
         class_name, self._df_name = self._nda_switch[self._report]
         if self._df_name:
             args = args + self.build_args()

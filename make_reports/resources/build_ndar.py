@@ -32,6 +32,7 @@ import subprocess
 import pandas as pd
 import numpy as np
 from datetime import datetime
+from dateutil.relativedelta import relativedelta
 import pydicom
 from make_reports.resources import report_helper
 
@@ -87,7 +88,7 @@ def _local_path() -> str:
     return (
         "/run/user/1001/gvfs/smb-share:server"
         + "=ccn-keoki.win.duke.edu,share=experiments2/EmoRep/"
-        + "Exp2_Compute_Emotion/ndar_upload/data_beh"
+        + "Exp2_Compute_Emotion/ndar_upload"
     )
 
 
@@ -611,7 +612,9 @@ class NdarBrd01(_CleanDemo):
                 "experiment_description": "(see design details of "
                 + f"experiment_ID {id_dict['new']})",
                 "stimuli_detail": "post-scan stimulus rating",
-                "data_file1": os.path.join(_local_path(), out_file),
+                "data_file1": os.path.join(
+                    _local_path(), "data_beh", out_file
+                ),
                 "experiment_id": id_dict["new"],
             }
             survey_date = df_sub.loc[0, "datetime"]
@@ -899,22 +902,29 @@ class NdarEmrq01(_CleanDemo):
         self.df_report = df_report
 
 
-class NdarImage03:
+class NdarImage03(_CleanDemo):
     """Make image03 report line-by-line.
+
+    Inherits _CleanDemo.
 
     Identify all data in rawdata and add a line to image03 for each
     MRI file in rawdata. Utilize BIDS JSON sidecar and DICOM header
     information to identify required values.
 
-    Make copies of study participants' NIfTI and events files in:
-        <proj_dir>/ndar_upload/data_mri
+    Make copies of study participants' MRI/events and physio files in:
+        <proj_dir>/ndar_upload/data_[mri|phys]
 
     Parameters
     ----------
-    proj_dir : path
-        Project's experiment directory
     df_demo : make_reports.build_reports.DemoAll.final_demo
         pd.DataFrame, compiled demographic info
+    proj_dir : str, os.PathLike
+        Project's experiment directory
+    close_date : datetime.date
+        Submission cycle close date
+    all_data : bool, optional
+        Host and make image03 from all data rather than
+        submission cycle.
     test_subj : str, optional
         BIDS subject identifier, for testing class
 
@@ -941,7 +951,9 @@ class NdarImage03:
 
     """
 
-    def __init__(self, proj_dir, df_demo, test_subj=None):
+    def __init__(
+        self, df_demo, proj_dir, close_date, all_data=False, test_subj=None
+    ):
         """Coordinate report generation for MRI data.
 
         Assumes BIDS organization of <proj_dir>/data_scanner_BIDS. Identify
@@ -968,6 +980,7 @@ class NdarImage03:
         print("Buiding NDA report : image03 ...")
 
         # Read in template, start empty dataframe
+        super().__init__(df_demo)
         self.nda_label, self._nda_cols = report_helper.mine_template(
             "image03_template.csv"
         )
@@ -975,9 +988,15 @@ class NdarImage03:
 
         # Set reference and orienting attributes
         self._proj_dir = proj_dir
+        self._close_date = datetime.combine(close_date, datetime.min.time())
+        self._all_data = all_data
         self._source_dir = os.path.join(
             proj_dir, "data_scanner_BIDS/sourcedata"
         )
+
+        # Calc start date
+        if not all_data:
+            self._start_date = self._close_date + relativedelta(months=-6)
 
         # Identify all session in rawdata, check that data is found
         rawdata_dir = os.path.join(proj_dir, "data_scanner_BIDS/rawdata")
@@ -994,22 +1013,18 @@ class NdarImage03:
                 f"Subject, session paths not found in {rawdata_dir}"
             )
 
-        # Get demographic info
-        df_demo = df_demo.replace("NaN", np.nan)
-        df_demo = df_demo.dropna(subset=["subjectkey"])
-        df_demo["sex"] = df_demo["sex"].replace(
-            ["Male", "Female", "Neither"], ["M", "F", "O"]
-        )
-        self._df_demo = df_demo
-
         # Get pilot df, make df_report for all study participants
-        self.make_pilot()
+        if self._all_data:
+            self.make_pilot()
         self.make_image03()
 
         # Combine df_report_study and df_report_pilot
-        self.df_report = pd.concat(
-            [self._df_report_pilot, self._df_report_study], ignore_index=True
+        df_list = (
+            [self._df_report_pilot, self._df_report_study]
+            if self._all_data
+            else [self._df_report_study]
         )
+        self.df_report = pd.concat(df_list, ignore_index=True)
 
     def make_pilot(self):
         """Read previously-generated NDAR report for pilot participants.
@@ -1030,11 +1045,10 @@ class NdarImage03:
             raise FileNotFoundError(
                 f"Expected to find pilot image03 at {pilot_report}"
             )
-        df_report_pilot = pd.read_csv(pilot_report)
-        df_report_pilot = df_report_pilot[1:]
-        df_report_pilot.columns = self._nda_cols
-        df_report_pilot["comments_misc"] = "PILOT PARTICIPANT"
-        self._df_report_pilot = df_report_pilot
+        self._df_report_pilot = pd.read_csv(pilot_report)
+        self._df_report_pilot = self._df_report_pilot[1:]
+        self._df_report_pilot.columns = self._nda_cols
+        self._df_report_pilot["comments_misc"] = "PILOT PARTICIPANT"
 
     def make_image03(self):
         """Generate image03 report for study participants.
@@ -1123,15 +1137,13 @@ class NdarImage03:
 
         """
         # Identify participant date of birth, sex, and GUID
-        # TODO deal with participants not found in df_demo (withdrawn)
-        df_demo = self._df_demo
-        idx_subj = df_demo.index[
-            df_demo["src_subject_id"] == self._subj_nda
+        idx_subj = self._df_demo.index[
+            self._df_demo["src_subject_id"] == self._subj_nda
         ].tolist()[0]
-        subj_guid = df_demo.iloc[idx_subj]["subjectkey"]
-        subj_id = df_demo.iloc[idx_subj]["src_subject_id"]
-        subj_sex = df_demo.iloc[idx_subj]["sex"]
-        subj_dob = datetime.strptime(df_demo.iloc[idx_subj]["dob"], "%Y-%m-%d")
+        subj_guid = self._df_demo.iloc[idx_subj]["subjectkey"]
+        subj_id = self._df_demo.iloc[idx_subj]["src_subject_id"]
+        subj_sex = self._df_demo.iloc[idx_subj]["sex"]
+        subj_dob = self._df_demo.iloc[idx_subj]["dob"]
 
         # Calculate age in months
         interview_age = report_helper.calc_age_mo([subj_dob], [scan_date])[0]
@@ -1272,7 +1284,7 @@ class NdarImage03:
             Missing defaced version in derivatives
 
         """
-        print(f"\t\tWriting line for {self._subj} {self._sess} : anat ...")
+        print(f"\t\tWorking on {self._subj} {self._sess} : anat ...")
 
         # Get JSON info
         json_file = sorted(glob.glob(f"{self._subj_sess}/anat/*.json"))[0]
@@ -1305,6 +1317,10 @@ class NdarImage03:
         scan_date = datetime.strptime(dicom_hdr[0x08, 0x20].value, "%Y%m%d")
         demo_dict = self._get_subj_demo(scan_date)
 
+        # Account for submission window
+        if not self._include_scan(scan_date):
+            return
+
         # Setup host file
         deface_file = os.path.join(
             self._proj_dir,
@@ -1332,7 +1348,8 @@ class NdarImage03:
             "image_resolution2": 1.0,
             "image_resolution3": float(nii_json["SliceThickness"]),
             "image_slice_thickness": float(nii_json["SliceThickness"]),
-            "software_preproc": "pydeface version=2.0.2",
+            "software_preproc": "@afni_refacer_run -mode_deface "
+            + "Version AFNI_23.0.03",
         }
 
         # Combine demographic, common MRI, and anat-specific dicts
@@ -1345,6 +1362,20 @@ class NdarImage03:
             [self._df_report_study.loc[:], new_row]
         ).reset_index(drop=True)
         del new_row
+
+    def _include_scan(self, scan_date: datetime) -> bool:
+        """Check if scan date is in submission window."""
+        if not self._all_data:
+            if scan_date < self._start_date or scan_date > self._close_date:
+                p_scan = scan_date.strftime("%Y-%m-%d")
+                p_start = self._start_date.strftime("%Y-%m-%d")
+                p_end = self._close_date.strftime("%Y-%m-%d")
+                print(
+                    f"\t\t\tScan date {p_scan} not in range : "
+                    + f"{p_start} - {p_end}, skipping"
+                )
+                return False
+        return True
 
     def info_fmap(self):
         """Write image03 line for fmap data.
@@ -1362,7 +1393,7 @@ class NdarImage03:
             Missing NIfTI file
 
         """
-        print(f"\t\tWriting line for {self._subj} {self._sess} : fmap ...")
+        print(f"\t\tWorking on {self._subj} {self._sess} : fmap ...")
 
         # Find nii, json files
         nii_list = sorted(glob.glob(f"{self._subj_sess}/fmap/*.nii.gz"))
@@ -1415,6 +1446,10 @@ class NdarImage03:
                 dicom_hdr[0x08, 0x20].value, "%Y%m%d"
             )
             demo_dict = self._get_subj_demo(scan_date)
+
+            # Account for submission window
+            if not self._include_scan(scan_date):
+                continue
 
             # Make a host file
             h_guid = demo_dict["subjectkey"]
@@ -1503,7 +1538,7 @@ class NdarImage03:
             # Identify appropriate DICOM, load header
             _, _, task, run, _ = os.path.basename(nii_path).split("_")
             print(
-                f"\t\tWriting line for {self._subj} {self._sess} : "
+                f"\t\tWorking on {self._subj} {self._sess} : "
                 + f"func {task} {run} ..."
             )
             day = self._sess.split("-")[1]
@@ -1528,6 +1563,10 @@ class NdarImage03:
                 dicom_hdr[0x08, 0x20].value, "%Y%m%d"
             )
             demo_dict = self._get_subj_demo(scan_date)
+
+            # Account for submission window
+            if not self._include_scan(scan_date):
+                continue
 
             # Setup host nii
             subj_guid = demo_dict["subjectkey"]
@@ -2068,15 +2107,11 @@ class NdarPhysio:
 
         """
         # Setup for determining experiment id
-        exp_dict = {"old": 1683, "new": 2113}
+        exp_dict = _task_id()
         pilot_list = report_helper.pilot_list()
 
         # Set local path for upload building
-        local_path = (
-            "/run/user/1001/gvfs/smb-share:server"
-            + "=ccn-keoki.win.duke.edu,share=experiments2/EmoRep/"
-            + "Exp2_Compute_Emotion/ndar_upload/data_phys"
-        )
+        local_path = os.path.join(_local_path(), "data_phys")
 
         # Start empty dataframe, fill with physio data
         df_report = pd.DataFrame(columns=self._nda_cols)

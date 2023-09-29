@@ -198,7 +198,7 @@ class _CalcProp(build_reports.DemoAll):
 
 
 # %%
-def demographics(proj_dir, redcap_token, plot_var="Count", ref_num=150):
+def demographics(proj_dir, redcap_token, plot_var="Count", ref_num=170):
     """Check on demographic recruitment.
 
     Currently only supports a subset of total planned demographics.
