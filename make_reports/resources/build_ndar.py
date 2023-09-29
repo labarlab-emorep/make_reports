@@ -1,9 +1,23 @@
 """Build datsets and data hosts for NDAR uploads.
 
-TODO
+NdarAffim01 : build affim01 report
+NdarAls01 : build als01 report
+NdarBdi01 : build bdi01 report
+NdarBrd01 : build brd01 report
+NdarDemoInfo01 : build demo_info01 report
+NdarEmrq01 : build emrq01 report
+NdarImage03 : build image03 report
+NdarPanas01 : build panas01 report
+NdarPhysio : Deprecated
+NdarPswq01 : build pswq01 report
+NdarRest01 : build restsurv01 report
+NdarRrs01 : build rrs01 report
+NdarStai01 : build stai01 report
+NdarTas01 : build tas01 report
 
-Each class is self-contained, requiring only demographic info input. Many
-classes are highly similar and a more generic class structure could have
+Notes
+-----
+Classes are highly similar and a more generic class structure could have
 done the necessary work for several NDAR reports, but here each report
 is kept separate for ease of fulfilling idiosyncratic NDAR requirements.
 
@@ -13,13 +27,7 @@ Each class contains two attributes used for writing the NDAR dataset reports:
     -   nda_label : list, the file identifier that should be prepended
             to df_report (e.g. image,03)
 
-Additionally, each class accepts as input two parameters:
-    -   proj_dir : path, project's parent directory
-    -   df_demo : make_reports.build_reports.DemoAll.final_demo, a
-            pd.DataFrame containing needed demographic and identification
-            information.
-
-Finally, instantiating the class triggers the construction of df_report and
+Instantiating the class triggers the construction of df_report and
 nda_label, as well as setting up any data for hosting. This consistent
 structure allows for the dynamic instantiation and use of the classes.
 
@@ -968,13 +976,6 @@ class NdarImage03(_CleanDemo):
             Image03 values for experiment/study participants
         nda_label : list
             NDA report template label
-
-        Raises
-        ------
-        FileNotFoundError
-            Missing pilot image03 csv
-        ValueError
-            Empty subj_sess_list
 
         """
         print("Buiding NDA report : image03 ...")

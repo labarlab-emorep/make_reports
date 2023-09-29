@@ -1,8 +1,8 @@
 """Methods for generating reports required by the NIH or Duke.
 
 make_regular_reports : Generate reports submited to NIH or Duke
-make_ndar_reports : Generate reports, data submitted to NIH Data
-                        Archive (NDAR)
+MakeNdarReports : Generate reports, data submitted to NIH Data
+                    Archive (NDAR)
 gen_guids : generate or check GUIDs
 
 """
@@ -79,21 +79,32 @@ def make_regular_reports(regular_reports, query_date, proj_dir, redcap_token):
 
 # %%
 class _GetData:
-    """Title.
+    """Get REDcap, Qualtrics, and rest-ratings data.
+
+    Download, clean, and return necessary data for
+    generating NDAR reports.
+
+    Intended to be inherited by MakeNdarReports,
+    references attrs set by child.
 
     Attributes
     ----------
-    df_demo
-    data_dict
+    df_demo : pd.DataFrame, make_reports.build_reports.DemoAll.final_demo
+        Compiled demographic information
+    data_dict : dict
+        RedCap, Qualtrics data organized in format:
+        {pilot|study: {visit: {survey_name: pd.DataFrame}}}
 
     Methods
     -------
-    get_data
+    get_data()
+        Get required demographic data, download/clean
+        survey data for values in self._report_names.
 
     """
 
     def get_data(self):
-        """Entrypoint, build df_demo and data_dict attrs."""
+        """Build df_demo and data_dict attrs."""
         # Get redcap demographic data, use only consented data in
         # submission cycle.
         redcap_demo = build_reports.DemoAll(self._proj_dir, self._redcap_token)
@@ -101,10 +112,8 @@ class _GetData:
         redcap_demo.submission_cycle(self._close_date)
         self.df_demo = redcap_demo.final_demo
 
-        # Start data_dict attr
+        # Build data_dict with redcap, qualtrics, and rest data
         self.data_dict = {"study": {}, "pilot": {}}
-
-        # Get redcap, qualtrics, and rest ratings
         if "bdi01" in self._report_names:
             self._get_red()
         self._get_qual()
@@ -169,12 +178,12 @@ class _GetData:
         rest_data.get_rest()
         self._merge_dict(rest_data.clean_rest)
 
-    def _merge_dict(self, d_new: dict):
-        """Update data_dict with d_new."""
+    def _merge_dict(self, new_data: dict):
+        """Update data_dict attr with new_data."""
         # Build omni dict of dataframes in format:
         #   {study|pilot: {visit: {survey_name: df}}}
         for status in self.data_dict.keys():
-            for visit, sur_dict in d_new[status].items():
+            for visit, sur_dict in new_data[status].items():
                 for sur_name, sur_df in sur_dict.items():
                     if visit not in self.data_dict[status].keys():
                         self.data_dict[status][visit] = {sur_name: sur_df}
@@ -183,23 +192,29 @@ class _GetData:
 
 
 class _BuildArgs:
-    """Title.
+    """Build arguments for build_ndar.Ndar* classes.
+
+    Unpack data_dict attr, return list of dataframes for
+    attr _df_name. Used to supply each build_ndar.Ndar*
+    class the appropriate number of dataframes.
 
     Methods
     -------
-    build_args
+    build_args()
+        Return list of dataframes for _df_name
 
     """
 
     def build_args(self) -> list:
-        """Title."""
-        #
+        """Return list of pd.DataFrame for _df_name."""
+        # Align report name to unpacking method
         v1_list = ["AIM", "ALS", "ERQ", "PSWQ", "RRS", "TAS"]
         v23_list = ["BDI", "PANAS", "rest_ratings", "post_scan_ratings"]
         v123_list = ["STAI"]
         if self._df_name not in v1_list + v23_list + v123_list:
             raise ValueError(f"Unexpected df name : {self._df_name}")
 
+        # Get, return list of dataframes
         if self._df_name in v1_list:
             arg_list = self._v1_pilot_study()
         elif self._df_name in v23_list:
@@ -209,7 +224,7 @@ class _BuildArgs:
         return arg_list
 
     def _v1_pilot_study(self) -> list:
-        """Title."""
+        """Return visit_day1 dataframes."""
         df_pilot = self.data_dict["pilot"]["visit_day1"][self._df_name]
         df_study = self.data_dict["study"]["visit_day1"][self._df_name]
 
@@ -217,7 +232,7 @@ class _BuildArgs:
         return [df_pilot, df_study] if self.df_name != "RRS" else [df_study]
 
     def _v23_pilot_study(self) -> list:
-        """Title."""
+        """Return visit_day2 and visit_day3 dataframes."""
         df_pilot_2 = self.data_dict["pilot"]["visit_day2"][self._df_name]
         df_study_2 = self.data_dict["study"]["visit_day2"][self._df_name]
         df_pilot_3 = self.data_dict["pilot"]["visit_day3"][self._df_name]
@@ -230,7 +245,7 @@ class _BuildArgs:
             return [df_pilot_2, df_study_2, df_pilot_3, df_study_3]
 
     def _v123_pilot_study(self) -> list:
-        """Title."""
+        """Return STAI dataframes."""
         df_pilot_1 = self.data_dict["pilot"]["visit_day1"]["STAI_Trait"]
         df_study_1 = self.data_dict["study"]["visit_day1"]["STAI_Trait"]
         df_pilot_2 = self.data_dict["pilot"]["visit_day2"]["STAI_State"]
@@ -255,13 +270,8 @@ class MakeNdarReports(_GetData, _BuildArgs):
     Generate requested NDAR reports and organize data (if required) for the
     biannual upload.
 
-    Reports are written to:
-        <proj_dir>/ndar_upload/cycle_<close_date>
-
     Parameters
     ----------
-    ndar_reports : list
-        Names of desired NDA reports e.g. ["demo_info01", "affim01"]
     proj_dir : path
         Project's experiment directory
     close_date : datetime.date
@@ -271,7 +281,20 @@ class MakeNdarReports(_GetData, _BuildArgs):
     qualtrics_token : str
         Personal access token for Qualtrics
 
+    Methods
+    -------
+    make_report(report_list: list)
+        Generate bi-annual NDAR reports.
 
+    Example
+    -------
+    make_ndar = required_reports.MakeNdarReports(*args)
+    make_ndar.make_report(["demo_info01", "affim01"])
+
+    Notes
+    -----
+    Reports written to <proj_dir>/ndar_upload/cycle_<close_date>
+    Data are hosted at <proj_dir>/ndar_upload/data_[mri|phys|beh]
 
     """
 
@@ -302,11 +325,12 @@ class MakeNdarReports(_GetData, _BuildArgs):
         }
 
     def make_report(self, report_names):
-        """Title.
+        """Generate requested NDAR report(s).
 
         Parameters
         ----------
-        report_names : list
+        ndar_reports : list
+            Names of desired NDA reports e.g. ["demo_info01", "affim01"]
 
         """
         # Validate ndar_reports arguments, download and clean
@@ -322,7 +346,7 @@ class MakeNdarReports(_GetData, _BuildArgs):
             self._build_report()
 
     def _build_report(self):
-        """Title."""
+        """Build requested report."""
         # Build args. All classes take df_demo as arg 1. Supply project_dir
         # to certain classes, give image03 close_date.
         args = [self.df_demo]
@@ -346,7 +370,7 @@ class MakeNdarReports(_GetData, _BuildArgs):
         self._write_report(rep_obj.df_report, rep_obj.nda_label)
 
     def _write_report(self, df: pd.DataFrame, nda_label: list):
-        """Title."""
+        """Write ndar report to disk."""
         # Setup output directories
         report_dir = os.path.join(
             self._proj_dir,
