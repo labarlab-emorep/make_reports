@@ -22,27 +22,18 @@ from pandas.api.types import is_numeric_dtype, is_string_dtype
 import numpy as np
 import seaborn as sns
 import matplotlib.pyplot as plt
+from make_reports.resources import manage_data
 
 
 # %%
 class _DescStat:
     """Supply statistic and plotting methods.
 
-    Each method supplies their own examples.
-
-    Parameters
-    ----------
-    df : pd.DataFrame
-        Input dataset
-    col_data : list, optional
-        Column name in df of desired data
-
-    Attributes
-    ----------
-    col_data : list
-        List of df columns containing numeric type data
-    df : pd.DataFrame
-        Wide- or long-formatted survey dataframe
+    Intended to be inherited, references attrs set by child:
+        - df : pd.DataFrame
+            Wide- or long-formatted survey dataframe
+        - col_data : list
+            List of df columns containing numeric type data
 
     Methods
     -------
@@ -67,13 +58,6 @@ class _DescStat:
         Generate and write a boxplot of row totals
 
     """
-
-    def __init__(self, df, col_data=None):
-        """Initialize."""
-        print("\tInitializing _DescStat")
-        self.df = df
-        if col_data:
-            self.col_data = col_data
 
     def calc_row_stats(self):
         """Calculate descriptive stats for dataframe rows.
@@ -578,43 +562,31 @@ class Visit1Stats(_DescStat):
 
     Parameters
     ----------
-    csv_path : path
-        Location of cleaned survey CSV, requires columns
+    df : pd.DataFrame
+        Cleaned survey data, requires columns
         "study_id" and "<survey_name>_*".
     survey_name : str
         Short name of survey, found in column names of CSV
 
     Example
     -------
-    stat_obj = Visit1Stats("/path/to/AIM.csv", "AIM")
+    stat_obj = Visit1Stats(pd.DataFrame, "AIM")
     stat_dict = stat_obj.calc_row_stats()
     stat_obj.draw_single_boxplot("Title", "/path/to/output/fig.png")
 
     """
 
-    def __init__(self, csv_path, survey_name):
+    def __init__(self, df, survey_name):
         """Initialize.
 
         Triggers construction of survey dataframe.
 
-        Raises
-        ------
-        FileNotFoundError
-            File missing at csv_path
-
         """
         print("Initializing Visit1Stats")
-        if not os.path.exists(csv_path):
-            raise FileNotFoundError(f"Missing file : {csv_path}")
-        df, col_data = self._make_df(csv_path, survey_name)
-        super().__init__(df, col_data)
 
-    def _make_df(
-        self, csv_path: str, survey_name: str
-    ) -> Tuple[pd.DataFrame, list]:
-        """Return survey data as dataframe and data column names."""
-        # Read in data, check column names
-        df = pd.read_csv(csv_path)
+        # Validate df
+        if not isinstance(df, pd.DataFrame):
+            raise TypeError(f"Expected pd.DataFrame, got df : {type(df)}")
         if "study_id" not in df.columns:
             raise KeyError("Expected dataframe to have column : study_id")
         col_str = "\t".join(df.columns)
@@ -622,13 +594,16 @@ class Visit1Stats(_DescStat):
             raise KeyError(
                 f"Expected dataframe column name that contains {survey_name}"
             )
+        self.df = df
+        self.col_data = self._prep_df(survey_name)
 
-        # Organize df for use by _DescStat
-        df = df.set_index("study_id")
-        df = df.drop(labels=["datetime"], axis=1)
-        col_data = [x for x in df.columns if survey_name in x]
-        df[col_data] = df[col_data].astype("Int64")
-        return (df, col_data)
+    def _prep_df(self, survey_name: str) -> list:
+        """Prep df for analyses, return relevant column names."""
+        self.df = self.df.set_index("study_id")
+        self.df = self.df.drop(labels=["datetime"], axis=1)
+        col_data = [x for x in self.df.columns if survey_name in x]
+        self.df[col_data] = self.df[col_data].astype("Int64")
+        return col_data
 
 
 # %%
@@ -643,11 +618,11 @@ class Visit23Stats(_DescStat):
 
     Parameters
     ----------
-    day2_csv_path : path
-        Location of cleaned visit 2 survey CSV, requires columns
+    df_day2 : pd.DataFrame
+        Cleaned visit 2 survey, requires columns
         "study_id" and "<survey_name>_*".
-    day3_csv_path : path
-        Location of cleaned visit 3 survey CSV, requires columns
+    df_day3 : pd.DataFrame
+        Cleaned visit 3 survey, requires columns
         "study_id" and "<survey_name>_*".
     survey_name : str
         Short name of survey, found in column names of CSV
@@ -664,8 +639,8 @@ class Visit23Stats(_DescStat):
     fac_a = "Visit 2"
     fac_b = "Visit 3"
     stat_obj = Visit23Stats(
-        "/path/to/day2/BDI.csv",
-        "/path/to/day3/BDI.csv",
+        df_day2,
+        df_day3,
         "BDI",
         fac_col,
         fac_a,
@@ -678,49 +653,36 @@ class Visit23Stats(_DescStat):
 
     """
 
-    def __init__(
-        self, day2_csv_path, day3_csv_path, survey_name, fac_col, fac_a, fac_b
-    ):
+    def __init__(self, df_day2, df_day3, survey_name, fac_col, fac_a, fac_b):
         """Initialize.
 
         Triggers construction of concatenated survey dataframe, with
         added "visit" column.
 
-        Raises
-        ------
-        FileNotFoundError
-            File missing at csv_path
-
         """
         print("Initializing Visit23Stats")
 
-        # Validate
-        for chk_path in [day2_csv_path, day3_csv_path]:
-            if not os.path.exists(chk_path):
-                raise FileNotFoundError(
-                    f"Missing expected CSV file : {chk_path}"
-                )
-
         # Get visit data and check column names
-        df_day2, col_day2 = self._make_df(
-            day2_csv_path, survey_name, fac_a, fac_col
+        df_day2_clean, col_day2 = self._make_df(
+            df_day2, survey_name, fac_a, fac_col
         )
-        df_day3, col_day3 = self._make_df(
-            day3_csv_path, survey_name, fac_b, fac_col
+        df_day3_clean, col_day3 = self._make_df(
+            df_day3, survey_name, fac_b, fac_col
         )
         if col_day2 != col_day3:
             raise ValueError("Dataframes do not have identical column names.")
 
         # Make single df
-        df = pd.concat([df_day2, df_day3], ignore_index=True)
-        super().__init__(df, col_day2)
+        self.df = pd.concat([df_day2_clean, df_day3_clean], ignore_index=True)
+        self.col_data = col_day2
 
     def _make_df(
-        self, csv_path: str, survey_name: str, fac: str, fac_col: str
+        self, df: pd.DataFrame, survey_name: str, fac: str, fac_col: str
     ) -> Tuple[pd.DataFrame, list]:
         """Return survey data as dataframe and data column names."""
-        # Read in data, check column names
-        df = pd.read_csv(csv_path)
+        # Validate
+        if not isinstance(df, pd.DataFrame):
+            raise TypeError(f"Expected pd.DataFrame, got df : {type(df)}")
         if "study_id" not in df.columns:
             raise KeyError("Expected dataframe to have column : study_id")
         col_str = "\t".join(df.columns)
@@ -738,19 +700,19 @@ class Visit23Stats(_DescStat):
 
 
 # %%
-class RestRatings(_DescStat):
+class RestRatings(manage_data.GetRest, _DescStat):
     """Get resting frequency data and supply statistic, plotting methods.
 
     Construct pd.DataFrame from cleaned Visit 2 and 3 resting-state
     emotion frequency responses and supply methods for generating
     descriptive statistics and figures.
 
-    Inherits _DescStat.
+    Inherits manage_data.GetRest, _DescStat.
 
     Parameters
     ----------
-    proj_dir : path
-        Location of project's experiment directory
+    proj_dir : str, os.PathLike
+        Location of project parent directory
 
     Methods
     -------
@@ -772,37 +734,27 @@ class RestRatings(_DescStat):
         resting state emotion frequency responses.
 
         """
-        self._proj_dir = proj_dir
-        df_long = self._get_data()
-        super().__init__(df_long)
+        super().__init__(proj_dir)
+        self.get_rest()
+        self.df = self._make_df()
 
-    def _get_data(self) -> pd.DataFrame:
+    def _make_df(self) -> pd.DataFrame:
         """Construct dataframe from clean visit 2, 3 data."""
-        # Identify rest-ratings files
-        day2_path = os.path.join(
-            self._proj_dir,
-            "data_survey/visit_day2/data_clean",
-            "df_rest-ratings.csv",
-        )
-        day3_path = os.path.join(
-            self._proj_dir,
-            "data_survey/visit_day3/data_clean",
-            "df_rest-ratings.csv",
-        )
-        for day in [day2_path, day3_path]:
-            if not os.path.exists(day):
-                raise FileNotFoundError(f"Expected to find file : {day}")
-
         # Make master dataframe
-        df_day2 = pd.read_csv(day2_path, na_values=88)
-        df_day3 = pd.read_csv(day3_path, na_values=88)
+        df_day2 = self.clean_rest["study"]["visit_day2"]["rest_ratings"].copy(
+            deep=True
+        )
+        df_day3 = self.clean_rest["study"]["visit_day3"]["rest_ratings"].copy(
+            deep=True
+        )
+        df_day2 = df_day2.replace(88, np.NaN)
+        df_day3 = df_day3.replace(88, np.NaN)
         df_rest_all = pd.concat([df_day2, df_day3], ignore_index=True)
         df_rest_all = df_rest_all.sort_values(
             by=["study_id", "visit", "resp_type"]
         ).reset_index(drop=True)
         df_rest_all["task"] = df_rest_all["task"].str.title()
         df_rest_all["task"] = df_rest_all["task"].replace("Movies", "Videos")
-        del df_day2, df_day3
 
         # Subset df for integer responses
         df_rest_int = df_rest_all[
@@ -864,6 +816,10 @@ class StimRatings(_DescStat):
         Location of project's experiment directory
     draw_plot : bool
         Whether to draw figures
+    df_day2 : pd.DataFrame
+        Cleaned visit 2 post-scan stim ratings responses
+    df_day3 : pd.DataFrame
+        Cleaned visit 3 post-scan stim ratings responses
 
     Attributes
     ----------
@@ -885,7 +841,7 @@ class StimRatings(_DescStat):
 
     """
 
-    def __init__(self, proj_dir, draw_plot):
+    def __init__(self, proj_dir, draw_plot, df_day2, df_day3):
         """Initialize.
 
         Trigger construction of long-formatted dataframe of
@@ -895,13 +851,6 @@ class StimRatings(_DescStat):
         ----------
         out_dir : path
             Output destination for generated files
-        _emo_list : list
-            Emotions categories presented in task
-
-        Raises
-        ------
-        TypeError
-            Incorrect user-input parameter types
 
         """
         # Validate user input
@@ -911,33 +860,16 @@ class StimRatings(_DescStat):
         # Set attrs
         print("\nInitializing DescriptStimRatings")
         self._draw_plot = draw_plot
-        self._proj_dir = proj_dir
         self.out_dir = os.path.join(proj_dir, "analyses/metrics_surveys")
 
         # Trigger dataframe construction, initialize helper
-        df, self._emo_list = self._get_data()
-        super().__init__(df)
+        self.df, self._emo_list = self._get_data(df_day2, df_day3)
 
-    def _get_data(self) -> Tuple[pd.DataFrame, list]:
+    def _get_data(
+        self, df_day2: pd.DataFrame, df_day3: pd.DataFrame
+    ) -> Tuple[pd.DataFrame, list]:
         """Make a dataframe of stimulus ratings."""
-        # Check for cleaned files
-        day2_path = os.path.join(
-            self._proj_dir,
-            "data_survey/visit_day2/data_clean",
-            "df_post_scan_ratings.csv",
-        )
-        day3_path = os.path.join(
-            self._proj_dir,
-            "data_survey/visit_day3/data_clean",
-            "df_post_scan_ratings.csv",
-        )
-        for day in [day2_path, day3_path]:
-            if not os.path.exists(day):
-                raise FileNotFoundError(f"Expected to find : {day}")
-
-        # Read-in, combine visit data
-        df_day2 = pd.read_csv(day2_path)
-        df_day3 = pd.read_csv(day3_path)
+        # Combine visit data
         df_all = pd.concat([df_day2, df_day3], ignore_index=True)
         df_all = df_all.sort_values(
             by=["study_id", "session", "type", "emotion", "prompt"]
@@ -1003,7 +935,7 @@ class StimRatings(_DescStat):
         if self._draw_plot:
             out_plot = os.path.join(
                 self.out_dir,
-                "plot_heatmap-prop_stim-ratings_endorsement_"
+                "plot_stim-ratings_endorsement_heatmap-prop_"
                 + f"{stim_type.lower()}.png",
             )
             self.confusion_heatmap(
@@ -1066,7 +998,7 @@ class StimRatings(_DescStat):
         if self._draw_plot:
             out_plot = os.path.join(
                 self.out_dir,
-                f"plot_boxplot-long_stim-ratings_{stim_type.lower()}.png",
+                f"plot_stim-ratings_{stim_type.lower()}_boxplot-long.png",
             )
             self.draw_long_boxplot(
                 x_col="emotion",
@@ -1140,7 +1072,7 @@ class EmorepTask(_DescStat):
         if not isinstance(draw_plot, bool):
             raise TypeError("Expected draw_plot type bool")
 
-        print("\nInitializing DescriptTask")
+        print("\nInitializing EmorepTask")
         self._draw_plot = draw_plot
         self.out_dir = os.path.join(proj_dir, "analyses/metrics_surveys")
 
@@ -1153,8 +1085,7 @@ class EmorepTask(_DescStat):
             raise ValueError(
                 f"Expected to find BIDS events files in : {mri_rawdata}"
             )
-        df = self._get_data(events_all)
-        super().__init__(df)
+        self.df = self._get_data(events_all)
 
     def _get_data(self, events_all: list) -> pd.DataFrame:
         """Combine all events files into dataframe."""
@@ -1248,7 +1179,7 @@ class EmorepTask(_DescStat):
         if self._draw_plot:
             out_plot = os.path.join(
                 self.out_dir,
-                "plot_boxplot-long_task-intensity.png",
+                "plot_task-intensity_boxplot-long.png",
             )
             self.draw_long_boxplot(
                 x_col="emotion",
@@ -1319,7 +1250,7 @@ class EmorepTask(_DescStat):
         if self._draw_plot:
             out_plot = os.path.join(
                 self.out_dir,
-                f"plot_heatmap-prop_task-emotion_{task.lower()}.png",
+                f"plot_task-emotion_{task.lower()}_heatmap-prop.png",
             )
             self.confusion_heatmap(
                 df_count,

@@ -7,9 +7,7 @@ get_metrics : generate metrics, figures for recruitment
 """
 # %%
 import os
-import glob
-from make_reports.resources import build_reports, calc_metrics
-from make_reports.workflows import manage_data
+from make_reports.resources import calc_metrics
 
 
 # %%
@@ -42,33 +40,13 @@ def get_metrics(
         API token for RedCap project
 
     """
-
-    def _get_surveys():
-        """Check for survey data and attempt cleaning if needed."""
-        redcap_clean = glob.glob(
-            f"{proj_dir}/data_survey/redcap_demographics/data_clean/*.csv"
-        )
-        visit_clean = glob.glob(
-            f"{proj_dir}/data_survey/visit*/data_clean/*.csv"
-        )
-        if len(redcap_clean) != 4 or len(visit_clean) != 17:
-            print("Missing RedCap, Qualtrics clean data. Cleaning ...")
-            cl_data = manage_data.CleanSurveys(proj_dir)
-            cl_data.clean_redcap()
-            cl_data.clean_qualtrics()
-            print("\tDone.")
-
     out_dir = os.path.join(proj_dir, "analyses/metrics_recruit")
     if not os.path.exists(out_dir):
         os.makedirs(out_dir)
 
     # Compare planned versus actual recruitment demographics
     if recruit_demo:
-        _get_surveys()
-        redcap_demo = build_reports.DemoAll(proj_dir)
-        redcap_demo.remove_withdrawn()
-        print("\nComparing planned vs. actual recruitment demographics ...")
-        _ = calc_metrics.demographics(proj_dir, redcap_demo.final_demo)
+        _ = calc_metrics.demographics(proj_dir, redcap_token)
 
     # Plot number of attempted scans per week
     if scan_pace:

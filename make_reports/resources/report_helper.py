@@ -24,6 +24,34 @@ import importlib.resources as pkg_resources
 from make_reports import reference_files
 
 
+def drop_participant(subj, df, subj_col):
+    """Drop participant from dataframe.
+
+    Remove a participant row from survey dataframe, for instance
+    ER0080 who reenrolled as ER1002.
+
+    Parameters
+    ----------
+    subj : str
+        ID of participant to remove (rows) from df
+    df : pd.DataFrame
+        Survey dataframe
+    subj_col : str
+        Column name of df containing subject ID
+
+    Returns
+    -------
+    pd.DataFrame
+        Input df with subject rows dropped
+
+    """
+    if subj_col not in df.columns:
+        raise ValueError(f"Expected dataframe to contain column : {subj_col}")
+    df_drop = df.copy()
+    df_drop.drop(df_drop[df_drop[subj_col] == subj].index, inplace=True)
+    return df_drop.reset_index(drop=True)
+
+
 def pull_redcap_data(
     redcap_token, report_id, content="report", return_format="csv"
 ):
@@ -141,7 +169,7 @@ def pull_qualtrics_data(
         request_check_progress = request_check_response.json()["result"][
             "percentComplete"
         ]
-        print(f"\tDownload is {request_check_progress} complete")
+        print(f"\tDownload is {round(request_check_progress, 2)} complete")
         progress_status = request_check_response.json()["result"]["status"]
 
     # Check for export error
@@ -288,14 +316,14 @@ def pilot_list() -> list:
 
 
 def redcap_dict() -> dict:
-    """Return a dict of RedCap surveys."""
+    """Return dict of RedCap survey-directory mappings."""
     # Key : RedCap dataframe, matches reference_files.report_keys_redcap.json
-    # Value : output parent directory name
+    # Value : output parent directory name, False to avoid writing
     return {
-        "demographics": "redcap_demographics",
-        "consent_pilot": "redcap_demographics",
-        "consent_v1.22": "redcap_demographics",
-        "guid": "redcap_demographics",
+        "demographics": False,
+        "consent_pilot": False,
+        "consent_v1.22": False,
+        "guid": "redcap",
         "bdi_day2": "visit_day2",
         "bdi_day3": "visit_day3",
     }

@@ -1,18 +1,39 @@
-"""Generate descriptives for survey data.
+r"""Generate descriptives for survey data.
 
-Calculate descriptive statistics and draw plots for
-REDCap, Qualtrics, rest-ratings, and stim-ratings
-surveys.
+Download, clean, and calculate descriptive statistics and plots
+for REDCap, Qualtrics, rest-ratings, and stim-ratings surveys.
 
 Output files are written to:
     <proj_dir>/analyses/metrics_surveys
 
+Notes
+-----
+Appropriate database token required, e.g. --redcap-token for BDI.
+General descriptive stats, all data are included.
+
 Examples
 --------
 sur_stats --survey-avail
-sur_stats --survey-all --draw-plots
-sur_stats --survey-names AIM ALS BDI --write-json
-sur_stats --make-tables --draw-plots
+
+sur_stats \
+    --survey-all \
+    --draw-plots \
+    --qualtrics-token $PAT_QUALTRICS_EMOREP \
+    --redcap-token $PAT_REDCAP_EMOREP
+
+sur_stats \
+    --survey-names AIM ALS stim \
+    --write-json \
+    --qualtrics-token $PAT_QUALTRICS_EMOREP
+
+sur_stats \
+    --survey-names rest task \
+    --write-json --draw-plots
+
+sur_stats \
+    --make-tables --draw-plots \
+    --qualtrics-token $PAT_QUALTRICS_EMOREP \
+    --redcap-token $PAT_REDCAP_EMOREP
 
 """
 import sys
@@ -58,6 +79,18 @@ def _get_args():
             (default : %(default)s)
             """
         ),
+    )
+    parser.add_argument(
+        "--qualtrics-token",
+        type=str,
+        default=None,
+        help="API token for Qualtrics project",
+    )
+    parser.add_argument(
+        "--redcap-token",
+        type=str,
+        default=None,
+        help="API token for RedCap project",
     )
     parser.add_argument(
         "--survey-all",
@@ -121,6 +154,8 @@ def main():
     survey_list = args.survey_names
     survey_all = args.survey_all
     survey_avail = args.survey_avail
+    qualtrics_token = args.qualtrics_token
+    redcap_token = args.redcap_token
 
     # Validate input
     if survey_list and (not draw_plot and not write_json):
@@ -129,10 +164,10 @@ def main():
         )
 
     # Set redcap/qualtircs and scan lists
-    sur_rc_qual = [
+    sur_rc = ["BDI"]
+    sur_qual = [
         "AIM",
         "ALS",
-        "BDI",
         "ERQ",
         "PANAS",
         "PSWQ",
@@ -141,6 +176,7 @@ def main():
         "STAI_State",
         "TAS",
     ]
+    sur_rc_qual = sur_rc + sur_qual
     sur_scan = ["rest", "stim", "task"]
     sur_all = sur_rc_qual + sur_scan
 
@@ -160,6 +196,17 @@ def main():
     if survey_all or make_tables:
         survey_list = sur_all
 
+    # Check tokens
+    for chk_sur in survey_list:
+        if chk_sur in sur_qual + ["stim"] and not qualtrics_token:
+            raise ValueError(
+                f"Qualtrics API token required for survey : {chk_sur}"
+            )
+        if chk_sur == "BDI" and not redcap_token:
+            raise ValueError(
+                f"RedCap API token required for survey : {chk_sur}"
+            )
+
     # Sort requested survey names, trigger appropriate workflows
     sur_online = [x for x in survey_list if x in sur_rc_qual]
     sur_scanner = [x for x in survey_list if x in sur_scan]
@@ -170,14 +217,18 @@ def main():
         sys.exit(0)
 
     if sur_online:
-        sur_stat = behavioral_reports.CalcRedcapQualtricsStats(
-            proj_dir, sur_online, draw_plot, write_json
+        sur_stat = behavioral_reports.CalcRedcapQualtricsStats(proj_dir)
+        sur_stat.gen_stats_plots(
+            sur_online,
+            draw_plot,
+            write_json,
+            qualtrics_token=qualtrics_token,
+            redcap_token=redcap_token,
         )
-        sur_stat.match_survey_visits()
 
     if sur_scanner:
         _ = behavioral_reports.calc_task_stats(
-            proj_dir, sur_scanner, draw_plot
+            proj_dir, sur_scanner, draw_plot, qualtrics_token=qualtrics_token
         )
 
 
