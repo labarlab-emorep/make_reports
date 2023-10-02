@@ -1,0 +1,26 @@
+subj,visit1,visit2,visit3,notes
+ER0017,,excl,excl,BDI
+ER0032,,excl,excl,BDI
+ER0057,,excl,excl,Compliance
+ER0080,,excl,excl,BDI
+ER0086,with,with,with,Time Conflict
+ER0087,,,lost,Time Conflict
+ER0103,,with,with,EAE
+ER0140,,with,with,Time Conflict
+ER0162,,excl,excl,BDI
+ER0166,,,lost,
+ER0190,,lost,lost,
+ER0193,,lost,lost,
+ER0213,,lost,lost,
+ER0228,,,lost,
+ER0246,,lost,lost,
+ER0300,,lost,lost,
+ER0325,,excl,excl,BDI
+ER0400,,with,with,Personal Preference
+ER0411,excl,excl,excl,MRI Compatibility
+ER0454,with,with,with,Time Conflict
+ER0618,with,with,with,Time Conflict
+ER0620,excl,excl,excl,Eligibility
+ER0800,,,lost,
+ER1014,,,lost,
+ER1024,with,with,with,Time Conflict
