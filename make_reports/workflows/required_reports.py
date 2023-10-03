@@ -229,7 +229,7 @@ class _BuildArgs:
         df_study = self.data_dict["study"]["visit_day1"][self._df_name]
 
         # RRS does not have pilot data in qualtrics
-        return [df_pilot, df_study] if self.df_name != "RRS" else [df_study]
+        return [df_pilot, df_study] if self._df_name != "RRS" else [df_study]
 
     def _v23_pilot_study(self) -> list:
         """Return visit_day2 and visit_day3 dataframes."""
@@ -239,7 +239,7 @@ class _BuildArgs:
         df_study_3 = self.data_dict["study"]["visit_day3"][self._df_name]
 
         # PANAS and post_scan_ratings do not have pilot data in qualtrics
-        if self.df_name in ["PANAS", "post_scan_ratings"]:
+        if self._df_name in ["PANAS", "post_scan_ratings"]:
             return [df_study_2, df_study_3]
         else:
             return [df_pilot_2, df_study_2, df_pilot_3, df_study_3]
