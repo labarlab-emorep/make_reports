@@ -20,7 +20,11 @@ setup(
     },
     include_package_data=True,
     package_data={
-        "": ["reference_files/*template.csv", "reference_files/*.json"]
+        "": [
+            "reference_files/*template.csv",
+            "reference_files/*.json",
+            "dataframes/track_*.csv",
+        ]
     },
     install_requires=[
         "graphviz>=0.20.1",

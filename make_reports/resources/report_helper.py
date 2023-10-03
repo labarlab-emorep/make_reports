@@ -1,8 +1,10 @@
 """Supporting functions for making reports.
 
+drop_participant : drop participant from dataframe
 pull_redcap_data : download survey data from REDCAP
 pull_qualtrics_data : download survey data from Qualtrics
 mine_template : extract values from NDA templates
+load_dataframes : load resources dataframes/track_foo.csv
 calc_age_mo : calculate age-in-months
 get_survey_age : add survey age to dataframe
 pilot_list : pilot participants
@@ -21,7 +23,7 @@ import zipfile
 import pandas as pd
 import numpy as np
 import importlib.resources as pkg_resources
-from make_reports import reference_files
+from make_reports import reference_files, dataframes
 
 
 def drop_participant(subj, df, subj_col):
@@ -214,6 +216,17 @@ def mine_template(template_file):
         reader = csv.reader(tf)
         row_info = [row for idx, row in enumerate(reader)]
     return (row_info[0], row_info[1])
+
+
+def load_dataframes(name: str) -> pd.DataFrame:
+    """Return df from resources."""
+    if name not in ["status", "incomplete"]:
+        raise ValueError(
+            f"Unexpected dataframe name : dataframes/track_{name}.csv"
+        )
+    with pkg_resources.open_text(dataframes, f"track_{name}.csv") as tdf:
+        df = pd.read_csv(tdf)
+    return df
 
 
 def calc_age_mo(subj_dob, subj_dos):

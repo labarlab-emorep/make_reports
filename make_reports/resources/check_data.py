@@ -16,64 +16,29 @@ from make_reports.resources import build_reports
 from make_reports.resources import report_helper
 
 
-class CheckMri:
-    """Conduct checks for pipeline steps.
+class _ChkRsc:
+    """Supporting resources for checking pipeline progress.
 
-    Test whether each subject has the expected data, and
-    capture the results in a dataframe.
-
-    Dataframe cell values:
-        - timestamp : all expected data were found
-        - int : only some of expected data were found
-        - np.nan : no files were found
-
-    Parameters
-    ----------
-    subj_list : list
-        Subjects encountered in project sourcedata
-    sess_list : list
-        Session identifiers without BIDS formatting
-    raw_dir : path
-        Location of project rawdata
-    deriv_dir : path
-        Location of project derivatives
-
-    Attributes
-    ----------
-    df_mri : pd.DataFrame
-        Dataframe of subj, MRI encountered
-
-    Methods
-    -------
-    check_emorep()
-        Check for EmoRep pipeline files, fills df_mri
-    check_archival()
-        Check for archival pipeline files, fills df_mri
-
-    Example
-    -------
-    check_data = CheckMri(*args)
-    check_data.check_emorep()
-    df_emorep = check_data.df_mri
+    Intended to be inherited, references attrs set by child.
 
     """
 
-    def __init__(self, subj_list, sess_list, raw_dir, deriv_dir):
-        """Initialize."""
-        print("\tInitializing CheckData")
-        self._subj_list = subj_list
-        self._sess_list = sess_list
-        self._raw_dir = raw_dir
-        self._deriv_dir = deriv_dir
+    def start_df(self, col_names: list):
+        """Generate pd.DataFrame from subject, session values."""
+        df_mri = pd.DataFrame(columns=col_names)
+        df_mri["subid"] = self._subj_list * len(self._sess_list)
+        df_mri = df_mri.sort_values(by=["subid"], ignore_index=True)
+        self.df_mri = df_mri
+        self.df_mri["sess"] = self._sess_list * len(self._subj_list)
 
-    def _get_time(self, mri_file: str) -> str:
+    def get_time(self, mri_path: Union[str, os.PathLike]) -> str:
         """Return datetime string of file maketime."""
         return time.strftime(
             "%Y-%m-%d",
-            time.strptime(time.ctime(os.path.getmtime(mri_file))),
+            time.strptime(time.ctime(os.path.getmtime(mri_path))),
         )
 
-    def _compare_count(self, subj, search_path, search_str, num_exp):
+    def compare_count(self, subj: str):
         """Compare encountered files to desired number.
 
         Search through directories to make a list of files. Compare length
@@ -81,45 +46,50 @@ class CheckMri:
         to (a) whether all are found (datetime), (b) only some are found (int),
         or (c) no files are found (np.nan).
 
-        Parameters
-        ----------
-        subj : str
-            Subject identifier
-        search_path : str, os.PathLike
-            Parent directory, where subjects will be searched
-        search_str : str
-            File suffix and extension to be searched for, will be
-            prepended by wildcard.
-        num_exp : int
-            Number of expected files
-
         Returns
         -------
         str (datetime.date), int, or np.NaN
 
         """
-        file_list = sorted(
-            glob.glob(
-                f"{search_path}/sub-{subj}/ses-{self._sess}/{search_str}",
-            )
+        search_file_str = (
+            f"{self._search_path}/sub-{subj}/"
+            + f"ses-{self._sess}/{self._search_str}"
         )
+        file_list = sorted(glob.glob(search_file_str))
         file_num = len(file_list)
 
-        if file_num == num_exp:
-            return self._get_time(file_list[-1])
+        if file_num == self._num_exp:
+            return self.get_time(file_list[-1])
         elif file_num > 0:
             return file_num
         else:
             return np.nan
 
-    def _update_df(self, in_val: list, col_name: str):
+    def multi_chk(self, num_proc: int = 10):
+        """Multiprocess compare_count, write df column."""
+        print(f"\t\tChecking {self._step}")
+        col_out = Pool(num_proc).starmap(
+            self.compare_count,
+            [(subj,) for subj in self._subj_list],
+        )
+        self.update_df(col_out, self._step)
+
+    def update_df(self, in_val: list, col_name: str):
         """Update column of df_mri."""
         idx_sess = self.df_mri.index[
             self.df_mri["sess"] == self._sess
         ].tolist()
         self.df_mri.loc[idx_sess, col_name] = in_val
 
-    def _check_bids(self):
+
+class _CheckEmorep(_ChkRsc):
+    """Resources for checking EmoRep pipeline progress.
+
+    Inherits _ChkRsc.
+
+    """
+
+    def check_bids(self):
         """Check for BIDS organization, update dataframe."""
         print("\t\tChecking bidsification ...")
         is_bids = []
@@ -132,14 +102,12 @@ class CheckMri:
 
             # Set value according to whether anat is found, update is_bids
             h_val = (
-                self._get_time(sess_dirs[0])
-                if "anat" in sess_names
-                else np.nan
+                self.get_time(sess_dirs[0]) if "anat" in sess_names else np.nan
             )
             is_bids.append(h_val)
-        self._update_df(is_bids, "bidsify")
+        self.update_df(is_bids, "bidsify")
 
-    def _check_mriqc(self):
+    def check_mriqc(self):
         """Check for MRIQC output, update dataframe."""
         print("\t\tChecking MRIQC ...")
         mriqc_found = []
@@ -153,14 +121,14 @@ class CheckMri:
 
             # Set value, update mriqc_found according to whether file exists.
             h_val = (
-                self._get_time(mriqc_file)
+                self.get_time(mriqc_file)
                 if os.path.exists(mriqc_file)
                 else np.nan
             )
             mriqc_found.append(h_val)
-        self._update_df(mriqc_found, "mriqc")
+        self.update_df(mriqc_found, "mriqc")
 
-    def _check_dcmnii(self):
+    def check_dcmnii(self):
         """Check for dcm2niix output."""
         nii_found = []
         for subj in self._subj_list:
@@ -182,96 +150,14 @@ class CheckMri:
                 and (num_fmap == 1 or num_fmap == 2)
                 and num_func == 9
             ):
-                nii_found.append(self._get_time(nii_list[-1]))
+                nii_found.append(self.get_time(nii_list[-1]))
             elif num_nii == 0:
                 nii_found.append(np.nan)
             elif num_nii > 0:
                 nii_found.append(num_nii)
-        self._update_df(nii_found, "dcm-nii")
+        self.update_df(nii_found, "dcm-nii")
 
-    def check_emorep(self):
-        """Check for expected EmoRep files.
-
-        Checks for the existence, organization of the following files:
-            -   dcm2niix output
-            -   BIDS organization
-            -   MRIQC output
-            -   task, rest behavioral data
-            -   physio data
-            -   defaced anats
-            -   fmriprep output
-            -   fsl preprocessing output
-            -   fsl first-level models of rest, task
-            -   fsl second-level models of task
-
-        Attributes
-        ----------
-        df_mri : pd.DataFrame
-            Dataframe of subj, MRI encountered
-
-        """
-        # Get info for checking, start df
-        col_names, check_info = self._info_emorep()
-        self._start_df(col_names)
-
-        # Check for each scan session
-        for self._sess in self._sess_list:
-            print(f"\tChecking session : {self._sess}")
-
-            # Check for bids organization and mriqc
-            self._check_bids()
-            self._check_mriqc()
-            self._check_dcmnii()
-
-            # Check steps in check_info, add session to search string
-            for step, trip in check_info.items():
-                self._multi_chk(step, trip[0], trip[1], trip[2])
-
-    def _multi_chk(self, step, search_path, search_str, num_exp, num_proc=10):
-        """Multiprocess _compare_count, write df column."""
-        print(f"\t\tChecking {step}")
-        col_out = Pool(num_proc).starmap(
-            self._compare_count, [
-                (subj, search_path, search_str, num_exp,)
-                for subj in self._subj_list
-            ]
-        )
-        self._update_df(col_out, step)
-
-    def check_archival(self):
-        """Check for expected archival files.
-
-        Checks for the existence, organization of the following files:
-            -   existence of anat, func files
-            -   fmriprep output
-            -   fsl preprocessing output
-            -   fsl first-level models of rest
-
-        Attributes
-        ----------
-        df_mri : pd.DataFrame
-            Dataframe of subj, MRI encountered
-
-        """
-        # Get info for checking, start df
-        col_names, check_info = self._info_archival()
-        self._start_df(col_names)
-
-        # Check for each scan session
-        for self._sess in self._sess_list:
-            print(f"\tChecking session : {self._sess}")
-            for step, trip in check_info.items():
-                self._multi_chk(step, trip[0], trip[1], trip[2])
-
-    def _start_df(self, col_names: list):
-        """Generate pd.DataFrame from subject, session values."""
-        df_mri = pd.DataFrame(columns=col_names)
-        df_mri["subid"] = self._subj_list * len(self._sess_list)
-        df_mri = df_mri.sort_values(by=["subid"], ignore_index=True)
-        self.df_mri = df_mri
-        self.df_mri["sess"] = self._sess_list * len(self._subj_list)
-
-    def _info_emorep(self) -> Tuple[list, dict]:
+    def info_emorep(self) -> Tuple[list, dict]:
         """Return list of column names, dict of expected data."""
         # Setup info for checking EmoRep.
         #   Key is preprocessing step which will become a column name
@@ -359,6 +245,124 @@ class CheckMri:
         for key in chk_dict:
             col_names.append(key)
         return (col_names, chk_dict)
+
+
+class CheckMri(_CheckEmorep):
+    """Conduct checks for pipeline steps.
+
+    Inherits _CheckEmorep.
+
+    Test whether each subject has the expected data, and
+    capture the results in a dataframe.
+
+    Dataframe cell values:
+        - timestamp : all expected data were found
+        - int : only some of expected data were found
+        - np.nan : no files were found
+
+    Parameters
+    ----------
+    subj_list : list
+        Subjects encountered in project sourcedata
+    sess_list : list
+        Session identifiers without BIDS formatting
+    raw_dir : path
+        Location of project rawdata
+    deriv_dir : path
+        Location of project derivatives
+
+    Attributes
+    ----------
+    df_mri : pd.DataFrame
+        Dataframe of subj, MRI encountered
+
+    Methods
+    -------
+    check_emorep()
+        Check for EmoRep pipeline files, fills df_mri
+    check_archival()
+        Check for archival pipeline files, fills df_mri
+
+    Example
+    -------
+    check_data = CheckMri(*args)
+    check_data.check_emorep()
+    df_emorep = check_data.df_mri
+
+    """
+
+    def __init__(self, subj_list, sess_list, raw_dir, deriv_dir):
+        """Initialize."""
+        print("\tInitializing CheckData")
+        self._subj_list = subj_list
+        self._sess_list = sess_list
+        self._raw_dir = raw_dir
+        self._deriv_dir = deriv_dir
+
+    def check_emorep(self):
+        """Check for expected EmoRep files.
+
+        Checks for the existence, organization of the following files:
+            -   dcm2niix output
+            -   BIDS organization
+            -   MRIQC output
+            -   task, rest behavioral data
+            -   physio data
+            -   defaced anats
+            -   fmriprep output
+            -   fsl preprocessing output
+            -   fsl first-level models of rest, task
+            -   fsl second-level models of task
+
+        Attributes
+        ----------
+        df_mri : pd.DataFrame
+            Dataframe of subj, MRI encountered
+
+        """
+        # Get info for checking, start df
+        col_names, check_info = self.info_emorep()
+        self.start_df(col_names)
+
+        # Check for each scan session
+        for self._sess in self._sess_list:
+            print(f"\tChecking session : {self._sess}")
+
+            # Check for bids organization and mriqc
+            self.check_bids()
+            self.check_mriqc()
+            self.check_dcmnii()
+
+            # Check steps in check_info, add session to search string
+            for self._step, trip in check_info.items():
+                self._search_path, self._search_str, self._num_exp = trip
+                self.multi_chk()
+
+    def check_archival(self):
+        """Check for expected archival files.
+
+        Checks for the existence, organization of the following files:
+            -   existence of anat, func files
+            -   fmriprep output
+            -   fsl preprocessing output
+            -   fsl first-level models of rest
+
+        Attributes
+        ----------
+        df_mri : pd.DataFrame
+            Dataframe of subj, MRI encountered
+
+        """
+        # Get info for checking, start df
+        col_names, check_info = self._info_archival()
+        self.start_df(col_names)
+
+        # Check for each scan session
+        for self._sess in self._sess_list:
+            print(f"\tChecking session : {self._sess}")
+            for self._step, trip in check_info.items():
+                self._search_path, self._search_str, self._num_exp = trip
+                self.multi_chk()
 
     def _info_archival(self) -> Tuple[list, dict]:
         """Return list of column names, dict of expected data."""
