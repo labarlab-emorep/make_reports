@@ -18,8 +18,8 @@ Plots and reports are written to:
 
 Examples
 --------
-rep_metrics --recruit-demo
 rep_metrics --prop-motion
+rep_metrics --recruit-demo --redcap-token $PAT_REDCAP_EMOREP
 rep_metrics --participant-flow --redcap-token $PAT_REDCAP_EMOREP
 rep_metrics --scan-pace --redcap-token $PAT_REDCAP_EMOREP
 
@@ -64,7 +64,12 @@ def _get_args():
     parser.add_argument(
         "--recruit-demo",
         action="store_true",
-        help="Calculate recruitement demographics",
+        help=textwrap.dedent(
+            """\
+            Requires --redcap-token.
+            Calculate recruitment demographics.
+            """
+        ),
     )
     parser.add_argument(
         "--redcap-token",
@@ -100,10 +105,15 @@ def main():
     participant_flow = args.participant_flow
     scan_pace = args.scan_pace
 
-    if not redcap_token and scan_pace:
-        raise ValueError("Option --scan-pace requires --redcap-token.")
-    if not redcap_token and participant_flow:
-        raise ValueError("Option --participant-flow requires --redcap-token.")
+    if not redcap_token:
+        if scan_pace:
+            raise ValueError("Option --scan-pace requires --redcap-token.")
+        if participant_flow:
+            raise ValueError(
+                "Option --participant-flow requires --redcap-token."
+            )
+        if recruit_demo:
+            raise ValueError("Option --recruit-demo requires --redcap-token.")
 
     data_metrics.get_metrics(
         proj_dir,

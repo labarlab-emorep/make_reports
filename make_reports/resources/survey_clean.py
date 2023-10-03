@@ -2,7 +2,7 @@
 
 CleanRedcap : organize, clean REDCap survey responses
 CleanQualtrics : organize, clean Qualtrics survey responses
-CombineRestRatings : aggregate post-rest responses into dataframe
+clean_rest_ratings : aggregate post-rest responses into dataframe
 
 """
 import os
@@ -20,75 +20,38 @@ from make_reports import reference_files
 class CleanRedcap:
     """Clean RedCap surveys.
 
-    Find downloaded original/raw RedCap survey responses, and
-    convert values into usable dataframe types and formats. Participants
-    who have withdrawn consent are included in the Consent, GUID, and
+    Intended to be inherited, references child attrs:
+        _proj_dir : str, os.PathLike
+            Location of project directory
+        _pilot_list : list
+            Pilot participant IDs
+        _df_raw : pd.DataFrame
+            Raw RedCap survey dataframe
+
+    Clean REDCap surveys and reports. Participants who have
+    withdrawn consent are included in the Consent, GUID, and
     demographic dataframes for NIH/Duke reporting purposes but are
     removed from the BDI dataframes.
 
-    Parameters
-    ----------
-    proj_dir : path
-        Location of parent directory for project
-
     Attributes
     ----------
-    df_clean : pd.DataFrame
+    df_study : pd.DataFrame
         Cleaned survey responses for study participants
     df_pilot : pd.DataFrame
         Cleaned survey responses for pilot participants
 
     Methods
     -------
-    clean_surveys(survey_name)
-        Load original survey data and coordinate cleaning methods.
+    clean_bdi_day23()
+        Generate clean attrs for day2 and day3 BDI data
+    clean_consent()
+        Generate clean attrs for consent data
+    clean_demographics()
+        Generate clean attrs for demographic data
+    clean_guid()
+        Generate clean attrs for GUID report
 
     """
-
-    def __init__(self, proj_dir):
-        """Initialize."""
-        self._proj_dir = proj_dir
-        self._redcap_dict = report_helper.redcap_dict()
-        self._pilot_list = report_helper.pilot_list()
-
-    def clean_surveys(self, survey_name):
-        """Clean original RedCap survey data.
-
-        Wrapper method, find data_raw csv dataframes and coordinate
-        appropriate cleaning methods for survey.
-
-        Parameters
-        ----------
-        survey_name : str, make_reports.report_helper.redcap_dict key
-            Name of RedCap survey
-
-        Raises
-        ------
-        FileNotFoundError
-            When dataframe not encountered in data_raw
-
-        """
-        # Load raw data
-        raw_file = os.path.join(
-            self._proj_dir,
-            "data_survey",
-            self._redcap_dict[survey_name],
-            "data_raw",
-            f"df_{survey_name}_latest.csv",
-        )
-        if not os.path.exists(raw_file):
-            raise FileNotFoundError(f"Failed to find {raw_file}.")
-        self._df_raw = pd.read_csv(raw_file)
-
-        # Get and run cleaning method
-        print(f"Cleaning survey : {survey_name}")
-        if survey_name == "bdi_day2" or survey_name == "bdi_day3":
-            self._clean_bdi_day23()
-        elif survey_name == "consent_v1.22" or survey_name == "consent_pilot":
-            self._clean_consent()
-        else:
-            clean_method = getattr(self, f"_clean_{survey_name}")
-            clean_method()
 
     def _dob_convert(self, dob_list):
         """Helper method for _clean_demographics.
@@ -135,20 +98,23 @@ class CleanRedcap:
             else:
                 return pd.to_datetime(f"{date_b}-{date_a}-{date_c}").date()
 
-        # Set switch for extra special cases
-        dob_switch = {"October 6 2000": "2000-10-06"}
+        # Set switch for extra special cases, wrong DOB entered
+        dob_switch = {
+            "October 6 2000": "2000-10-06",
+            "2023-01-05": "1998-07-30",
+        }
 
         # Convert each dob free response or redcap datetime
         dob_clean = []
         for dob in dob_list:
-            if "/" in dob or "-" in dob:
+            if dob in dob_switch:
+                dob_clean.append(pd.to_datetime(dob_switch[dob]).date())
+            elif "/" in dob or "-" in dob:
                 dob_clean.append(
                     pd.to_datetime(dob, infer_datetime_format=True).date()
                 )
             elif dob.isnumeric():
                 dob_clean.append(_num_convert(dob))
-            elif dob in dob_switch:
-                dob_clean.append(pd.to_datetime(dob_switch[dob]).date())
             else:
                 raise TypeError(f"Unrecognized datetime str: {dob}.")
         return dob_clean
@@ -168,23 +134,35 @@ class CleanRedcap:
         """
         # Convert education level to years
         educate_switch = {2: 12, 3: 13, 4: 14, 5: 16, 6: 17, 7: 18, 8: 20}
+        year_str_switch = {
+            "1984": 20,
+            "PhD degree (18 years of school in total)": 18,
+            "Undergraduate Degree": 16,
+        }
 
         # Get education level, and self-report of years educated
         edu_year = self._df_raw["years_education"].tolist()
         edu_level = self._df_raw["level_education"].tolist()
         record_id = self._df_raw["record_id"].tolist()
 
-        # Convert into years (deal with self-reports)
+        # Convert education into years
         subj_educate = []
-        for h_year, h_level, h_id in zip(edu_year, edu_level, record_id):
-            # Patch for 1984 education issue
-            if h_year == "1984":
-                subj_educate.append(educate_switch[8])
+        for _year, _level, _id in zip(edu_year, edu_level, record_id):
+
+            # Patch education level issues, deal with self-reports
+            if _year in year_str_switch.keys():
+                edu_value = year_str_switch[_year]
             else:
                 try:
-                    subj_educate.append(int(h_year))
+                    edu_value = int(_year)
                 except ValueError:
-                    subj_educate.append(educate_switch[h_level])
+                    edu_value = educate_switch[_level]
+
+            # Adjust for self-report years vs education level
+            if edu_value <= 12 and _level >= 3:
+                edu_value = educate_switch[_level]
+
+            subj_educate.append(edu_value)
         return subj_educate
 
     def _clean_city_state(self):
@@ -252,7 +230,12 @@ class CleanRedcap:
         ]
         self._df_raw = self._df_raw[col_reorder]
 
-    def _clean_demographics(self):
+    def _res_idx(self):
+        """Reset df_[pilot|study] indices."""
+        self.df_study.reset_index(drop=True, inplace=True)
+        self.df_pilot.reset_index(drop=True, inplace=True)
+
+    def clean_demographics(self):
         """Cleaning method for RedCap demographics survey.
 
         Convert RedCap report values and participant responses
@@ -260,7 +243,7 @@ class CleanRedcap:
 
         Attributes
         ----------
-        df_clean : pd.DataFrame
+        df_study : pd.DataFrame
             Clean demographic info for study participants
         df_pilot : pd.DataFrame
             Clean demographic info for pilot participants
@@ -278,8 +261,13 @@ class CleanRedcap:
         self._df_raw["dob"] = dob_clean
 
         # Fix years of education
-        yrs_edu = self._get_educ_years()
-        self._df_raw["years_education"] = yrs_edu
+        # self._df_raw["years_education"] = self._df_raw[
+        #     "years_education"
+        # ].astype("Int64")
+        # self._df_raw["level_education"] = self._df_raw[
+        #     "level_education"
+        # ].astype("Int64")
+        self._df_raw["years_education"] = self._get_educ_years()
 
         # Fix City, State of birth
         self._clean_city_state()
@@ -300,6 +288,9 @@ class CleanRedcap:
         ].astype("str").isin(special_list)
         df_raw.loc[sp_mask, ["middle_name"]] = np.nan
 
+        # Drop participants
+        df_raw = self._drop_subj(df_raw)
+
         # Separate pilot from study data
         pilot_list = [int(x[-1]) for x in self._pilot_list]
         idx_pilot = df_raw[df_raw["record_id"].isin(pilot_list)].index.tolist()
@@ -307,16 +298,17 @@ class CleanRedcap:
             ~df_raw["record_id"].isin(pilot_list)
         ].index.tolist()
         self.df_pilot = df_raw.loc[idx_pilot]
-        self.df_clean = df_raw.loc[idx_study]
+        self.df_study = df_raw.loc[idx_study]
+        self._res_idx()
 
-    def _clean_consent(self):
+    def clean_consent(self):
         """Cleaning method for RedCap consent survey.
 
         Only return participants who signed the consent form.
 
         Attributes
         ----------
-        df_clean : pd.DataFrame
+        df_study : pd.DataFrame
             Clean consent info for study participants
         df_pilot : pd.DataFrame
             Clean consent info for pilot participants
@@ -329,6 +321,9 @@ class CleanRedcap:
         )
         df_raw = self._df_raw[self._df_raw[col_drop].notna()]
 
+        # Drop participants
+        df_raw = self._drop_subj(df_raw)
+
         # Separate pilot from study data
         pilot_list = [int(x[-1]) for x in self._pilot_list]
         idx_pilot = df_raw[df_raw["record_id"].isin(pilot_list)].index.tolist()
@@ -336,16 +331,17 @@ class CleanRedcap:
             ~df_raw["record_id"].isin(pilot_list)
         ].index.tolist()
         self.df_pilot = df_raw.loc[idx_pilot]
-        self.df_clean = df_raw.loc[idx_study]
+        self.df_study = df_raw.loc[idx_study]
+        self._res_idx()
 
-    def _clean_guid(self):
+    def clean_guid(self):
         """Cleaning method for RedCap GUID survey.
 
         Only return participants who have an assigned GUID.
 
         Attributes
         ----------
-        df_clean : pd.DataFrame
+        df_study : pd.DataFrame
             Clean guid info for study participants
         df_pilot : pd.DataFrame
             Clean guid info for pilot participants
@@ -353,6 +349,9 @@ class CleanRedcap:
         """
         # Drop rows without guid
         df_raw = self._df_raw[self._df_raw["guid"].notna()]
+
+        # Drop participants
+        df_raw = self._drop_subj(df_raw)
 
         # Separate pilot from study data
         idx_pilot = df_raw[
@@ -362,14 +361,15 @@ class CleanRedcap:
             ~df_raw["study_id"].isin(self._pilot_list)
         ].index.tolist()
         self.df_pilot = df_raw.loc[idx_pilot]
-        self.df_clean = df_raw.loc[idx_study]
+        self.df_study = df_raw.loc[idx_study]
+        self._res_idx()
 
-    def _clean_bdi_day23(self):
+    def clean_bdi_day23(self):
         """Cleaning method for RedCap BDI surveys.
 
         Attributes
         ----------
-        df_clean : pd.DataFrame
+        df_study : pd.DataFrame
             Clean bdi info for study participants
         df_pilot : pd.DataFrame
             Clean bdi info for pilot participants
@@ -389,6 +389,9 @@ class CleanRedcap:
         # Remove rows without responses or study_id (from guid survey)
         df_raw = df_raw[df_raw["study_id"].notna()]
         df_raw = df_raw[df_raw["BDI_1"].notna()]
+
+        # Drop participants
+        df_raw = self._drop_subj(df_raw)
 
         # Enforce datetime format
         col_rename = (
@@ -419,94 +422,54 @@ class CleanRedcap:
             ~df_raw["study_id"].isin(self._pilot_list)
         ].index.tolist()
         self.df_pilot = df_raw.loc[idx_pilot]
-        self.df_clean = df_raw.loc[idx_study]
+        self.df_study = df_raw.loc[idx_study]
+        self._res_idx()
+
+    def _drop_subj(self, df: pd.DataFrame) -> pd.DataFrame:
+        """Drop certain subjects from dataframe."""
+        drop_list = [80]
+        for subj in drop_list:
+            df = report_helper.drop_participant(subj, df, "record_id")
+        return df
 
 
 class CleanQualtrics:
     """Clean Qualtrics surveys.
 
+    Intended to be inherited, references child attrs:
+        _proj_dir : str, os.PathLike
+            Location of project directory
+        _pilot_list : list
+            Pilot participant IDs
+        _df_raw : pd.DataFrame
+            Raw RedCap survey dataframe
+        _withdrew_list : list
+            Participants IDs who withdrew consent
+
     Find downloaded original/raw Qualtrics survey responses, and
     convert values into usable dataframe tyeps and formats.
 
-    Parameters
-    ----------
-    proj_dir : path
-        Location of parent directory for project
-
     Attributes
     ----------
-    data_clean : dict
+    data_study : dict
         Cleaned survey data of study participant responses
-        {survey_name: pd.DataFrame}, or
         {visit: {survey_name: pd.DataFrame}}
     data_pilot : dict
         Cleaned survey data of pilot participant responses
-        {survey_name: pd.DataFrame}, or
         {visit: {survey_name: pd.DataFrame}}
 
     Methods
     -------
-    clean_surveys(survey_name)
-        Load original survey data and coordinate cleaning methods.
+    clean_session_1()
+        Organize and clean session 1 surveys
+    clean_session_23()
+        Organize and clean surveys for sessions 2, 3
+    clean_postscan_ratings()
+        Organize and clean post-scan stimulus ratings
 
     """
 
-    def __init__(self, proj_dir):
-        """Initialize."""
-        self._proj_dir = proj_dir
-        self._qualtrics_dict = report_helper.qualtrics_dict()
-        self._pilot_list = report_helper.pilot_list()
-
-        part_comp = report_helper.ParticipantComplete()
-        part_comp.status_change("withdrew")
-        self._withdrew_list = part_comp.all
-
-    def clean_surveys(self, survey_name):
-        """Split and clean original Qualtrics survey data.
-
-        Find original omnibus session data and coordinate cleaning methods.
-
-        Parameters
-        ----------
-        survey_name : str, make_reports.report_helper.qualtrics_dict key
-            Name of Qualtrics survey session
-
-        Raises
-        ------
-        FileNotFoundError
-            When dataframe not encountered in data_raw
-
-        """
-        # Find data_raw path, visit_day2 has raw qualtrics for both
-        # visit_day2 and visit_day3
-        visit_raw = (
-            "visit_day2"
-            if survey_name != "EmoRep_Session_1"
-            else self._qualtrics_dict[survey_name]
-        )
-        raw_file = os.path.join(
-            self._proj_dir,
-            "data_survey",
-            visit_raw,
-            "data_raw",
-            f"{survey_name}_latest.csv",
-        )
-        if not os.path.exists(raw_file):
-            raise FileNotFoundError(f"Failed to find {raw_file}.")
-        self._df_raw = pd.read_csv(raw_file)
-
-        # Get and run cleaning method
-        print(f"Cleaning survey : {survey_name}")
-        meth_switch = {
-            "EmoRep_Session_1": "session_1",
-            "Session 2 & 3 Survey": "session_23",
-            "FINAL - EmoRep Stimulus Ratings "
-            + "- fMRI Study": "post_scan_ratings",
-        }
-        clean_method = getattr(self, f"_clean_{meth_switch[survey_name]}")
-        clean_method()
-
-    def _clean_session_1(self):
+    def clean_session_1(self):
         """Cleaning method for visit 1 surveys.
 
         Split session into individual surveys, convert participant
@@ -514,12 +477,12 @@ class CleanQualtrics:
 
         Attributes
         ----------
-        data_clean : dict
+        data_study : dict
             Cleaned survey data of study participant responses
-            {survey_name: pd.DataFrame}
+            {visit: {survey_name: pd.DataFrame}}
         data_pilot : dict
             Cleaned survey data of pilot participant responses
-            {survey_name: pd.DataFrame}
+            {visit: {survey_name: pd.DataFrame}}
 
         """
         # Identify surveys in visit1 session
@@ -540,10 +503,13 @@ class CleanQualtrics:
             axis=1,
             inplace=True,
         )
+        self._df_raw = report_helper.drop_participant(
+            "ER0080", self._df_raw, "study_id"
+        )
         col_names = self._df_raw.columns
 
         # Subset session dataframe by survey
-        data_clean = {}
+        data_study = {}
         data_pilot = {}
         for sur_name in surveys_visit1:
             print(f"\tCleaning survey data : day1, {sur_name}")
@@ -575,19 +541,19 @@ class CleanQualtrics:
                 ~df_sur["study_id"].isin(self._pilot_list)
             ].index.tolist()
             df_pilot = df_sur.loc[idx_pilot]
-            df_clean = df_sur.loc[idx_study]
+            df_study = df_sur.loc[idx_study]
 
             # Update dictionaries
             data_pilot[sur_name] = df_pilot
-            data_clean[sur_name] = df_clean
+            data_study[sur_name] = df_study
             del df_sur
             del df_pilot
-            del df_clean
+            del df_study
 
-        self.data_clean = data_clean
-        self.data_pilot = data_pilot
+        self.data_study = {"visit_day1": data_study}
+        self.data_pilot = {"visit_day1": data_pilot}
 
-    def _clean_session_23(self):
+    def clean_session_23(self):
         """Cleaning method for visit 2 & 3 surveys.
 
         Split session into individual surveys, convert participant
@@ -596,7 +562,7 @@ class CleanQualtrics:
 
         Attributes
         ----------
-        data_clean : dict
+        data_study : dict
             Cleaned survey data of study participant responses
             {visit: {survey_name: pd.DataFrame}}
         data_pilot : dict
@@ -619,13 +585,16 @@ class CleanQualtrics:
             axis=1,
             inplace=True,
         )
+        self._df_raw = report_helper.drop_participant(
+            "ER0080", self._df_raw, "study_id"
+        )
         col_names = self._df_raw.columns
 
         # Get relevant info from dataframe for each day
-        data_clean = {}
+        data_study = {}
         data_pilot = {}
         for day_str, day_code in day_dict.items():
-            data_clean[f"visit_{day_str}"] = {}
+            data_study[f"visit_{day_str}"] = {}
             data_pilot[f"visit_{day_str}"] = {}
             for sur_key in surveys_visit23:
                 print(f"\tCleaning survey data : {day_str}, {sur_key}")
@@ -665,19 +634,19 @@ class CleanQualtrics:
                     ~df_sub["study_id"].isin(self._pilot_list)
                 ].index.tolist()
                 df_pilot = df_sub.loc[idx_pilot]
-                df_clean = df_sub.loc[idx_study]
+                df_study = df_sub.loc[idx_study]
 
                 # Update dicts
-                data_clean[f"visit_{day_str}"][sur_key] = df_clean
+                data_study[f"visit_{day_str}"][sur_key] = df_study
                 data_pilot[f"visit_{day_str}"][sur_key] = df_pilot
                 del df_sub
-                del df_clean
+                del df_study
                 del df_pilot
 
-        self.data_clean = data_clean
+        self.data_study = data_study
         self.data_pilot = data_pilot
 
-    def _clean_post_scan_ratings(self):
+    def clean_postscan_ratings(self):
         """Cleaning method for stimuli ratings.
 
         Mine "FINAL - EmoRep Stimulus Ratings - fMRI Study" and generate
@@ -690,7 +659,7 @@ class CleanQualtrics:
 
         Attributes
         ----------
-        data_clean : dict
+        data_study : dict
             Cleaned survey data of study participant responses
             {visit: {survey_name: pd.DataFrame}}
         data_pilot : dict
@@ -698,39 +667,17 @@ class CleanQualtrics:
             {visit: {survey_name: pd.DataFrame}}
 
         """
-        print("\tCleaning survey data : post_scan_ratings")
-
-        # Get scenario reference file for mapping prompt to stimulus
-        with pkg_resources.open_text(
-            reference_files, "EmoRep_PostScan_Task_ScenarioIDs_2022.csv"
-        ) as rf:
-            _df_keys_scenario = pd.read_csv(rf, index_col="Qualtrics_ID")
-        _keys_scenarios = _df_keys_scenario.to_dict()["Stimulus_ID"]
-
-        # Remove punctuation, setup reference dictionary:
-        #   key = qualtrics id, value = stimulus id.
-        keys_scenarios = {}
-        for h_key, h_val in _keys_scenarios.items():
-            new_key = h_key.translate(
-                str.maketrans("", "", string.punctuation)
-            )
-            keys_scenarios[new_key] = h_val
-
-        # Get video reference file, setup reference dict
-        with pkg_resources.open_text(
-            reference_files, "EmoRep_PostScan_Task_VideoIDs_2022.csv"
-        ) as rf:
-            _df_keys_video = pd.read_csv(rf, index_col="Qualtrics_ID")
-        keys_videos = _df_keys_video.to_dict()["Stimulus_ID"]
+        print("\tCleaning survey data : post_scan_ratings ...")
 
         # Remove header rows, test IDs, txtFile NaNs, and restarted
         # sessions (Finished=False).
-        df_clean = self._df_raw
-        df_clean = df_clean.drop([0, 1])
-        df_clean = df_clean[~df_clean["SubID"].str.contains("ER9")]
-        df_clean = df_clean[df_clean["txtFile"].notna()]
-        df_clean = df_clean[~df_clean["Finished"].str.contains("False")]
-        df_clean = df_clean.reset_index(drop=True)
+        self._df_raw = self._df_raw.drop([0, 1])
+        self._df_raw = self._df_raw[~self._df_raw["SubID"].str.contains("ER9")]
+        self._df_raw = self._df_raw[self._df_raw["txtFile"].notna()]
+        self._df_raw = self._df_raw[
+            ~self._df_raw["Finished"].str.contains("False")
+        ]
+        self._df_raw = self._df_raw.reset_index(drop=True)
 
         # Remove some unneeded columns
         drop_list = [
@@ -750,16 +697,19 @@ class CleanQualtrics:
             "ScenInstruct",
         ]
         for drop_name in drop_list:
-            drop_cols = [x for x in df_clean.columns if drop_name in x]
-            df_clean = df_clean.drop(drop_cols, axis=1)
+            drop_cols = [x for x in self._df_raw.columns if drop_name in x]
+            self._df_raw = self._df_raw.drop(drop_cols, axis=1)
 
         # Extract subject, session, and stimulus type columns
-        sub_list = df_clean["SubID"].tolist()
-        sess_list = df_clean["SessionID"].tolist()
+        self._df_raw = report_helper.drop_participant(
+            "ER0080", self._df_raw, "SubID"
+        )
+        sub_list = self._df_raw["SubID"].tolist()
+        sess_list = self._df_raw["SessionID"].tolist()
 
         # Unpack txtFile column to get list and order of stimuli that
         # were presented to participant.
-        stim_all = df_clean["txtFile"].tolist()
+        stim_all = self._df_raw["txtFile"].tolist()
         stim_all = [x.replace("<br>", " ") for x in stim_all]
         stim_unpack = [re.split(r"\t+", x.rstrip("\t")) for x in stim_all]
 
@@ -774,98 +724,26 @@ class CleanQualtrics:
             "prompt",
             "response",
         ]
-        df_study = pd.DataFrame(columns=out_names)
+        self._df_study = pd.DataFrame(columns=out_names)
         df_pilot = pd.DataFrame(columns=out_names)
 
-        # Setup inner function for mining df_clean
-        def _fill_psr(sub, sess, stim_list):
-            """Find participant responses and fill dataframe."""
-            print(f"\t\tGetting data for : {sub} {sess} ...")
-
-            # Subset df_raw for subject, session data. Remove empty columns.
-            df_sub = df_clean.loc[
-                (df_clean["SubID"] == sub) & (df_clean["SessionID"] == sess)
-            ]
-            df_sub = df_sub.dropna(axis=1)
-
-            # Identify session, datetime, and type values
-            day = f"day{int(sess) + 1}"
-            sur_date = df_sub.iloc[0]["RecordedDate"].split(" ")[0]
-            stim_type = df_sub.iloc[0]["StimulusType"]
-
-            # Get relevant reference dictionary for stimulus type, remove
-            # punctuation from scenario prompts and deal with \u2019.
-            if stim_type == "Scenarios":
-                ref_dict = keys_scenarios
-                stim_list = [
-                    x.translate(
-                        str.maketrans("", "", string.punctuation)
-                    ).replace("can’t", "cant")
-                    for x in stim_list
-                ]
-            else:
-                ref_dict = keys_videos
-
-            # Add a number lines to df_study for each stimulus
-            nonlocal df_study
-            for h_cnt, stim in enumerate(stim_list):
-
-                # Determine stimulus number in qualtrics, extract
-                # emotion and trial stimulus from reference dict.
-                cnt = h_cnt + 1
-                emotion, trial_stim = ref_dict[stim].split("_")
-
-                # Add a line to df_study for each prompt type
-                for prompt in ["Arousal", "Valence", "Endorsement"]:
-
-                    # Get response value from proper column, manage multiple,
-                    # single, or non responses.
-                    df_resp = df_sub.loc[
-                        :,
-                        df_sub.columns.str.startswith(f"{cnt}_{prompt}"),
-                    ]
-                    if df_resp.empty:
-                        resp = np.nan
-                    elif df_resp.shape == (1, 1):
-                        resp = df_resp.values[0][0]
-                    else:
-                        resp = ";".join(df_resp.values[0])
-
-                    # Add stimulus prompt values to df_study
-                    update_dict = {
-                        "study_id": sub,
-                        "datetime": sur_date,
-                        "session": day,
-                        "type": stim_type,
-                        "emotion": emotion,
-                        "stimulus": trial_stim,
-                        "prompt": prompt,
-                        "response": resp,
-                    }
-                    df_study = pd.concat(
-                        [
-                            df_study,
-                            pd.DataFrame.from_records([update_dict]),
-                        ]
-                    )
-            del df_sub
-
-        # Update df_study with each participant's responses
+        # Update self._df_raw with each participant's responses
+        self._stim_keys()
         for sub, sess, stim_list in zip(sub_list, sess_list, stim_unpack):
             if sub in self._withdrew_list:
                 continue
-            _fill_psr(sub, sess, stim_list)
-        df_study = df_study.sort_values(
+            self._fill_resp(sub, sess, stim_list)
+        self._df_study = self._df_study.sort_values(
             by=["study_id", "session", "emotion", "stimulus", "prompt"]
         )
 
         # Split dataframe by session
-        sess_mask = df_study["session"] == "day2"
-        df_study_day2 = df_study[sess_mask]
-        df_study_day3 = df_study[~sess_mask]
+        sess_mask = self._df_study["session"] == "day2"
+        df_study_day2 = self._df_study[sess_mask]
+        df_study_day3 = self._df_study[~sess_mask]
 
         # Make ouput attributes, just use df_pilot as filler
-        self.data_clean = {
+        self.data_study = {
             "visit_day2": {"post_scan_ratings": df_study_day2},
             "visit_day3": {"post_scan_ratings": df_study_day3},
         }
@@ -874,135 +752,201 @@ class CleanQualtrics:
             "visit_day3": {"post_scan_ratings": df_pilot},
         }
 
+    def _stim_keys(self):
+        """Set attrs _keys_[scenarios|videos]."""
+        # Get scenario reference file for mapping prompt to stimulus
+        with pkg_resources.open_text(
+            reference_files, "EmoRep_PostScan_Task_ScenarioIDs_2022.csv"
+        ) as rf:
+            _df_keys_scenario = pd.read_csv(rf, index_col="Qualtrics_ID")
+        _keys_scenarios = _df_keys_scenario.to_dict()["Stimulus_ID"]
 
-class CombineRestRatings:
-    """Aggregate post resting ratings.
+        # Remove punctuation, setup reference dictionary:
+        #   key = qualtrics id, value = stimulus id.
+        self._keys_scenarios = {}
+        for h_key, h_val in _keys_scenarios.items():
+            new_key = h_key.translate(
+                str.maketrans("", "", string.punctuation)
+            )
+            self._keys_scenarios[new_key] = h_val
 
-    Find and combine subject rest ratings, output by dcm_conversion.
+        # Get video reference file, setup reference dict
+        with pkg_resources.open_text(
+            reference_files, "EmoRep_PostScan_Task_VideoIDs_2022.csv"
+        ) as rf:
+            _df_keys_video = pd.read_csv(rf, index_col="Qualtrics_ID")
+        self._keys_videos = _df_keys_video.to_dict()["Stimulus_ID"]
+
+    def _fill_resp(self, sub, sess, stim_list):
+        """Find participant responses and fill dataframe."""
+        # Subset df_raw for subject, session data. Remove empty columns.
+        df_sub = self._df_raw.loc[
+            (self._df_raw["SubID"] == sub)
+            & (self._df_raw["SessionID"] == sess)
+        ].copy(deep=True)
+        df_sub = df_sub.dropna(axis=1)
+
+        # Identify session, datetime, and type values
+        day = f"day{int(sess) + 1}"
+        sur_date = df_sub.iloc[0]["RecordedDate"].split(" ")[0]
+        stim_type = df_sub.iloc[0]["StimulusType"]
+
+        # Get relevant reference dictionary for stimulus type, remove
+        # punctuation from scenario prompts and deal with \u2019.
+        if stim_type == "Scenarios":
+            ref_dict = self._keys_scenarios
+            stim_list = [
+                x.translate(str.maketrans("", "", string.punctuation)).replace(
+                    "can’t", "cant"
+                )
+                for x in stim_list
+            ]
+        else:
+            ref_dict = self._keys_videos
+
+        # Add a number lines to df_study for each stimulus
+        # nonlocal df_study
+        for h_cnt, stim in enumerate(stim_list):
+
+            # Determine stimulus number in qualtrics, extract
+            # emotion and trial stimulus from reference dict.
+            cnt = h_cnt + 1
+            emotion, trial_stim = ref_dict[stim].split("_")
+
+            # Add a line to df_study for each prompt type
+            for prompt in ["Arousal", "Valence", "Endorsement"]:
+
+                # Get response value from proper column, manage multiple,
+                # single, or non responses.
+                df_resp = df_sub.loc[
+                    :,
+                    df_sub.columns.str.startswith(f"{cnt}_{prompt}"),
+                ].copy(deep=True)
+                if df_resp.empty:
+                    resp = np.nan
+                elif df_resp.shape == (1, 1):
+                    resp = df_resp.values[0][0]
+                else:
+                    resp = ";".join(df_resp.values[0])
+
+                # Add stimulus prompt values to df_study
+                update_dict = {
+                    "study_id": sub,
+                    "datetime": sur_date,
+                    "session": day,
+                    "type": stim_type,
+                    "emotion": emotion,
+                    "stimulus": trial_stim,
+                    "prompt": prompt,
+                    "response": resp,
+                }
+                self._df_study = pd.concat(
+                    [
+                        self._df_study,
+                        pd.DataFrame.from_records([update_dict]),
+                    ]
+                )
+
+
+def clean_rest_ratings(sess, rawdata_path):
+    """Find and aggregate participant rest ratings for session.
 
     Parameters
     ----------
-    proj_dir : path
-        Location of parent directory for project
+    sess : str
+        ["day2" | "day3"]
+    rawdata_path : path
+        Location of BIDS rawdata
 
-    Attributes
-    ----------
+    Returns
+    -------
     df_sess : pd.DataFrame
         Aggregated rest ratings for session
 
-    Methods
-    -------
-    get_rest_ratings(sess, rawdata_path)
-        Aggregate session rest ratings
+    Raises
+    ------
+    ValueError
+        Invalid sess argument supplied
+    FileNotFoundError
+        Participant rest-rating files are not found
 
     """
+    # Check arg
+    if sess not in ["day2", "day3"]:
+        raise ValueError(f"Improper session argument : sess={sess}")
 
-    def __init__(self, proj_dir):
-        """Initialize."""
-        self._sess_valid = ["day2", "day3"]
+    # Setup session dataframe
+    col_names = [
+        "study_id",
+        "visit",
+        "task",
+        "datetime",
+        "resp_type",
+        "AMUSEMENT",
+        "ANGER",
+        "ANXIETY",
+        "AWE",
+        "CALMNESS",
+        "CRAVING",
+        "DISGUST",
+        "EXCITEMENT",
+        "FEAR",
+        "HORROR",
+        "JOY",
+        "NEUTRAL",
+        "ROMANCE",
+        "SADNESS",
+        "SURPRISE",
+    ]
+    df_sess = pd.DataFrame(columns=col_names)
 
-    def get_rest_ratings(self, sess, rawdata_path):
-        """Find and aggregate participant rest ratings for session.
+    # Find all session files
+    beh_search_path = f"{rawdata_path}/sub-*/ses-{sess}/beh"
+    beh_list = sorted(glob.glob(f"{beh_search_path}/*rest-ratings*.tsv"))
+    if not beh_list:
+        raise FileNotFoundError(
+            f"No rest-ratings files found in {beh_search_path}."
+        )
 
-        Parameters
-        ----------
-        sess : str
-            ["day2" | "day3"]
-        rawdata_path : path
-            Location of BIDS rawdata
+    # Add each participant's responses to df_sess
+    for beh_path in beh_list:
 
-        Attributes
-        ----------
-        df_sess : pd.DataFrame
-            Aggregated rest ratings for session
+        # Get session info
+        beh_file = os.path.basename(beh_path)
+        subj, sess, _, date_ext = beh_file.split("_")
+        subj_str = subj.split("-")[1]
+        date_str = date_ext.split(".")[0]
 
-        Raises
-        ------
-        ValueError
-            Invalid sess argument supplied
-        FileNotFoundError
-            Participant rest-rating files are not found
-
-        """
-        # Check arg
-        if sess not in self._sess_valid:
-            raise ValueError(f"Improper session argument : sess={sess}")
-
-        # Setup session dataframe
-        col_names = [
-            "study_id",
-            "visit",
-            "task",
-            "datetime",
-            "resp_type",
-            "AMUSEMENT",
-            "ANGER",
-            "ANXIETY",
-            "AWE",
-            "CALMNESS",
-            "CRAVING",
-            "DISGUST",
-            "EXCITEMENT",
-            "FEAR",
-            "HORROR",
-            "JOY",
-            "NEUTRAL",
-            "ROMANCE",
-            "SADNESS",
-            "SURPRISE",
-        ]
-        df_sess = pd.DataFrame(columns=col_names)
-
-        # Find all session files
-        beh_search_path = f"{rawdata_path}/sub-*/ses-{sess}/beh"
-        beh_list = sorted(glob.glob(f"{beh_search_path}/*rest-ratings*.tsv"))
-        if not beh_list:
-            raise FileNotFoundError(
-                f"No rest-ratings files found in {beh_search_path}."
-                + "\n\tTry running dcm_conversion."
+        # Determine sesion stimulus type by finding a BIDS
+        # events file.
+        search_path = os.path.join(rawdata_path, subj, sess, "func")
+        try:
+            task_path = glob.glob(f"{search_path}/*_run-02_events.tsv")[0]
+            _, _, task, _, _ = os.path.basename(task_path).split("_")
+        except (IndexError):
+            print(
+                f"\n\t\tNo run-02 BIDS event file detected for {subj}, "
+                + f"{sess}. Continuing ..."
             )
+            continue
 
-        # Add each participant's responses to df_sess
-        for beh_path in beh_list:
+        # Get data, organize for concat with df_sess
+        df_beh = pd.read_csv(beh_path, sep="\t", index_col="prompt")
+        df_beh_trans = df_beh.T
+        df_beh_trans.reset_index(inplace=True)
+        df_beh_trans = df_beh_trans.rename(columns={"index": "resp_type"})
+        df_beh_trans["study_id"] = subj_str
+        df_beh_trans["visit"] = sess.split("-")[-1]
+        df_beh_trans["datetime"] = date_str
+        df_beh_trans["task"] = task.split("-")[-1]
 
-            # Get session info
-            beh_file = os.path.basename(beh_path)
-            subj, sess, _, date_ext = beh_file.split("_")
-            subj_str = subj.split("-")[1]
-            date_str = date_ext.split(".")[0]
+        # Add info to df_sess
+        df_sess = pd.concat([df_sess, df_beh_trans], ignore_index=True)
+        del df_beh, df_beh_trans
 
-            # Determine sesion stimulus type by finding a BIDS
-            # events file.
-            search_path = os.path.join(rawdata_path, subj, sess, "func")
-            try:
-                task_path = glob.glob(f"{search_path}/*_run-02_events.tsv")[0]
-                _, _, task, _, _ = os.path.basename(task_path).split("_")
-            except (IndexError):
-                print(
-                    f"\n\t\tNo run-02 BIDS event file detected for {subj}, "
-                    + f"{sess}. Continuing ..."
-                )
-                continue
-
-            # Get data, organize for concat with df_sess
-            df_beh = pd.read_csv(beh_path, sep="\t", index_col="prompt")
-            df_beh_trans = df_beh.T
-            df_beh_trans.reset_index(inplace=True)
-            df_beh_trans = df_beh_trans.rename(columns={"index": "resp_type"})
-            df_beh_trans["study_id"] = subj_str
-            df_beh_trans["visit"] = sess.split("-")[-1]
-            df_beh_trans["datetime"] = date_str
-            df_beh_trans["task"] = task.split("-")[-1]
-
-            # Add info to df_sess
-            df_sess = pd.concat([df_sess, df_beh_trans], ignore_index=True)
-            del df_beh, df_beh_trans
-
-        # Remove responses from withdrawn participants
-        part_comp = report_helper.ParticipantComplete()
-        part_comp.status_change("withdrew")
-        df_sess = df_sess[
-            ~df_sess.study_id.str.contains("|".join(part_comp.all))
-        ]
-        df_sess = df_sess.reset_index(drop=True)
-        self.df_sess = df_sess
+    # Remove responses from withdrawn participants
+    part_comp = report_helper.ParticipantComplete()
+    part_comp.status_change("withdrew")
+    df_sess = df_sess[~df_sess.study_id.str.contains("|".join(part_comp.all))]
+    df_sess = df_sess.reset_index(drop=True)
+    return df_sess

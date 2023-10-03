@@ -1,13 +1,12 @@
 """Functions for downloading survey data from RedCap and Qualtrics.
 
-download_mri_log : get MRI visit logs
-download_completion_log : get completion log
-download_prescreening : get prescreening responses
-download_redcap : download REDCap surveys
+dl_mri_log : get MRI visit logs
+dl_completion_log : get completion log
+dl_prescreening : get prescreening responses
+dl_redcap : download REDCap surveys
 download qualtrics : download Qualtrics surveys
 
 """
-import os
 import json
 import pandas as pd
 import importlib.resources as pkg_resources
@@ -15,7 +14,7 @@ from make_reports.resources import report_helper
 from make_reports import reference_files
 
 
-def download_mri_log(redcap_token):
+def dl_mri_log(redcap_token):
     """Download and combine MRI Visit Logs by session.
 
     Returns a reduced report, containing only a datetime column
@@ -68,7 +67,7 @@ def download_mri_log(redcap_token):
     return df
 
 
-def download_completion_log(redcap_token):
+def dl_completion_log(redcap_token):
     """Return Completion log.
 
     Only includes participants who have a value in the
@@ -97,7 +96,7 @@ def download_completion_log(redcap_token):
     return df_compl
 
 
-def download_prescreening(redcap_token):
+def dl_prescreening(redcap_token):
     """Return reduced prescreening survey.
 
     Parameters
@@ -124,7 +123,7 @@ def download_prescreening(redcap_token):
     return df_out
 
 
-def _download_info(database, survey_name=None):
+def _dl_info(database, survey_name):
     """Gather API survey IDs and organization mapping.
 
     Parameters
@@ -132,7 +131,7 @@ def _download_info(database, survey_name=None):
     database : str
         [redcap | qualtrics]
     survey_name : str
-        Individual survey name from database (optional)
+        Individual survey name from database
 
     Returns
     -------
@@ -158,14 +157,14 @@ def _download_info(database, survey_name=None):
     h_map = h_meth()
 
     # Check if survey_name is valid
-    if survey_name and survey_name not in h_map.keys():
+    if survey_name not in h_map.keys():
         raise ValueError(
             f"Survey name {survey_name} was not found in "
             + f"make_reports.report_helper.{database}_dict."
         )
 
     # Determine which surveys to download based on user input
-    report_org = {survey_name: h_map[survey_name]} if survey_name else h_map
+    report_org = {survey_name: h_map[survey_name]}
 
     # Check that surveys have a key
     for h_key in report_org:
@@ -177,7 +176,7 @@ def _download_info(database, survey_name=None):
     return (report_org, report_keys)
 
 
-def download_redcap(proj_dir, redcap_token, survey_name=None):
+def dl_redcap(proj_dir, redcap_token, survey_list):
     """Download EmoRep survey data from RedCap.
 
     Parameters
@@ -186,53 +185,40 @@ def download_redcap(proj_dir, redcap_token, survey_name=None):
         Location of parent directory for project
     redcap_token : str
         API token for RedCap
-    survey_name : str
-        RedCap survey name (optional)
+    survey_list : list
+        RedCap survey names
 
     Returns
     -------
     dict
-        key : survey name
-        value : pd.DataFrame
-
-    Notes
-    -----
-    Study data written to:
-        <proj_dir>/data_survey/<visit>/data_raw
+        {survey_name: (str|bool, pd.DataFrame)}, e.g.
+        {"bdi_day2": ("visit_day2", pd.DataFrame)}
+        {"demographics": (False, pd.DataFrame)}
 
     """
-    print("\nPulling RedCap surveys ...")
+    # Validate survey list
+    valid_list = [
+        "demographics",
+        "consent_pilot",
+        "consent_v1.22",
+        "guid",
+        "bdi_day2",
+        "bdi_day3",
+    ]
+    for chk in survey_list:
+        if chk not in valid_list:
+            raise ValueError(f"Survey name '{chk}' not valid")
 
-    # Get survey names, keys, directory mapping
-    report_org, report_keys = _download_info("redcap", survey_name)
-
-    # Download and write desired RedCap surveys
+    # Download, return data
     out_dict = {}
-    for sur_name, dir_name in report_org.items():
-        print(f"\t Downloading RedCap survey : {sur_name}")
-        report_id = report_keys[sur_name]
-        df = report_helper.pull_redcap_data(redcap_token, report_id)
-
-        # Setup output name, location
-        out_file = os.path.join(
-            proj_dir,
-            "data_survey",
-            dir_name,
-            "data_raw",
-            f"df_{sur_name}_latest.csv",
-        )
-        out_dir = os.path.dirname(out_file)
-        if not os.path.exists(out_dir):
-            os.makedirs(out_dir)
-
-        # Write, update dictionary
-        df.to_csv(out_file, index=False, na_rep="")
-        print(f"\t Wrote : {out_file}")
-        out_dict[sur_name] = df
+    for sur_name in survey_list:
+        rep_org, rep_key = _dl_info("redcap", sur_name)
+        df = report_helper.pull_redcap_data(redcap_token, rep_key[sur_name])
+        out_dict[sur_name] = (rep_org[sur_name], df)
     return out_dict
 
 
-def download_qualtrics(proj_dir, qualtrics_token, survey_name=None):
+def dl_qualtrics(proj_dir, qualtrics_token, survey_list):
     """Download EmoRep survey data from Qualtrics.
 
     Parameters
@@ -241,35 +227,42 @@ def download_qualtrics(proj_dir, qualtrics_token, survey_name=None):
         Location of parent directory for project
     qualtrics_token : str
         API token for Qualtrics
-    survey_name : str
-        Qualtrics survey name (optional)
+    survey_name : list
+        Qualtrics survey names
 
     Returns
     -------
     dict
-        {day: {survey_name: pd.DataFrame}}
-
-    Notes
-    -----
-    Study data written to:
-        <proj_dir>/data_survey/<visit>/data_raw
+        {survey_name: (visit, pd.DataFrame)}, e.g.
+        {"Session 2 & 3 Survey_latest": ("visit_day23", pd.DataFrame)}
 
     """
     print("\nPulling Qualtrics surveys ...")
+    valid_list = [
+        "EmoRep_Session_1",
+        "Session 2 & 3 Survey",
+        "FINAL - EmoRep Stimulus Ratings - fMRI Study",
+    ]
+    for chk in survey_list:
+        if chk not in valid_list:
+            raise ValueError(f"Survey name '{chk}' not valid")
 
     # Get survey names, keys, directory mapping
-    report_org, report_keys = _download_info("qualtrics", survey_name)
-    datacenter_id = report_keys["datacenter_ID"]
-
-    # Download and write desired Qualtrics surveys
     out_dict = {}
-    for sur_name, dir_name in report_org.items():
+    for sur_name in survey_list:
+
+        # Setup for data pull
+        report_org, report_keys = _dl_info("qualtrics", sur_name)
+        datacenter_id = report_keys["datacenter_ID"]
+        dir_name = report_org[sur_name]
         post_labels = (
             True
             if sur_name == "FINAL - EmoRep Stimulus Ratings - fMRI Study"
             else False
         )
         survey_id = report_keys[sur_name]
+
+        # Get data
         df = report_helper.pull_qualtrics_data(
             sur_name,
             survey_id,
@@ -277,42 +270,8 @@ def download_qualtrics(proj_dir, qualtrics_token, survey_name=None):
             qualtrics_token,
             post_labels,
         )
-
-        # Account for visit/directory identifier
         if type(dir_name) == list:
-
-            # Write same file to visit_day2 and visit_day3 since
-            # the survey has info for both sessions.
-            for day in dir_name:
-
-                # Setup output location, file
-                out_file = os.path.join(
-                    proj_dir,
-                    "data_survey",
-                    day,
-                    "data_raw",
-                    f"{sur_name}_latest.csv",
-                )
-                out_dir = os.path.dirname(out_file)
-                if not os.path.exists(out_dir):
-                    os.makedirs(out_dir)
-
-                # Write out and update return dict
-                df.to_csv(out_file, index=False, na_rep="")
-                print(f"\tWrote : {out_file}")
-                out_dict[day] = df
+            out_dict[sur_name] = ("visit_day23", df)
         else:
-            out_file = os.path.join(
-                proj_dir,
-                "data_survey",
-                dir_name,
-                "data_raw",
-                f"{sur_name}_latest.csv",
-            )
-            out_dir = os.path.dirname(out_file)
-            if not os.path.exists(out_dir):
-                os.makedirs(out_dir)
-            df.to_csv(out_file, index=False, na_rep="")
-            print(f"\tWrote : {out_file}")
-            out_dict[sur_name] = df
+            out_dict[sur_name] = (dir_name, df)
     return out_dict
