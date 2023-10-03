@@ -4,16 +4,16 @@ Compare detected files against known lists to identify
 participants with missing data (survey, scanner) or need
 processing of MRI data.
 
-Examples
---------
-check_data --process emorep
-check_data --process emorep --complete
-check_data --process archival
-
 Notes
 -----
 - Written to be executed on the local VM labarserv2
 - Assumes EmoRep data structure
+
+Examples
+--------
+chk_data --project emorep
+chk_data --project emorep --complete
+chk_data --project archival
 
 """
 # %%
@@ -35,7 +35,7 @@ def _get_args():
         help="Check for expected EmoRep survey and scanner files",
     )
     parser.add_argument(
-        "--process",
+        "--project",
         type=str,
         choices=["emorep", "archival"],
         default=None,
@@ -53,12 +53,12 @@ def _get_args():
 def main():
     """Trigger workflow."""
     args = _get_args().parse_args()
-    process = args.process
+    project = args.project
     complete = args.complete
 
-    if process:
+    if project:
         do_chk = data_metrics.CheckProjectMri()
-        do_chk.run_check(process)
+        do_chk.run_check(project)
     if complete:
         print("Complete is currently deprecated")
         sys.exit(0)

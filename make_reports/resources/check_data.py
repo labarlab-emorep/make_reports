@@ -11,6 +11,7 @@ import time
 import pandas as pd
 import numpy as np
 from typing import Union, Tuple
+from multiprocessing import Pool
 from make_reports.resources import build_reports
 from make_reports.resources import report_helper
 
@@ -72,7 +73,7 @@ class CheckMri:
             time.strptime(time.ctime(os.path.getmtime(mri_file))),
         )
 
-    def _compare_count(self, search_path, search_str, num_exp, col_name):
+    def _compare_count(self, subj, search_path, search_str, num_exp):
         """Compare encountered files to desired number.
 
         Search through directories to make a list of files. Compare length
@@ -82,39 +83,34 @@ class CheckMri:
 
         Parameters
         ----------
-        search_path : path
+        subj : str
+            Subject identifier
+        search_path : str, os.PathLike
             Parent directory, where subjects will be searched
         search_str : str
             File suffix and extension to be searched for, will be
             prepended by wildcard.
         num_exp : int
             Number of expected files
-        col_name : str
-            Column name of self.df_mri to update
+
+        Returns
+        -------
+        str (datetime.date), int, or np.NaN
 
         """
-        # Start empty column, search each subject
-        print(f"\t\tChecking {col_name} ...")
-        col_out = []
-        for subj in self._subj_list:
-            # Search for files, count
-            file_list = sorted(
-                glob.glob(
-                    f"{search_path}/sub-{subj}/ses-{self._sess}/{search_str}",
-                    recursive=True,
-                )
+        file_list = sorted(
+            glob.glob(
+                f"{search_path}/sub-{subj}/ses-{self._sess}/{search_str}",
             )
-            file_num = len(file_list)
+        )
+        file_num = len(file_list)
 
-            # Determine input value for col_out
-            if file_num == num_exp:
-                h_val = self._get_time(file_list[-1])
-            elif file_num > 0:
-                h_val = file_num
-            else:
-                h_val = np.nan
-            col_out.append(h_val)
-        self._update_df(col_out, col_name)
+        if file_num == num_exp:
+            return self._get_time(file_list[-1])
+        elif file_num > 0:
+            return file_num
+        else:
+            return np.nan
 
     def _update_df(self, in_val: list, col_name: str):
         """Update column of df_mri."""
@@ -229,7 +225,18 @@ class CheckMri:
 
             # Check steps in check_info, add session to search string
             for step, trip in check_info.items():
-                self._compare_count(trip[0], trip[1], trip[2], step)
+                self._multi_chk(step, trip[0], trip[1], trip[2])
+
+    def _multi_chk(self, step, search_path, search_str, num_exp, num_proc=10):
+        """Multiprocess _compare_count, write df column."""
+        print(f"\t\tChecking {step}")
+        col_out = Pool(num_proc).starmap(
+            self._compare_count, [
+                (subj, search_path, search_str, num_exp,)
+                for subj in self._subj_list
+            ]
+        )
+        self._update_df(col_out, step)
 
     def check_archival(self):
         """Check for expected archival files.
@@ -254,7 +261,7 @@ class CheckMri:
         for self._sess in self._sess_list:
             print(f"\tChecking session : {self._sess}")
             for step, trip in check_info.items():
-                self._compare_count(trip[0], trip[1], trip[2], step)
+                self._multi_chk(step, trip[0], trip[1], trip[2])
 
     def _start_df(self, col_names: list):
         """Generate pd.DataFrame from subject, session values."""
@@ -272,7 +279,6 @@ class CheckMri:
         #   Value is triple of:
         #       [0] = Path of parent directory location
         #       [1] = Searchable path/string by glob for matching files, e.g.:
-        #           "**/*.nii.gz"
         #           "func/*desc-preproc_bold.nii.gz"
         #           "*defaced.nii.gz"
         #       [2] = int, number of files glob is expected to match
