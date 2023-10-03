@@ -623,7 +623,7 @@ class NdarBrd01(_CleanDemo):
                 "data_file1": os.path.join(
                     _local_path(), "data_beh", out_file
                 ),
-                "experiment_id": id_dict["new"],
+                # "experiment_id": id_dict["new"],
             }
             survey_date = df_sub.loc[0, "datetime"]
             brd01_info.update(self._get_subj_demo(survey_date, sub))
@@ -652,7 +652,10 @@ class NdarBrd01(_CleanDemo):
         # Clean up df
         df_pilot = df_pilot[1:]
         df_pilot.columns = self._nda_cols
-        df_pilot["experiment_id"] = df_pilot["experiment_id"].astype("Int64")
+        # df_pilot["experiment_id"] = df_pilot["experiment_id"].astype("Int64")
+        df_pilot["experiment_id"] = df_pilot["experiment_id"].replace(
+            "1683", np.NaN
+        )
         df_pilot["comments_misc"] = "PILOT PARTICIPANT"
 
         # Add to self.df_report
