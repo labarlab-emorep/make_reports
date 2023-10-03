@@ -265,9 +265,11 @@ class DemoAll(manage_data.GetRedcap):
 
     def remove_withdrawn(self):
         """Remove participants from final_demo who have withdrawn consent."""
-        part_comp = report_helper.ParticipantComplete()
+        part_comp = report_helper.CheckStatus()
         part_comp.status_change("withdrew")
-        withdrew_list = part_comp.all
+        if not part_comp.all:
+            return
+        withdrew_list = [x for x in part_comp.all]
         self.final_demo = self.final_demo[
             ~self.final_demo.src_subject_id.str.contains(
                 "|".join(withdrew_list)

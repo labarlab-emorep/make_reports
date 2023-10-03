@@ -285,7 +285,7 @@ class CheckMri(_CheckEmorep):
 
     Example
     -------
-    check_data = CheckMri(*args)
+    check_data = check_data.CheckMri(*args)
     check_data.check_emorep()
     df_emorep = check_data.df_mri
 
@@ -396,8 +396,10 @@ class CheckMri(_CheckEmorep):
         return (col_names, chk_dict)
 
 
-class CheckEmorepComplete:
+class CheckEmorepComplete(build_reports.DemoAll, report_helper.AddStatus):
     """Compare encountered EmoRep data to expected.
+
+    Inherits build_reports.DemoAll, report_helper.AddStatus.
 
     Iterate through all data to determine which participant
     is missing what survey responses or scanner files. Compare
@@ -425,6 +427,8 @@ class CheckEmorepComplete:
     ----------
     proj_dir : str, os.PathLike
         Location of project parent directory
+    redcap_token : str
+        Personal access token for RedCap
 
     Attributes
     ----------
@@ -438,29 +442,26 @@ class CheckEmorepComplete:
 
     Example
     -------
-    cec = CheckEmorepComplete()
+    cec = check_data.CheckEmorepComplete(*args)
     cec.check_data()
     df_out = cec.df_check
 
     """
 
-    def __init__(self, proj_dir):
-        """Initialize."""
+    def __init__(self, proj_dir, redcap_token):
+        """Initialize.
+
+        Build _df_demo attr via DemoAll and AddStatus.
+
+        """
         print("Initializing CheckEmorepComplete")
-        self._proj_dir = proj_dir
+        super().__init__(proj_dir, redcap_token)
+        self.remove_withdrawn()
+        self._df_demo = self.enroll_status(self.final_demo, "src_subject_id")
         self._setup()
 
     def _setup(self):
         """Setup for conducting completion check."""
-        # Load participant info
-        rc_demo = build_reports.DemoAll(self._proj_dir)
-        rc_demo.remove_withdrawn()
-        add_status = report_helper.AddStatus()
-        self._df_demo = add_status.enroll_status(
-            rc_demo.final_demo, "src_subject_id"
-        )
-
-        # Determine participants, data expected, start df
         self._subj_list = self._df_demo["src_subject_id"].to_list()
         self._expected()
         self._start_df()
