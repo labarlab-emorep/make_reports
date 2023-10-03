@@ -1,8 +1,10 @@
 """Supporting functions for making reports.
 
+drop_participant : drop participant from dataframe
 pull_redcap_data : download survey data from REDCAP
 pull_qualtrics_data : download survey data from Qualtrics
 mine_template : extract values from NDA templates
+load_dataframes : load resources dataframes/track_foo.csv
 calc_age_mo : calculate age-in-months
 get_survey_age : add survey age to dataframe
 pilot_list : pilot participants
@@ -21,7 +23,7 @@ import zipfile
 import pandas as pd
 import numpy as np
 import importlib.resources as pkg_resources
-from make_reports import reference_files
+from make_reports import reference_files, dataframes
 
 
 def drop_participant(subj, df, subj_col):
@@ -216,6 +218,17 @@ def mine_template(template_file):
     return (row_info[0], row_info[1])
 
 
+def load_dataframes(name: str) -> pd.DataFrame:
+    """Return df from resources."""
+    if name not in ["status", "incomplete"]:
+        raise ValueError(
+            f"Unexpected dataframe name : dataframes/track_{name}.csv"
+        )
+    with pkg_resources.open_text(dataframes, f"track_{name}.csv") as tdf:
+        df = pd.read_csv(tdf)
+    return df
+
+
 def calc_age_mo(subj_dob, subj_dos):
     """Calculate age in months.
 
@@ -344,8 +357,87 @@ def qualtrics_dict() -> dict:
     }
 
 
+class CheckStatus:
+    """Check for status changes in study.
+
+    Produce usable attributes that contain subject IDs and reasons
+    for why participants did not make it to the end of the protocol.
+
+    Methods
+    -------
+    status_change(str)
+        Set all, visit1-3 dict attrs, indicating which
+        participant had status change and why.
+
+    Example
+    -------
+    chk_stat = report_helper.CheckStatus()
+    chk_stat.status_change("lost")
+    v1_dict = chk_stat.visit1
+
+    """
+
+    _df_status = load_dataframes("status")
+
+    def status_change(self, title):
+        """Identify participants with status change.
+
+        Parameters
+        ----------
+        title : str
+            ["lost", "excluded", "withdrew"]
+            Status change of interest
+
+        Attributes
+        ----------
+        all : dict
+            All participants with status change and reason
+        visit1 : dict
+            Status changes during/after visit1
+        visit2 : dict
+            Status changes during/after visit2
+        visit3 : dict
+            Status changes during/after visit3
+
+        Notes
+        -----
+        All attributes in format {"subject": "reason"}
+
+        """
+        map_arg = {"lost": "lost", "excluded": "excl", "withdrew": "with"}
+        if title not in map_arg.keys():
+            raise ValueError(f"Unexpected status change : {title}")
+
+        # Match status to subject and reason
+        all_dict = {}
+        for visit in ["visit1", "visit2", "visit3"]:
+            idx_status = self._df_status.index[
+                self._df_status[visit] == map_arg[title]
+            ].to_list()
+            subj_list = self._df_status.loc[idx_status, "subj"].to_list()
+            reas_list = self._df_status.loc[idx_status, "notes"].to_list()
+            all_dict[visit] = {x: y for x, y in zip(subj_list, reas_list)}
+
+        # Build attrs
+        self.visit1 = all_dict["visit1"]
+        self.visit2 = all_dict["visit2"]
+        self.visit3 = all_dict["visit3"]
+        self._build_all()
+
+    def _build_all(self):
+        """Build flat all attr from visit attrs."""
+        self.all = {}
+        for visit in [self.visit1, self.visit2, self.visit3]:
+            if not visit:
+                continue
+            for subj, reas in visit.items():
+                self.all[subj] = reas
+
+
 class ParticipantComplete:
     """Track participants who change status or have incomplete data.
+
+    DEPRECATED.
 
     Determine visit-specific participants who have been lost-to-follow up
     excluded, or have withdrawn consent. Lost participants yields
@@ -396,6 +488,12 @@ class ParticipantComplete:
         Set list (lost) or dict (excluded, withdrew) attributes
         holding which participants did not complete the study
         and the reason why.
+
+        Parameters
+        ----------
+        title : str
+            [lost | excluded | withdrew]
+            Status title of interest
 
         Attributes
         ----------
@@ -468,6 +566,8 @@ class ParticipantComplete:
 
 class AddStatus(ParticipantComplete):
     """Add participant status for each visit to dataframe.
+
+    DEPRECATED.
 
     Inherits ParticipantComplete.
 

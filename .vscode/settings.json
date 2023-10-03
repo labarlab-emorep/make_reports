@@ -7,5 +7,5 @@
         "--line-length",
         "79",
     ],
-    "files.trimTrailingWhitespace": true
+    "files.trimTrailingWhitespace": true,
 }
