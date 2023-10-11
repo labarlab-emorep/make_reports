@@ -229,9 +229,9 @@ class GetQualtrics(survey_clean.CleanQualtrics):
         self._proj_dir = proj_dir
         self._pilot_list = report_helper.pilot_list()
         self._qualtrics_token = qualtrics_token
-        part_comp = report_helper.ParticipantComplete()
+        part_comp = report_helper.CheckStatus()
         part_comp.status_change("withdrew")
-        self._withdrew_list = part_comp.all
+        self._withdrew_list = [x for x in part_comp.all.keys()]
 
     def _download_qualtrics(self, survey_list: list) -> dict:
         """Get, write, and return Qualtrics survey info.
