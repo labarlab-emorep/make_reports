@@ -409,6 +409,7 @@ class CleanRedcap:
 
         # Drop participants who have withdrawn consent
         part_comp = report_helper.CheckStatus()
+        part_comp.status_change("withdrew")
         if not part_comp.all:
             return
         withdrew_list = [int(x[2:]) for x in part_comp.all.keys()]
@@ -953,7 +954,7 @@ def clean_rest_ratings(sess, rawdata_path):
     part_comp = report_helper.CheckStatus()
     part_comp.status_change("withdrew")
     if not part_comp.all:
-        return
+        return df_sess
     withdrew_list = [x for x in part_comp.all.keys()]
     df_sess = df_sess[~df_sess.study_id.str.contains("|".join(withdrew_list))]
     df_sess = df_sess.reset_index(drop=True)

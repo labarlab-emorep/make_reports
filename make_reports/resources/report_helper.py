@@ -445,10 +445,8 @@ class _RedCapComplete:
         return self.df_compl.loc[idx_subj, "record_id"].to_list()
 
 
-class CheckStatus(_RedCapComplete):
+class CheckStatus:
     """Check for status changes in study.
-
-    Inherits _RedCapComplete.
 
     Produce usable attributes that contain subject IDs and reasons
     for why participants did not make it to the end of the protocol.
@@ -590,7 +588,7 @@ class CheckStatus(_RedCapComplete):
         self._subj_col = subj_col
         self._v_list = [1, 2, 3]
         self._clear = clear_following
-        super().__init__(redcap_token)
+        self._rc_compl = _RedCapComplete(redcap_token)
 
         # Start empty columns for visit status and reason of change,
         # then fill rows with "enrolled" for participants who
@@ -608,7 +606,11 @@ class CheckStatus(_RedCapComplete):
     def _add_enroll(self):
         """Change visit value to enrolled if subj started the visit."""
         for v_num in self._v_list:
-            v_subj = self.v1_start() if v_num == 1 else self.v23_start(v_num)
+            v_subj = (
+                self._rc_compl.v1_start()
+                if v_num == 1
+                else self._rc_compl.v23_start(v_num)
+            )
             idx_subj = self._df.index[
                 self._df["src_subject_id"].isin(v_subj)
             ].to_list()
