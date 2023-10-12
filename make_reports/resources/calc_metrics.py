@@ -509,7 +509,7 @@ def scan_pace(redcap_token, proj_dir):
     out_plot = os.path.join(
         proj_dir,
         "analyses/metrics_recruit",
-        "plot_barplot-wide_scan-attempts.png",
+        "plot_scan-attempts_barplot-wide.png",
     )
     plt.savefig(out_plot, bbox_inches="tight")
     print(f"\t\tDrew barplot : {out_plot}")
@@ -597,7 +597,7 @@ def censored_volumes(proj_dir):
     out_path = os.path.join(
         proj_dir,
         "analyses/metrics_recruit",
-        "plot_boxplot-double_epi-motion.png",
+        "plot_epi-motion_boxplot-double.png",
     )
     plt.savefig(out_path, bbox_inches="tight")
     print(f"\t\tDrew boxplot : {out_path}")
