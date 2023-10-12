@@ -399,6 +399,8 @@ class CheckMri(_CheckEmorep):
 class CheckEmorepComplete(build_reports.DemoAll, report_helper.AddStatus):
     """Compare encountered EmoRep data to expected.
 
+    DEPRECATED
+
     Inherits build_reports.DemoAll, report_helper.AddStatus.
 
     Iterate through all data to determine which participant

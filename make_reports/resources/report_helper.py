@@ -11,9 +11,9 @@ pilot_list : pilot participants
 redcap_dict : REDCAP survey mappings
 qualtrics_dict : Qualtrics survey mappings
 CheckIncomplete : TODO
-CheckStatus : TODO
-ParticipantComplete : track participant, data completion status
-AddStatus : add participant complete status to dataframe
+CheckStatus : Make participant status change available for use
+ParticipantComplete : deprecated, track participant, data completion status
+AddStatus : deprecated, add participant complete status to dataframe
 
 """
 import sys
@@ -394,36 +394,92 @@ class CheckIncomplete:
                 ].to_list()
 
 
-class CheckStatus:
+class _RedCapComplete:
+    """Supply information from REDCap Completion Log.
+
+    Attributes
+    ----------
+    df_compl : pd.DataFrame
+        Completion Log Report
+
+    Methods
+    -------
+    v1_start()
+        Return list of participants that started|completed visit_day1
+    v23_start()
+        Return list of participants that started|completed visit_day2|3
+
+    """
+
+    def __init__(self, redcap_token: str):
+        """Set df_compl attr from REDCap completion log."""
+        self.df_compl = survey_download.dl_completion_log(redcap_token)
+        self.df_compl = self.df_compl.loc[
+            (self.df_compl["day_1_fully_completed"] == 1.0)
+            | (
+                (self.df_compl["consent_form_completed"] == 1.0)
+                & (self.df_compl["demographics_completed"] == 1.0)
+            )
+        ].reset_index(drop=True)
+        self.df_compl["record_id"] = self.df_compl["record_id"].astype(str)
+        self.df_compl["record_id"] = self.df_compl["record_id"].str.zfill(4)
+        self.df_compl["record_id"] = "ER" + self.df_compl["record_id"]
+
+    def v1_start(self) -> list:
+        """Return subjs that started|completed visit_day1."""
+        idx_subj = self.df_compl.index[
+            (self.df_compl["day_1_fully_completed"] == 1.0)
+            | (
+                (self.df_compl["consent_form_completed"] == 1.0)
+                & (self.df_compl["demographics_completed"] == 1.0)
+            )
+        ].to_list()
+        return self.df_compl.loc[idx_subj, "record_id"].to_list()
+
+    def v23_start(self, day: int) -> list:
+        """Return subjs that started|completed visit_day2|3."""
+        idx_subj = self.df_compl.index[
+            (self.df_compl[f"day_{day}_fully_completed"] == 1.0)
+            | (self.df_compl[f"bdi_day{day}_completed"] == 1.0)
+        ].tolist()
+        return self.df_compl.loc[idx_subj, "record_id"].to_list()
+
+
+class CheckStatus(_RedCapComplete):
     """Check for status changes in study.
+
+    Inherits _RedCapComplete.
 
     Produce usable attributes that contain subject IDs and reasons
     for why participants did not make it to the end of the protocol.
+
+    Attributes
+    ----------
+    df_status : pd.DataFrame
+        Class attribute, loaded dataframes/track_status.csv
 
     Methods
     -------
     status_change(str)
         Set all, visit1-3 dict attrs, indicating which
         participant had status change and why.
-    add_status()
-        TODO
-
-    Example
-    -------
-    chk_stat = report_helper.CheckStatus()
-    chk_stat.status_change("lost")
-    v1_dict = chk_stat.visit1
+    add_status(*args)
+        Return a pd.DataFrame with columns holding visit status
+        and change reasons
 
     """
 
-    _df_status = load_dataframes("status")
+    df_status = load_dataframes("status")
 
-    def status_change(self, title):
+    def status_change(self, status_name):
         """Identify participants with status change.
+
+        Read dataframes/track_status.csv to determine which participants
+        had a status change for which visit.
 
         Parameters
         ----------
-        title : str
+        status_name : str
             ["lost", "excluded", "withdrew"]
             Status change of interest
 
@@ -442,19 +498,25 @@ class CheckStatus:
         -----
         All attributes in format {"subject": "reason"}
 
+        Example
+        -------
+        chk_stat = report_helper.CheckStatus()
+        chk_stat.status_change("lost")
+        v1_dict = chk_stat.visit1
+
         """
         map_arg = {"lost": "lost", "excluded": "excl", "withdrew": "with"}
-        if title not in map_arg.keys():
-            raise ValueError(f"Unexpected status change : {title}")
+        if status_name not in map_arg.keys():
+            raise ValueError(f"Unexpected status change : {status_name}")
 
         # Match status to subject and reason
         all_dict = {}
         for visit in ["visit1", "visit2", "visit3"]:
-            idx_status = self._df_status.index[
-                self._df_status[visit] == map_arg[title]
+            idx_status = self.df_status.index[
+                self.df_status[visit] == map_arg[status_name]
             ].to_list()
-            subj_list = self._df_status.loc[idx_status, "subj"].to_list()
-            reas_list = self._df_status.loc[idx_status, "notes"].to_list()
+            subj_list = self.df_status.loc[idx_status, "subj"].to_list()
+            reas_list = self.df_status.loc[idx_status, "notes"].to_list()
             all_dict[visit] = {x: y for x, y in zip(subj_list, reas_list)}
 
         # Build attrs
@@ -480,89 +542,80 @@ class CheckStatus:
         status_list=["lost", "withdrew", "excluded"],
         clear_following=True,
     ):
-        """Title.
+        """Add visit status and reason to dataframe.
+
+        Add new columns visit[1-3]_[status|reason] to df. Fill with
+        "enrolled" if subj participant completed or started the visit
+        (ref REDCap completion log). Then update each visit if a status
+        is found in dataframes/track_status.csv. Updated visit status
+        clears subsequent visit "enrolled" status if clear_collowing=True.
 
         Parameters
         ----------
-        df
-        redcap_token
-        subj_col
-        status_list
-        clear_following
+        df : pd.DataFrame, build_reports.DemoAll.final_demo
+            Input df to be updated
+        redcap_token : str
+            API token for REDCap
+        subj_col : str, optional
+            Column name of input df holding subject ID strings
+        status_list : list, optional
+            Status to check, append to df
+        clear_following : bool, optional
+            Clear subsequent visit statuses once a status change
+            occurred for a participant's visit
 
         Returns
         -------
         pd.DataFrame
 
+        Example
+        -------
+        chk_stat = report_helper.CheckStatus()
+        chk_stat.status_change("lost")
+        v1_dict = chk_stat.visit1
+
+        get_demo = build_reports.DemoAll(*args)
+        df_demo_status = chk_stat.add_status(get_demo.final_demo, redcap_token)
+
         """
+        # Validate input
         if subj_col not in df.columns:
             raise KeyError(f"Dataframe missing column : {subj_col}")
         for status in status_list:
             if status not in ["lost", "withdrew", "excluded"]:
                 raise ValueError(f"Unexpected status : {status}")
-        #
+
+        # Set attrs, inherit completion check
         self._df = df
         self._subj_col = subj_col
         self._v_list = [1, 2, 3]
         self._clear = clear_following
-        self._df_compl = self._dl_compl(redcap_token)
+        super().__init__(redcap_token)
 
-        #
+        # Start empty columns for visit status and reason of change,
+        # then fill rows with "enrolled" for participants who
+        # started the session.
         for v_num in self._v_list:
             self._df[f"visit{v_num}_status"] = np.NaN
             self._df[f"visit{v_num}_reason"] = np.NaN
         self._add_enroll()
 
-        #
+        # Update status columns
         for status in status_list:
             self._add_change(status)
         return self._df
 
     def _add_enroll(self):
-        """Title."""
+        """Change visit value to enrolled if subj started the visit."""
         for v_num in self._v_list:
-            v_subj = self._v1_start() if v_num == 1 else self._v23_start(v_num)
+            v_subj = self.v1_start() if v_num == 1 else self.v23_start(v_num)
             idx_subj = self._df.index[
                 self._df["src_subject_id"].isin(v_subj)
             ].to_list()
             self._df.loc[idx_subj, f"visit{v_num}_status"] = "enrolled"
 
-    def _dl_compl(self, redcap_token: str) -> pd.DataFrame:
-        """Return completion log of enrolled participants."""
-        df_compl = survey_download.dl_completion_log(redcap_token)
-        df_compl = df_compl.loc[
-            (df_compl["day_1_fully_completed"] == 1.0)
-            | (
-                (df_compl["consent_form_completed"] == 1.0)
-                & (df_compl["demographics_completed"] == 1.0)
-            )
-        ].reset_index(drop=True)
-        df_compl["record_id"] = df_compl["record_id"].astype(str)
-        df_compl["record_id"] = df_compl["record_id"].str.zfill(4)
-        df_compl["record_id"] = "ER" + df_compl["record_id"]
-        return df_compl
-
-    def _v1_start(self) -> list:
-        """Title."""
-        idx_subj = self._df_compl.index[
-            (self._df_compl["day_1_fully_completed"] == 1.0)
-            | (
-                (self._df_compl["consent_form_completed"] == 1.0)
-                & (self._df_compl["demographics_completed"] == 1.0)
-            )
-        ].to_list()
-        return self._df_compl.loc[idx_subj, "record_id"].to_list()
-
-    def _v23_start(self, day: int) -> dict:
-        """Title."""
-        idx_subj = self._df_compl.index[
-            (self._df_compl[f"day_{day}_fully_completed"] == 1.0)
-            | (self._df_compl[f"bdi_day{day}_completed"] == 1.0)
-        ].tolist()
-        return self._df_compl.loc[idx_subj, "record_id"].to_list()
-
     def _add_change(self, status: str):
-        """Title."""
+        """Change visit value to status if necessary."""
         self.status_change(status)
         for v_num in reversed(self._v_list):  # reverse to allow clearing
             visit_dict = getattr(self, f"visit{v_num}")

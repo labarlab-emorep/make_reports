@@ -609,7 +609,7 @@ def censored_volumes(proj_dir):
 class ParticipantFlow(build_reports.DemoAll, report_helper.CheckStatus):
     """Generate PRISMA flowchart of participants in study.
 
-    Inherits build_reports.DemoAll, report_helper.AddStatus.
+    Inherits build_reports.DemoAll, report_helper.CheckStatus.
 
     PRISMA main flow includes recruitment, visits 1-3, and
     final participant numbers. Offshoots include numbers
@@ -656,12 +656,12 @@ class ParticipantFlow(build_reports.DemoAll, report_helper.CheckStatus):
             <proj-dir>/analyses_metrics/plot_flow-participant.png
 
         """
-        # Visit0 node
+        # Recruitment node
         flo = Digraph("participant_flow")
         flo.attr(label="Participant Flow", labelloc="t", fontsize="18")
         flo.node(
             "0",
-            f"Visit0: Recruitment\nn={self._get_recruit()}",
+            f"Recruitment\nn={self._get_recruit()}",
             shape="box",
         )
 

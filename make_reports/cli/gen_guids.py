@@ -8,7 +8,7 @@ Generated GUIDs are written to:
     <proj_dir>/data_survey/redcap/output_guid_*.txt
 
 Examples
--------_
+--------
 gen_guids -n nmuncy -t $PAT_REDCAP_EMOREP
 gen_guids -n nmuncy -t $PAT_REDCAP_EMOREP --find-mismatch
 
