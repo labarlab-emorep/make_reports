@@ -410,11 +410,10 @@ class CleanRedcap:
         # Drop participants who have withdrawn consent
         part_comp = report_helper.CheckStatus()
         part_comp.status_change("withdrew")
-        if not part_comp.all:
-            return
-        withdrew_list = [int(x[2:]) for x in part_comp.all.keys()]
-        df_raw = df_raw[~df_raw["study_id"].isin(withdrew_list)]
-        df_raw = df_raw.reset_index(drop=True)
+        if part_comp.all:
+            withdrew_list = [int(x[2:]) for x in part_comp.all.keys()]
+            df_raw = df_raw[~df_raw["study_id"].isin(withdrew_list)]
+            df_raw = df_raw.reset_index(drop=True)
 
         # Separate pilot from study data
         idx_pilot = df_raw[

@@ -160,7 +160,7 @@ def main():
     # Validate input
     if survey_list and (not draw_plot and not write_json):
         raise ValueError(
-            "Option --survey-names requires --draw-plot or --write-json."
+            "Option --survey-names requires --draw-plots or --write-json."
         )
 
     # Set redcap/qualtircs and scan lists
@@ -213,7 +213,9 @@ def main():
 
     # Trigger workflows based on user input
     if make_tables:
-        behavioral_reports.make_survey_table(proj_dir, sur_online, sur_scanner)
+        behavioral_reports.make_survey_table(
+            proj_dir, sur_online, sur_scanner, qualtrics_token, redcap_token
+        )
         sys.exit(0)
 
     if sur_online:

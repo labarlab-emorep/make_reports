@@ -86,18 +86,18 @@ def main():
         raise ValueError("--get-qualtrics requires --qualtrics-token")
 
     if manage_rest:
-        dl_clean__rest = manage_data.GetRest(proj_dir)
-        dl_clean__rest.get_rest()
+        dl_clean_rest = manage_data.GetRest(proj_dir)
+        dl_clean_rest.get_rest()
 
     if manage_redcap:
-        dl_clean__redcap = manage_data.GetRedcap(proj_dir, redcap_token)
-        dl_clean__redcap.get_redcap()
+        dl_clean_redcap = manage_data.GetRedcap(proj_dir, redcap_token)
+        dl_clean_redcap.get_redcap()
 
     if manage_qualtrics:
-        dl_clean__qualtrics = manage_data.GetQualtrics(
+        dl_clean_qualtrics = manage_data.GetQualtrics(
             proj_dir, qualtrics_token
         )
-        dl_clean__qualtrics.get_qualtrics()
+        dl_clean_qualtrics.get_qualtrics()
 
 
 if __name__ == "__main__":
