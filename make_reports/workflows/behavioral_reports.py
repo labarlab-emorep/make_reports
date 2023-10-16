@@ -128,7 +128,7 @@ class _Visit23:
     def _visit23_redcap_data(self):
         """Make clean_visit23_rc attr {visit: {survey_name: pd.DataFrame}}."""
         get_red = manage_data.GetRedcap(self._proj_dir, self._redcap_token)
-        get_red.get_redcap(["bdi_day2", "bdi_day3"])
+        get_red.get_redcap(survey_list=["bdi_day2", "bdi_day3"])
         self._clean_visit23_rc = get_red.clean_redcap["study"]
 
     def _visit23_qualtrics_data(self):
@@ -459,7 +459,9 @@ def calc_task_stats(proj_dir, survey_list, draw_plot, qualtrics_token=None):
 
 
 # %%
-def make_survey_table(proj_dir, sur_online, sur_scanner):
+def make_survey_table(
+    proj_dir, sur_online, sur_scanner, qualtrics_token, redcap_token
+):
     """Generate tables from REDCap, Qualtrics, and task survey data.
 
     Trigger workflows.CalcRedcapQualtricsStats and workflows.calc_task_stats
@@ -475,11 +477,15 @@ def make_survey_table(proj_dir, sur_online, sur_scanner):
         All abbreviations for task responses
 
     """
-    # Trigger Visit 1-2 methods
-    calc_rcq = CalcRedcapQualtricsStats(
-        proj_dir, sur_online, draw_plot=True, write_json=False
+    # Trigger Visit 1-3 methods
+    calc_rcq = CalcRedcapQualtricsStats(proj_dir)
+    calc_rcq.gen_stats_plots(
+        sur_online,
+        False,
+        False,
+        qualtrics_token=qualtrics_token,
+        redcap_token=redcap_token,
     )
-    calc_rcq.match_survey_visits()
     data_rcq = calc_rcq.survey_descriptives
 
     # Organize generated dataframe into table, write out
@@ -500,7 +506,9 @@ def make_survey_table(proj_dir, sur_online, sur_scanner):
     df_all.to_csv(out_stats, index=False)
 
     # Trigger task methods
-    _ = calc_task_stats(proj_dir, sur_scanner, draw_plot=True)
+    _ = calc_task_stats(
+        proj_dir, sur_scanner, draw_plot=True, qualtrics_token=qualtrics_token
+    )
 
 
 # %%

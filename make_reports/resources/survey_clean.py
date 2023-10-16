@@ -408,11 +408,12 @@ class CleanRedcap:
         df_raw["datetime"] = df_raw["datetime"].dt.strftime("%Y-%m-%d")
 
         # Drop participants who have withdrawn consent
-        part_comp = report_helper.ParticipantComplete()
+        part_comp = report_helper.CheckStatus()
         part_comp.status_change("withdrew")
-        withdrew_list = [int(x[2:]) for x in part_comp.all]
-        df_raw = df_raw[~df_raw["study_id"].isin(withdrew_list)]
-        df_raw = df_raw.reset_index(drop=True)
+        if part_comp.all:
+            withdrew_list = [int(x[2:]) for x in part_comp.all.keys()]
+            df_raw = df_raw[~df_raw["study_id"].isin(withdrew_list)]
+            df_raw = df_raw.reset_index(drop=True)
 
         # Separate pilot from study data
         idx_pilot = df_raw[
@@ -528,10 +529,13 @@ class CleanQualtrics:
 
             # Drop first duplicate and withdrawn participant responses
             df_sur = df_sur.drop_duplicates(subset="study_id", keep="last")
-            df_sur = df_sur[
-                ~df_sur.study_id.str.contains("|".join(self._withdrew_list))
-            ]
-            df_sur = df_sur.reset_index(drop=True)
+            if self._withdrew_list:
+                df_sur = df_sur[
+                    ~df_sur.study_id.str.contains(
+                        "|".join(self._withdrew_list)
+                    )
+                ]
+                df_sur = df_sur.reset_index(drop=True)
 
             # Separate pilot from study data
             idx_pilot = df_sur[
@@ -619,12 +623,13 @@ class CleanQualtrics:
 
                 # Drop first duplicate and withdrawn participant responses
                 df_sub = df_sub.drop_duplicates(subset="study_id", keep="last")
-                df_sub = df_sub[
-                    ~df_sub.study_id.str.contains(
-                        "|".join(self._withdrew_list)
-                    )
-                ]
-                df_sub = df_sub.reset_index(drop=True)
+                if self._withdrew_list:
+                    df_sub = df_sub[
+                        ~df_sub.study_id.str.contains(
+                            "|".join(self._withdrew_list)
+                        )
+                    ]
+                    df_sub = df_sub.reset_index(drop=True)
 
                 # Separate pilot from study data
                 idx_pilot = df_sub[
@@ -945,8 +950,11 @@ def clean_rest_ratings(sess, rawdata_path):
         del df_beh, df_beh_trans
 
     # Remove responses from withdrawn participants
-    part_comp = report_helper.ParticipantComplete()
+    part_comp = report_helper.CheckStatus()
     part_comp.status_change("withdrew")
-    df_sess = df_sess[~df_sess.study_id.str.contains("|".join(part_comp.all))]
+    if not part_comp.all:
+        return df_sess
+    withdrew_list = [x for x in part_comp.all.keys()]
+    df_sess = df_sess[~df_sess.study_id.str.contains("|".join(withdrew_list))]
     df_sess = df_sess.reset_index(drop=True)
     return df_sess
