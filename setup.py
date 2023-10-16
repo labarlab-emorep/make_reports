@@ -28,10 +28,11 @@ setup(
     },
     install_requires=[
         "graphviz>=0.20.1",
-        "matplotlib>=3.1.2",
+        "matplotlib>=3.6.1",
         "numpy>=1.23.1",
         "pandas>=1.4.3",
         "pydicom>=2.3.1",
+        "python_dateutil>=2.8.2",
         "requests>=2.22.0",
         "seaborn>=0.12.2",
         "setuptools>=65.5.1",

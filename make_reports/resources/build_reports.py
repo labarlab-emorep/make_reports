@@ -269,7 +269,7 @@ class DemoAll(manage_data.GetRedcap):
         part_comp.status_change("withdrew")
         if not part_comp.all:
             return
-        withdrew_list = [x for x in part_comp.all]
+        withdrew_list = [x for x in part_comp.all.keys()]
         self.final_demo = self.final_demo[
             ~self.final_demo.src_subject_id.str.contains(
                 "|".join(withdrew_list)
