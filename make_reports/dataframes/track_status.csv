@@ -1,4 +1,4 @@
-subj,visit1,visit2,visit3,notes,extra information
+subj,visit1,visit2,visit3,notes,extra_info
 ER0017,,excl,excl,BDI,
 ER0032,,excl,excl,BDI,
 ER0057,lost,excl,excl,Compliance,visit1 marked lost bc didn't do Emotion surveys
