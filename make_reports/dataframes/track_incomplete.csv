@@ -4,7 +4,7 @@ ER0060,,,,,,incl,,,,,,"day2 run5: ""there was a biopac hardware connection issue
 ER0071,,,,,,,,incl,,,,,
 ER0075,,,,,incl,,,,,,,,
 ER0087,,,,incl,incl,incl,incl,incl,incl,incl,incl,,
-ER0093,,,,,bad_per_red,bad_per_red,,,,incl,,"day2 run6: ""Failed to present the task"" ""Missing day2 run-6 task file."" ; day3: ""Missing rest ratings (2023-03-31 NM), forgot to run.""",
+ER0093,,,,bad_per_red,bad_per_red,bad_per_red,,,,incl,,"day2 run6: ""Failed to present the task"" ""Missing day2 run-6 task file."" ; day3: ""Missing rest ratings (2023-03-31 NM), forgot to run.""",
 ER0110,,,,,,,,incl,,,,,
 ER0126,,,,,bad_per_red,,,,incl,,,"day2 run6: ""Missed judgment responses, maybe falling asleep""",
 ER0135,,,,,incl,,,,,,,,
@@ -17,7 +17,6 @@ ER0228,,,,,,,incl,incl,incl,incl,incl,,
 ER0229,incl,,,,incl,,,incl,incl,incl,incl,,excluded_participants : day2 run1 behav files ; day3 all files
 ER0274,,,incl,,,,,,,,,,
 ER0325,,,,incl,incl,incl,,incl,incl,incl,incl,NEED TO REMOVE S2/3 MRI DATA - day2 & day3 data not good due to exclusion criteria (BDI),
-ER0443,,,,extra,,,,,extra,,,,
 ER0445,,,,,,,,,extra,,,,
 ER0489,,,,,,,,,,incl,,,
 ER0611,,,,,,,,,incl,,incl,,excluded_participants: day2 anat file ; day3 run5 DICOMs
