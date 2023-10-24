@@ -754,7 +754,7 @@ class RestRatings(manage_data.GetRest, _DescStat):
             by=["study_id", "visit", "resp_type"]
         ).reset_index(drop=True)
         df_rest_all["task"] = df_rest_all["task"].str.title()
-        df_rest_all["task"] = df_rest_all["task"].replace("Movies", "Videos")
+        # df_rest_all["task"] = df_rest_all["task"].replace("Movies", "Videos")
 
         # Subset df for integer responses
         df_rest_int = df_rest_all[
@@ -836,8 +836,8 @@ class StimRatings(_DescStat):
     Example
     -------
     stim_stats = StimRatings("/path/to/project/dir", True)
-    stim_stats.endorsement("Videos")
-    stim_stats.arousal_valence("Videos")
+    stim_stats.endorsement("Movies")
+    stim_stats.arousal_valence("Movies")
 
     """
 
@@ -891,7 +891,7 @@ class StimRatings(_DescStat):
         Parameters
         ----------
         stim_type : str
-            [Videos | Scenarios]
+            [Movies | Scenarios]
             Stimulus modality of session
 
         Returns
@@ -906,7 +906,7 @@ class StimRatings(_DescStat):
             Unexpected stimulus type
 
         """
-        if stim_type not in ["Videos", "Scenarios"]:
+        if stim_type not in ["Movies", "Scenarios"]:
             raise ValueError(f"Unexpected stimulus type : {stim_type}")
         print(f"\tGenerating descriptives of endorsement for : {stim_type}")
 
@@ -940,7 +940,7 @@ class StimRatings(_DescStat):
             )
             self.confusion_heatmap(
                 df_prop,
-                main_title=f"Post-Scan {stim_type[:-1]} "
+                main_title=f"Post-Scan {stim_type} "
                 + "Endorsement Proportion",
                 out_path=out_plot,
             )
@@ -956,7 +956,7 @@ class StimRatings(_DescStat):
         Parameters
         ----------
         stim_type : str
-            [Videos | Scenarios]
+            [Movies | Scenarios]
             Stimulus modality of task
 
         Returns
@@ -973,7 +973,7 @@ class StimRatings(_DescStat):
 
         """
         # Validate
-        if stim_type not in ["Videos", "Scenarios"]:
+        if stim_type not in ["Movies", "Scenarios"]:
             raise ValueError(f"Unexpected stimulus type : {stim_type}")
 
         # Get relevant data
@@ -1007,7 +1007,7 @@ class StimRatings(_DescStat):
                 y_lab="Rating",
                 hue_order=["Arousal", "Valence"],
                 hue_col="prompt",
-                main_title=f"Post-Scan {stim_type[:-1]} Ratings",
+                main_title=f"Post-Scan {stim_type} Ratings",
                 out_path=out_plot,
             )
         self.df = df_all.copy()
@@ -1047,7 +1047,7 @@ class EmorepTask(_DescStat):
     -------
     stim_stats = EmorepTask("/path/to/project/dir", True)
     stim_stats.select_intensity()
-    stim_stats.select_emotion("Videos")
+    stim_stats.select_emotion("Movies")
 
     """
 
@@ -1077,9 +1077,10 @@ class EmorepTask(_DescStat):
         self.out_dir = os.path.join(proj_dir, "analyses/metrics_surveys")
 
         # Find all events files, make and initialize dataframe
+        print("\tFinding all events.tsv files ...")
         mri_rawdata = os.path.join(proj_dir, "data_scanner_BIDS", "rawdata")
         events_all = sorted(
-            glob.glob(f"{mri_rawdata}/**/*_events.tsv", recursive=True)
+            glob.glob(f"{mri_rawdata}/sub-*/ses-*/func/*_events.tsv")
         )
         if not events_all:
             raise ValueError(
@@ -1136,7 +1137,7 @@ class EmorepTask(_DescStat):
         # Clean up column values and types
         df_resp["emotion"] = df_resp["emotion"].str.title()
         df_resp["task"] = df_resp["task"].str.title()
-        df_resp["task"] = df_resp["task"].replace("Movies", "Videos")
+        # df_resp["task"] = df_resp["task"].replace("Movies", "Videos")
         df_resp["run"] = df_resp["run"].astype("Int64")
         return df_resp
 
@@ -1186,7 +1187,7 @@ class EmorepTask(_DescStat):
                 x_lab="Emotion",
                 y_col="response",
                 y_lab="Intensity",
-                hue_order=["Scenarios", "Videos"],
+                hue_order=["Scenarios", "Movies"],
                 hue_col="task",
                 main_title="In-Scan Stimulus Ratings",
                 out_path=out_plot,
@@ -1203,7 +1204,7 @@ class EmorepTask(_DescStat):
         Parameters
         ----------
         task : str
-            [Videos | Scenarios]
+            [Movies | Scenarios]
             Stimulus modality of task
 
         Returns
@@ -1218,7 +1219,7 @@ class EmorepTask(_DescStat):
             Unexpected input parameter
 
         """
-        if task not in ["Videos", "Scenarios"]:
+        if task not in ["Movies", "Scenarios"]:
             raise ValueError(f"Unexpected task value : {task}")
 
         # Subset dataframe for emotion selection
@@ -1254,7 +1255,7 @@ class EmorepTask(_DescStat):
             )
             self.confusion_heatmap(
                 df_count,
-                main_title=f"In-Scan {task[:-1]} Endorsement Proportion",
+                main_title=f"In-Scan {task} Endorsement Proportion",
                 out_path=out_plot,
             )
         self.df = df_all.copy()

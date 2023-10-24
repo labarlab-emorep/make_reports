@@ -744,6 +744,9 @@ class CleanQualtrics:
 
         # Split dataframe by session
         sess_mask = self._df_study["session"] == "day2"
+        self._df_study["type"] = self._df_study["type"].replace(
+            "Videos", "Movies"
+        )
         df_study_day2 = self._df_study[sess_mask]
         df_study_day3 = self._df_study[~sess_mask]
 

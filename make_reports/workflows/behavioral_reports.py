@@ -426,7 +426,7 @@ def calc_task_stats(proj_dir, survey_list, draw_plot, qualtrics_token=None):
                 x_lab="Emotion Category",
                 y_col="rating",
                 y_lab="Frequency",
-                hue_order=["Scenarios", "Videos"],
+                hue_order=["Scenarios", "Movies"],
                 hue_col="task",
                 main_title="In-Scan Resting Emotion Frequency",
                 out_path=out_plot,
@@ -444,7 +444,7 @@ def calc_task_stats(proj_dir, survey_list, draw_plot, qualtrics_token=None):
             gq.clean_qualtrics["study"]["visit_day2"]["post_scan_ratings"],
             gq.clean_qualtrics["study"]["visit_day3"]["post_scan_ratings"],
         )
-        for stim_type in ["Videos", "Scenarios"]:
+        for stim_type in ["Movies", "Scenarios"]:
             _ = stim_stats.endorsement(stim_type)
             survey_descriptives["stim"] = stim_stats.arousal_valence(stim_type)
 
@@ -452,7 +452,7 @@ def calc_task_stats(proj_dir, survey_list, draw_plot, qualtrics_token=None):
     if "task" in survey_list:
         task_stats = calc_surveys.EmorepTask(proj_dir, draw_plot)
         survey_descriptives["task"] = task_stats.select_intensity()
-        for task in ["Videos", "Scenarios"]:
+        for task in ["Movies", "Scenarios"]:
             _ = task_stats.select_emotion(task)
 
     return survey_descriptives
