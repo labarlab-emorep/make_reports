@@ -200,7 +200,7 @@ class _DescStat:
         plt.title(main_title)
 
         # Write and close plot
-        plt.savefig(out_path)
+        plt.savefig(out_path, dpi=300)
         plt.close()
         print(f"\t\tDrew boxplot : {out_path}")
 
@@ -267,7 +267,7 @@ class _DescStat:
         plt.title(main_title)
 
         # Write and close
-        plt.savefig(out_path)
+        plt.savefig(out_path, dpi=300)
         print(f"\t\tDrew boxplot : {out_path}")
         plt.close()
 
@@ -409,7 +409,7 @@ class _DescStat:
         plt.xlabel(x_lab)
         plt.xticks(rotation=45, ha="right")
         plt.title(main_title)
-        plt.savefig(out_path, bbox_inches="tight")
+        plt.savefig(out_path, bbox_inches="tight", dpi=300)
         print(f"\t\tDrew boxplot : {out_path}")
         plt.close()
 
@@ -545,7 +545,7 @@ class _DescStat:
         ax = sns.heatmap(df_conf)
         ax.set(xlabel=x_lab, ylabel=y_lab)
         ax.set_title(main_title)
-        plt.savefig(out_path, bbox_inches="tight")
+        plt.savefig(out_path, bbox_inches="tight", dpi=300)
         print(f"\t\tDrew heatmap plot : {out_path}")
         plt.close()
 
