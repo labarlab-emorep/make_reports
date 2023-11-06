@@ -544,7 +544,7 @@ class _DescStat:
         # Draw and write
         ax = sns.heatmap(df_conf)
         ax.set(xlabel=x_lab, ylabel=y_lab)
-        ax.set_title(main_title, weight="bold")
+        ax.set_title(main_title, weight="bold", fontsize=15)
         plt.savefig(out_path, bbox_inches="tight", dpi=300)
         print(f"\t\tDrew heatmap plot : {out_path}")
         plt.close()
