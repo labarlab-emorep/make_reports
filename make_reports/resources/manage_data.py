@@ -71,8 +71,9 @@ class GetRedcap(survey_clean.CleanRedcap):
     def __init__(self, proj_dir, redcap_token):
         """Initialize."""
         self._proj_dir = proj_dir
-        self._pilot_list = report_helper.pilot_list()
+        pilot_list = report_helper.pilot_list()
         self._redcap_token = redcap_token
+        super().__init__(self._proj_dir, pilot_list)
 
     def _download_redcap(self, survey_list: list) -> dict:
         """Get, write, and return RedCap survey info.
@@ -147,12 +148,12 @@ class GetRedcap(survey_clean.CleanRedcap):
         self.clean_redcap = {"pilot": {}, "study": {}}
         for sur_name in raw_redcap:
             visit = clean_map[sur_name][1]
-            dir_name, self._df_raw = raw_redcap[sur_name]
+            dir_name, df_raw = raw_redcap[sur_name]
 
             # Find and execute appropriate clean method
             print(f"\tCleaning RedCap survey : {sur_name}")
             clean_method = getattr(self, clean_map[sur_name][0])
-            clean_method()
+            clean_method(df_raw)
 
             # Update clean_redcap attr
             key_name = (
@@ -227,11 +228,12 @@ class GetQualtrics(survey_clean.CleanQualtrics):
     def __init__(self, proj_dir, qualtrics_token):
         """Initialize."""
         self._proj_dir = proj_dir
-        self._pilot_list = report_helper.pilot_list()
+        pilot_list = report_helper.pilot_list()
         self._qualtrics_token = qualtrics_token
         part_comp = report_helper.CheckStatus()
         part_comp.status_change("withdrew")
-        self._withdrew_list = [x for x in part_comp.all.keys()]
+        withdrew_list = [x for x in part_comp.all.keys()]
+        super().__init__(self._proj_dir, pilot_list, withdrew_list)
 
     def _download_qualtrics(self, survey_list: list) -> dict:
         """Get, write, and return Qualtrics survey info.
@@ -298,11 +300,11 @@ class GetQualtrics(survey_clean.CleanQualtrics):
         # Clean surveys and build clean_qualtrics attr
         self.clean_qualtrics = {"pilot": {}, "study": {}}
         for omni_name in raw_qualtrics:
-            _, self._df_raw = raw_qualtrics[omni_name]
+            _, df_raw = raw_qualtrics[omni_name]
 
             # Trigger relevant cleaning method
             clean_method = getattr(self, clean_map[omni_name])
-            clean_method()
+            clean_method(df_raw)
             self._unpack_qualtrics()
 
     def _unpack_qualtrics(self):
