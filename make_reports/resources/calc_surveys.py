@@ -29,11 +29,12 @@ from make_reports.resources import manage_data
 class _DescStat:
     """Supply statistic and plotting methods.
 
-    Intended to be inherited, references attrs set by child:
-        - df : pd.DataFrame
-            Wide- or long-formatted survey dataframe
-        - col_data : list
-            List of df columns containing numeric type data
+    Parameters
+    ----------
+    df : pd.DataFrame
+        Wide- or long-formatted survey dataframe
+    col_data : list, optional
+        List of df columns containing numeric type data
 
     Methods
     -------
@@ -58,6 +59,19 @@ class _DescStat:
         Generate and write a boxplot of row totals
 
     """
+
+    def __init__(self, df, col_data=None):
+        """Initialize."""
+        self.df = df
+        self.col_data = col_data
+
+    def _valid_cols(self):
+        """Validate supplied cols in df."""
+        if not hasattr(self, "col_data"):
+            raise AttributeError("Missing required col_data attr.")
+        for col in self.col_data:
+            if col not in self.df.columns:
+                raise KeyError(f"Missing expected column in df : {col}")
 
     def calc_row_stats(self):
         """Calculate descriptive stats for dataframe rows.
@@ -88,11 +102,7 @@ class _DescStat:
 
         """
         # Validate attrs
-        if not hasattr(self, "col_data"):
-            raise AttributeError("Missing required col_data attr.")
-        for col in self.col_data:
-            if col not in self.df.columns:
-                raise KeyError(f"Missing expected column in df : {col}")
+        self._valid_cols()
 
         # Total row values, avoid editing original df
         df_calc = self.df.copy()
@@ -135,9 +145,7 @@ class _DescStat:
 
         Example
         -------
-        stat_obj = _DescStat(
-            pd.DataFrame, col_data=["col_a", "col_b", "col_c"]
-        )
+        stat_obj = _DescStat(pd.DataFrame)
         stat_dict = stat_obj.calc_factor_stats("visit", "Visit 2", "Visit 3")
 
         """
@@ -179,6 +187,7 @@ class _DescStat:
 
         """
         # Get needed data and setup dataframe
+        self._valid_cols()
         stat_dict = self.calc_row_stats()
         df_plot = self.df.copy()
         df_plot["total"] = df_plot[self.col_data].sum(axis=1)
@@ -238,6 +247,7 @@ class _DescStat:
 
         """
         # Get needed data and setup dataframes
+        self._valid_cols()
         stat_dict = self.calc_factor_stats(fac_col, fac_a, fac_b)
         df_plot = self.df.copy()
         df_plot["total"] = df_plot[self.col_data].sum(axis=1)
@@ -595,7 +605,8 @@ class Visit1Stats(_DescStat):
                 f"Expected dataframe column name that contains {survey_name}"
             )
         self.df = df
-        self.col_data = self._prep_df(survey_name)
+        col_data = self._prep_df(survey_name)
+        super().__init__(df, col_data=col_data)
 
     def _prep_df(self, survey_name: str) -> list:
         """Prep df for analyses, return relevant column names."""
@@ -673,8 +684,8 @@ class Visit23Stats(_DescStat):
             raise ValueError("Dataframes do not have identical column names.")
 
         # Make single df
-        self.df = pd.concat([df_day2_clean, df_day3_clean], ignore_index=True)
-        self.col_data = col_day2
+        df = pd.concat([df_day2_clean, df_day3_clean], ignore_index=True)
+        super().__init__(df, col_data=col_day2)
 
     def _make_df(
         self, df: pd.DataFrame, survey_name: str, fac: str, fac_col: str
@@ -736,7 +747,8 @@ class RestRatings(manage_data.GetRest, _DescStat):
         """
         super().__init__(proj_dir)
         self.get_rest()
-        self.df = self._make_df()
+        df = self._make_df()
+        _DescStat.__init__(self, df)
 
     def _make_df(self) -> pd.DataFrame:
         """Construct dataframe from clean visit 2, 3 data."""
@@ -864,6 +876,7 @@ class StimRatings(_DescStat):
 
         # Trigger dataframe construction, initialize helper
         self.df, self._emo_list = self._get_data(df_day2, df_day3)
+        super().__init__(self.df)
 
     def _get_data(
         self, df_day2: pd.DataFrame, df_day3: pd.DataFrame
@@ -1087,6 +1100,7 @@ class EmorepTask(_DescStat):
                 f"Expected to find BIDS events files in : {mri_rawdata}"
             )
         self.df = self._get_data(events_all)
+        super().__init__(self.df)
 
     def _get_data(self, events_all: list) -> pd.DataFrame:
         """Combine all events files into dataframe."""
@@ -1171,7 +1185,7 @@ class EmorepTask(_DescStat):
 
         # Calculate and write stats
         self.df = df_int
-        df_stats = self.calc_long_stats(grp_a="task", grp_b="emotion")
+        df_stats = self.calc_long_stats("task", "emotion")
         out_csv = os.path.join(self.out_dir, "table_task-intensity.csv")
         df_stats.to_csv(out_csv)
         print(f"\tWrote csv : {out_csv}")
