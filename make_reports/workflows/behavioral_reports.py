@@ -9,21 +9,45 @@ make_survey_table : organize multiple descriptive reports into tables
 # %%
 import os
 import json
+from typing import Union
 import pandas as pd
 from make_reports.resources import calc_surveys
 from make_reports.resources import manage_data
 
 
 # %%
+def _get_title(sur_name: str) -> str:
+    """Switch survey abbreviation for name."""
+    plot_titles = {
+        "AIM": "Affective Intensity Measure",
+        "ALS": "Affective Lability Scale",
+        "ERQ": "Emotion Regulation Questionnaire",
+        "PSWQ": "Penn State Worry Questionnaire",
+        "RRS": "Ruminative Response Scale",
+        "STAI_Trait": "Spielberg Trait Anxiety Inventory",
+        "TAS": "Toronto Alexithymia Scale",
+        "STAI_State": "Spielberg State Anxiety Inventory",
+        "PANAS": "Positive and Negative Affect Schedule",
+        "BDI": "Beck Depression Inventory",
+    }
+    return plot_titles[sur_name]
+
+
 class _Visit1:
-    """Get visit1 data and trigger stats.
+    """Get visit1 data and trigger stats and plots."""
 
-    Intended to be inherited by CalcRedcapQualtricsStats, references
-    attrs set by child.
+    def __init__(
+        self,
+        proj_dir: Union[str, os.PathLike],
+        qualtrics_token: str,
+    ):
+        """Initialize."""
+        self._proj_dir = proj_dir
+        self._qualtrics_token = qualtrics_token
+        self.sur_descript = {}
+        self._mk_subscale()
 
-    """
-
-    def _visit1_data(self):
+    def visit1_data(self):
         """Make clean_visit1 attr {survey_name: pd.DataFrame}."""
         get_qual = manage_data.GetQualtrics(
             self._proj_dir, self._qualtrics_token
@@ -31,42 +55,53 @@ class _Visit1:
         get_qual.get_qualtrics(["EmoRep_Session_1"])
         self._clean_visit1 = get_qual.clean_qualtrics["study"]["visit_day1"]
 
-    def _visit1_stats_plots(self):
+    def visit1_stats_plots(
+        self,
+        sur_name: str,
+        write_json: bool,
+        draw_plot: bool,
+        out_dir: Union[str, os.PathLike],
+    ):
         """Generate descriptive stats and figures for visit 1 surveys."""
+        self._sur_name = sur_name
+        self._write_json = write_json
+        self._draw_plot = draw_plot
+        self._out_dir = out_dir
+
         # Setup output dict for survey
-        self.survey_descriptives[self._sur_name] = {}
+        self.sur_descript[self._sur_name] = {}
 
         # Generate stats, update output dict
-        sur_stat = calc_surveys.Visit1Stats(
+        self._sur_stat = calc_surveys.Visit1Stats(
             self._clean_visit1[self._sur_name], self._sur_name
         )
-        report_dict = {"Title": self._get_title()}
-        report_dict.update(sur_stat.calc_row_stats())
-        self.survey_descriptives[self._sur_name]["full"] = report_dict
+        report_dict = {"Title": _get_title(self._sur_name)}
+        report_dict.update(self._sur_stat.calc_row_stats())
+        self.sur_descript[self._sur_name]["full"] = report_dict
 
         # Write JSON and figures
         if self._write_json:
             stat_out = os.path.join(
-                self.out_dir, f"stats_{self._sur_name}.json"
+                self._out_dir, f"stats_{self._sur_name}.json"
             )
             with open(stat_out, "w") as jf:
                 json.dump(report_dict, jf)
                 print(f"\tSaved descriptive stats : {stat_out}")
         if self._draw_plot:
             plot_out = os.path.join(
-                self.out_dir, f"plot_{self._sur_name}_boxplot-single.png"
+                self._out_dir, f"plot_{self._sur_name}_boxplot-single.png"
             )
-            sur_stat.draw_single_boxplot(self._get_title(), plot_out)
+            self._sur_stat.draw_single_boxplot(
+                _get_title(self._sur_name), plot_out
+            )
 
         # Trigger subscale stats, plots
-        if self._sur_name in self._has_subscales:
-            self._visit1_subscale(sur_stat)
+        if self._sur_name in self._subscale_dict.keys():
+            self._visit1_subscale()
 
-    def _visit1_subscale(self, sur_stat: calc_surveys.Visit1Stats):
-        """Generate stats, plots for visit 1 survey subscales."""
-
-        # Setup subscale names and column names for each survey
-        subscale_dict = {
+    def _mk_subscale(self):
+        """Setup subscale names and column names for each survey."""
+        self._subscale_dict = {
             "ALS": {
                 "Anx-Dep": [f"ALS_{x}" for x in [1, 3, 5, 6, 7]],
                 "Dep-Ela": [
@@ -88,42 +123,50 @@ class _Visit1:
             },
         }
 
-        # Generate stats, plots for each subscale
-        df_work = sur_stat.df.copy()
-        for sub_name, sub_cols in subscale_dict[self._sur_name].items():
-            sur_stat.df = df_work[sub_cols].copy()
-            sur_stat.col_data = sub_cols
+    def _visit1_subscale(self):
+        """Generate stats, plots for visit 1 survey subscales."""
+        df_work = self._sur_stat.df.copy()
+        for sub_name, sub_cols in self._subscale_dict[self._sur_name].items():
+            self._sur_stat.df = df_work[sub_cols].copy()
+            self._sur_stat.col_data = sub_cols
 
             # Calculate subscale stats
-            sub_title = self._get_title() + f", {sub_name}"
-            _stat_dict = sur_stat.calc_row_stats()
+            sub_title = _get_title(self._sur_name) + f", {sub_name}"
+            _stat_dict = self._sur_stat.calc_row_stats()
             report_dict = {"Title": sub_title}
             report_dict.update(_stat_dict)
-            self.survey_descriptives[self._sur_name][sub_name] = report_dict
+            self.sur_descript[self._sur_name][sub_name] = report_dict
 
             # Write stat JSON and boxplot
             if self._write_json:
                 sub_stat_out = os.path.join(
-                    self.out_dir, f"stats_{self._sur_name}_{sub_name}.json"
+                    self._out_dir, f"stats_{self._sur_name}_{sub_name}.json"
                 )
                 with open(sub_stat_out, "w") as jf:
                     json.dump(report_dict, jf)
                     print(f"\tSaved descriptive stats : {sub_stat_out}")
             if self._draw_plot:
                 sub_plot_out = os.path.join(
-                    self.out_dir,
+                    self._out_dir,
                     f"plot_{self._sur_name}_{sub_name}_boxplot-single.png",
                 )
-                sur_stat.draw_single_boxplot(sub_title, sub_plot_out)
+                self._sur_stat.draw_single_boxplot(sub_title, sub_plot_out)
 
 
 class _Visit23:
-    """Get visit2 and 3 data and trigger stats.
+    """Get visit2 and 3 data and trigger stats and plots."""
 
-    Intended to be inherited by CalcRedcapQualtricsStats, references
-    attrs set by child.
-
-    """
+    def __init__(
+        self,
+        proj_dir: Union[str, os.PathLike],
+        redcap_token: str,
+        qualtrics_token: str,
+    ):
+        """Initialize."""
+        self._proj_dir = proj_dir
+        self._redcap_token = redcap_token
+        self._qualtrics_token = qualtrics_token
+        self.sur_descript = {}
 
     def _visit23_redcap_data(self):
         """Make clean_visit23_rc attr {visit: {survey_name: pd.DataFrame}}."""
@@ -142,7 +185,13 @@ class _Visit23:
         self._clean_visit23_qual = get_qual.clean_qualtrics["study"]
 
     def _visit23_stats_plots(
-        self, df_day2: pd.DataFrame, df_day3: pd.DataFrame
+        self,
+        sur_name: str,
+        df_day2: pd.DataFrame,
+        df_day3: pd.DataFrame,
+        write_json: bool,
+        draw_plot: bool,
+        out_dir: Union[str, os.PathLike],
     ):
         """Generate descriptive stats and figures for visit 2, 3 surveys."""
         # Set factor column, values
@@ -156,40 +205,38 @@ class _Visit23:
             for visit in [fac_a, fac_b]:
                 _dict = in_dict[visit]
                 _dict["Title"] = _title + ", " + visit
-                self.survey_descriptives[self._sur_name][visit] = _dict
+                self.sur_descript[sur_name][visit] = _dict
 
         # Generate stats, update output dict
-        self.survey_descriptives[self._sur_name] = {}
+        self.sur_descript[sur_name] = {}
         sur_stat = calc_surveys.Visit23Stats(
-            df_day2, df_day3, self._sur_name, fac_col, fac_a, fac_b
+            df_day2, df_day3, sur_name, fac_col, fac_a, fac_b
         )
-        report_dict = {"Title": self._get_title()}
+        report_dict = {"Title": _get_title(sur_name)}
         report_dict.update(sur_stat.calc_factor_stats(fac_col, fac_a, fac_b))
         _flatten(report_dict)
 
         # Write stats to JSON, draw boxplot
-        if self._write_json:
-            stat_out = os.path.join(
-                self.out_dir, f"stats_{self._sur_name}.json"
-            )
+        if write_json:
+            stat_out = os.path.join(out_dir, f"stats_{sur_name}.json")
             with open(stat_out, "w") as jf:
                 json.dump(report_dict, jf)
                 print(f"\tSaved descriptive stats : {stat_out}")
-        if self._draw_plot:
+        if draw_plot:
             plot_out = os.path.join(
-                self.out_dir, f"plot_{self._sur_name}_boxplot-double.png"
+                out_dir, f"plot_{sur_name}_boxplot-double.png"
             )
             sur_stat.draw_double_boxplot(
                 fac_col,
                 fac_a,
                 fac_b,
-                self._get_title(),
+                _get_title(sur_name),
                 plot_out,
             )
 
 
 # %%
-class CalcRedcapQualtricsStats(_Visit1, _Visit23):
+class CalcRedcapQualtricsStats:
     """Generate descriptive stats and plots for REDCap, Qualtrics surveys.
 
     Match items in input survey list to respective visits, then generate
@@ -199,8 +246,6 @@ class CalcRedcapQualtricsStats(_Visit1, _Visit23):
     Written descriptive stats are titled <out_dir>/stats_<survey_name>.json,
     and plots are titled:
         <out_dir>/plot_<survey_name>_boxplot-<single|double>.png
-
-    Inherits _Visit1, _Visit23.
 
     Parameters
     ----------
@@ -270,48 +315,74 @@ class CalcRedcapQualtricsStats(_Visit1, _Visit23):
             redcap survey names.
 
         """
-        # Capture params, setup
-        self._draw_plot = draw_plot
-        self._write_json = write_json
-        self._sur_list = sur_list
-        self._qualtrics_token = qualtrics_token
-        self._redcap_token = redcap_token
+        # Validate types, setup
+        if not isinstance(draw_plot, bool):
+            raise TypeError("Expected draw_plot type bool")
+        if not isinstance(write_json, bool):
+            raise TypeError("Expected type bool for write_json")
         self._setup()
 
+        # Validate survey list
+        for sur in sur_list:
+            if sur not in self._visit1_list + self._visit23_list:
+                raise ValueError(f"Unexpected survey requested : {sur}")
+            if not redcap_token and sur in self._visit23_rc:
+                raise ValueError(f"Survey {sur} requires RedCap API token")
+            if not qualtrics_token and sur in self._qualtrics_list:
+                raise ValueError(f"Survey {sur} requires Qualtrics API token")
+
         # Unpack list of surveys
-        get_visit1 = [x for x in self._sur_list if x in self._visit1_list]
-        get_visit23_rc = [x for x in self._sur_list if x in self._visit23_rc]
-        get_visit23_qual = [
-            x for x in self._sur_list if x in self._visit23_qual
-        ]
+        get_visit1 = [x for x in sur_list if x in self._visit1_list]
+        get_visit23_rc = [x for x in sur_list if x in self._visit23_rc]
+        get_visit23_qual = [x for x in sur_list if x in self._visit23_qual]
 
         # Get visit1 (qualtrics) data and generate stats/plots
         if get_visit1:
-            self._visit1_data()
-            for self._sur_name in get_visit1:
-                self._visit1_stats_plots()
+            v1 = _Visit1(
+                self._proj_dir,
+                qualtrics_token,
+            )
+            v1.visit1_data()
+            for sur_name in get_visit1:
+                v1.visit1_stats_plots(
+                    sur_name, write_json, draw_plot, self.out_dir
+                )
+            self.survey_descriptives.update(v1.sur_descript)
 
         # Get visit2/3 redcap data, generate stats/plots
+        if not get_visit23_rc and not get_visit23_qual:
+            return
+        v23 = _Visit23(self._proj_dir, redcap_token, qualtrics_token)
+
         if get_visit23_rc:
-            self._visit23_redcap_data()
-            for self._sur_name in get_visit23_rc:
-                self._visit23_stats_plots(
-                    self._clean_visit23_rc["visit_day2"][self._sur_name],
-                    self._clean_visit23_rc["visit_day3"][self._sur_name],
+            v23._visit23_redcap_data()
+            for sur_name in get_visit23_rc:
+                v23._visit23_stats_plots(
+                    sur_name,
+                    v23._clean_visit23_rc["visit_day2"][sur_name],
+                    v23._clean_visit23_rc["visit_day3"][sur_name],
+                    write_json,
+                    draw_plot,
+                    self.out_dir,
                 )
+            self.survey_descriptives.update(v23.sur_descript)
 
         # Get visit2/3 qualtrics data, generate stats/plots
         if get_visit23_qual:
-            self._visit23_qualtrics_data()
-            for self._sur_name in get_visit23_qual:
-                self._visit23_stats_plots(
-                    self._clean_visit23_qual["visit_day2"][self._sur_name],
-                    self._clean_visit23_qual["visit_day3"][self._sur_name],
+            v23._visit23_qualtrics_data()
+            for sur_name in get_visit23_qual:
+                v23._visit23_stats_plots(
+                    sur_name,
+                    v23._clean_visit23_qual["visit_day2"][sur_name],
+                    v23._clean_visit23_qual["visit_day3"][sur_name],
+                    write_json,
+                    draw_plot,
+                    self.out_dir,
                 )
+            self.survey_descriptives.update(v23.sur_descript)
 
     def _setup(self):
         """Validate and set orienting attrs."""
-        self._has_subscales = ["ALS", "ERQ", "RRS"]
         self._visit1_list = [
             "AIM",
             "ALS",
@@ -327,37 +398,6 @@ class CalcRedcapQualtricsStats(_Visit1, _Visit23):
         self._visit23_list = self._visit23_qual + self._visit23_rc
         if not os.path.exists(self.out_dir):
             os.makedirs(self.out_dir)
-
-        # Validate survey list
-        for sur in self._sur_list:
-            if sur not in self._visit1_list + self._visit23_list:
-                raise ValueError(f"Unexpected survey requested : {sur}")
-            if not self._redcap_token and sur in self._visit23_rc:
-                raise ValueError(f"Survey {sur} requires RedCap API token")
-            if not self._qualtrics_token and sur in self._qualtrics_list:
-                raise ValueError(f"Survey {sur} requires Qualtrics API token")
-
-        # Validate types
-        if not isinstance(self._draw_plot, bool):
-            raise TypeError("Expected draw_plot type bool")
-        if not isinstance(self._write_json, bool):
-            raise TypeError("Expected type bool for write_json")
-
-    def _get_title(self) -> str:
-        """Switch survey abbreviation for name."""
-        plot_titles = {
-            "AIM": "Affective Intensity Measure",
-            "ALS": "Affective Lability Scale",
-            "ERQ": "Emotion Regulation Questionnaire",
-            "PSWQ": "Penn State Worry Questionnaire",
-            "RRS": "Ruminative Response Scale",
-            "STAI_Trait": "Spielberg Trait Anxiety Inventory",
-            "TAS": "Toronto Alexithymia Scale",
-            "STAI_State": "Spielberg State Anxiety Inventory",
-            "PANAS": "Positive and Negative Affect Schedule",
-            "BDI": "Beck Depression Inventory",
-        }
-        return plot_titles[self._sur_name]
 
 
 # %%
