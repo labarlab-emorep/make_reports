@@ -1153,6 +1153,20 @@ class EmorepTask(_DescStat):
         df_resp["task"] = df_resp["task"].str.title()
         # df_resp["task"] = df_resp["task"].replace("Movies", "Videos")
         df_resp["run"] = df_resp["run"].astype("Int64")
+
+        # Clean up dataframe for writing
+        df_task = df_resp.copy()
+        df_task = df_task.drop("response_time", axis=1)
+        df_task = df_task.rename(columns={"emotion": "block"})
+        df_task["block"] = df_task.block.str.lower()
+        df_task["task"] = df_task.task.str.lower()
+        df_task["response"] = df_task.response.str.lower()
+        df_task = df_task[
+            ["subj", "sess", "task", "run", "block", "trial_type", "response"]
+        ]
+        out_path = os.path.join(self.out_dir, "df_in_scan_ratings.csv")
+        print(f"\tWriting : {out_path}")
+        df_task.to_csv(out_path, index=False)
         return df_resp
 
     def select_intensity(self):
