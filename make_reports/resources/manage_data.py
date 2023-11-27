@@ -17,6 +17,7 @@ import pandas as pd
 from make_reports.resources import survey_download
 from make_reports.resources import survey_clean
 from make_reports.resources import report_helper
+from make_reports.resources import sql_database
 
 
 # %%
@@ -200,6 +201,8 @@ class GetQualtrics(survey_clean.CleanQualtrics):
         Location of project parent directory
     qualtrics_token : str
         API token for Qualtrics
+    sql_pass : str
+        Password for MySQL database
 
     Attributes
     ----------
@@ -225,7 +228,7 @@ class GetQualtrics(survey_clean.CleanQualtrics):
 
     """
 
-    def __init__(self, proj_dir, qualtrics_token):
+    def __init__(self, proj_dir, qualtrics_token, sql_pass):
         """Initialize."""
         self._proj_dir = proj_dir
         pilot_list = report_helper.pilot_list()
@@ -234,6 +237,7 @@ class GetQualtrics(survey_clean.CleanQualtrics):
         part_comp.status_change("withdrew")
         withdrew_list = [x for x in part_comp.all.keys()]
         super().__init__(self._proj_dir, pilot_list, withdrew_list)
+        self._db_con = sql_database.DbConnect(sql_pass)
 
     def _download_qualtrics(self, survey_list: list) -> dict:
         """Get, write, and return Qualtrics survey info.
@@ -269,7 +273,7 @@ class GetQualtrics(survey_clean.CleanQualtrics):
         Parameters
         ----------
         survey_list : list, optional
-            RedCap report names, available names = EmoRep_Session_1,
+            Qualtrics report names, available names = EmoRep_Session_1,
             Session 2 & 3 Survey, FINAL - EmoRep Stimulus Ratings - fMRI Study
 
         Attributes
@@ -319,6 +323,10 @@ class GetQualtrics(survey_clean.CleanQualtrics):
                     else:
                         self.clean_qualtrics[data_type][visit][sur_name] = df
                     self._write_qualtrics(df, sur_name, visit, is_pilot)
+                    if is_pilot:
+                        continue
+                    continue
+                    self._update_sql_db(df, sur_name, visit)
 
     def _write_qualtrics(
         self, df: pd.DataFrame, sur_name: str, visit: str, is_pilot: bool
@@ -332,6 +340,17 @@ class GetQualtrics(survey_clean.CleanQualtrics):
             f"df_{sur_name}.csv",
         )
         _write_dfs(df, out_file)
+
+    def _update_sql_db(
+        self,
+        df: pd.DataFrame,
+        sur_name: str,
+        visit: str,
+    ):
+        """Title."""
+        # sur_name = sur_name.lower()
+        sess_id = int(visit[-1])
+        sql_database.update_qualtrics(self._db_con, df, sur_name, sess_id)
 
 
 class GetRest:
