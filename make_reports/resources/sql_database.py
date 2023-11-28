@@ -4,6 +4,7 @@
 # %%
 import os
 import pandas as pd
+import numpy as np
 import mysql.connector
 from contextlib import contextmanager
 
@@ -12,12 +13,21 @@ from contextlib import contextmanager
 class DbConnect:
     """Title."""
 
-    def __init__(self, sql_pass: str):
+    def __init__(self):
         """Set db_con attr as mysql connection."""
+        #
+        try:
+            os.environ["PAS_SQL"]
+        except KeyError as e:
+            raise Exception(
+                "No global variable 'PAS_SQL' defined in user env"
+            ) from e
+
+        #
         self.db_con = mysql.connector.connect(
             host="localhost",
             user=os.environ["USER"],
-            password=sql_pass,
+            password=os.environ["PAS_SQL"],
             database="db_emorep",
         )
 
@@ -28,9 +38,7 @@ class DbConnect:
         try:
             yield db_cursor
         finally:
-            db_cursor.closedf = _subj_col(df, subj_col)
-
-    df["sess_id"] = sess_id()
+            db_cursor.close()
 
     def exec_many(self, sql_cmd: str, value_list: list):
         """Update db via executemany."""
@@ -97,8 +105,7 @@ def _convert_wide_long(df, sur_name):
         j="item",
     ).reset_index()
     df_long = df_long.drop(["id"], axis=1)
-    df_long["item"] = df_long["item"].astype(str)
-    df_long["item"] = f"{sur_name}_" + df_long["item"]
+    df_long["item"] = df_long["item"].astype(int)
     df_long = df_long.rename(columns={sur_name: "resp"})
     df_long["resp"] = df_long["resp"].astype(int)
     return df_long
@@ -131,14 +138,122 @@ def _task_map():
     }
 
 
+class _UpdatePsr:
+    """Title."""
+
+    def __init__(self, db_con, df, sess_id, subj_col="study_id"):
+        self._db_con = db_con
+        self._df = df
+        self._sess_id = sess_id
+        self._sur_name = "post_scan_ratings"
+        self._subj_col = subj_col
+
+    def _update_psr(self):
+        """Title."""
+        self._prep_tidy()
+        self._prep_date()
+        _update_survey_date(self._db_con, self._df_date, self._sur_name)
+
+        #
+        tbl_input = list(
+            self._df_tidy[
+                [
+                    "subj_id",
+                    "sess_id",
+                    "task_id",
+                    "emo_id",
+                    "stim_name",
+                    "resp_arousal",
+                    "resp_endorse",
+                    "resp_valence",
+                ]
+            ].itertuples(index=False, name=None)
+        )
+        self._db_con.exec_many(
+            f"insert ignore into tbl_{self._sur_name.lower()} "
+            + "(subj_id, sess_id, task_id, emo_id, stim_name,"
+            + " resp_arousal, resp_endorse, resp_valence)"
+            + " values (%s, %s, %s, %s, %s, %s, %s, %s)",
+            tbl_input,
+        )
+
+    def _prep_tidy(self):
+        """Title."""
+        # convert for sql compat
+        self._df["type"] = self._df["type"].str.lower()
+        self._df["prompt"] = self._df["prompt"].str.lower()
+        self._df["task_id"] = self._df.apply(self._task_label, axis=1)
+        self._df["emo_id"] = self._df.apply(self._emo_label, axis=1)
+        self._df_tidy = self._df.pivot(
+            index=[
+                "study_id",
+                "subj_id",
+                "sess_id",
+                "datetime",
+                "session",
+                "type",
+                "task_id",
+                "emotion",
+                "emo_id",
+                "stimulus",
+            ],
+            columns=[
+                "prompt",
+            ],
+            values="response",
+        ).reset_index()
+
+        #
+        self._df_tidy = self._df_tidy.rename(
+            columns={
+                "stimulus": "stim_name",
+                "arousal": "resp_arousal",
+                "endorsement": "resp_endorse",
+                "valence": "resp_valence",
+            }
+        )
+        char_list = ["stim_name", "resp_endorse"]
+        self._df_tidy[char_list] = self._df_tidy[char_list].astype(str)
+        int_list = [
+            "subj_id",
+            "sess_id",
+            "task_id",
+            "emo_id",
+            "resp_arousal",
+            "resp_valence",
+        ]
+        self._df_tidy[int_list] = self._df_tidy[int_list].astype(int)
+
+    def _prep_date(self):
+        """Title."""
+        idx = list(np.unique(self._df_tidy["subj_id"], return_index=True)[1])
+        self._df_date = self._df_tidy.loc[
+            idx, ["subj_id", "sess_id", "datetime"]
+        ]
+
+    def _task_label(self, row):
+        """Title."""
+        task_map = _task_map()
+        for task_name, task_id in task_map.items():
+            if row["type"] == task_name:
+                return task_id
+
+    def _emo_label(self, row):
+        """Title."""
+        emo_map = _emo_map()
+        for emo_name, emo_id in emo_map.items():
+            if row["emotion"] == emo_name:
+                return emo_id
+
+
 class UpdateQualtrics:
     """Title."""
 
     def __init__(self, db_con, df, sur_name, sess_id, subj_col="study_id"):
         self._db_con = db_con
         self._df = df
-        self._sur_name = sur_name
         self._sess_id = sess_id
+        self._sur_name = sur_name
         self._subj_col = subj_col
 
     def db_update(self):
@@ -147,7 +262,8 @@ class UpdateQualtrics:
         self._df["sess_id"] = self._sess_id
 
         if self._sur_name == "post_scan_ratings":
-            self._update_psr()
+            up_psr = _UpdatePsr(self._db_con, self._df, self._sess_id)
+            up_psr._update_psr()
         else:
             self._update_reg()
 
@@ -165,38 +281,3 @@ class UpdateQualtrics:
             + "values (%s, %s, %s, %s)",
             tbl_input,
         )
-
-    def _update_psr(self):
-        """Title."""
-        emo_map = _emo_map()
-        task_map = _task_map()
-
-
-def update_qualtrics(db_con, df, sur_name, sess_id, subj_col="study_id"):
-    """Title."""
-    #
-    df = _subj_col(df, subj_col)
-    df["sess_id"] = sess_id
-    _update_survey_date(db_con, df, sur_name.lower())
-
-    #
-    if sur_name == "post_scan_ratings":
-        df = _convert_post_scan()
-    else:
-        df = _convert_wide_long(df, sur_name)
-
-    #
-    tbl_input = list(
-        df[["subj_id", "sess_id", "item", "resp"]].itertuples(
-            index=False, name=None
-        )
-    )
-    db_con.exec_many(
-        f"insert ignore into tbl_{sur_name.lower()} "
-        + "(subj_id, sess_id, item, resp) "
-        + "values (%s, %s, %s, %s)",
-        tbl_input,
-    )
-
-
-# udpate tbl_*

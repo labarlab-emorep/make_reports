@@ -201,8 +201,6 @@ class GetQualtrics(survey_clean.CleanQualtrics):
         Location of project parent directory
     qualtrics_token : str
         API token for Qualtrics
-    sql_pass : str
-        Password for MySQL database
 
     Attributes
     ----------
@@ -228,7 +226,7 @@ class GetQualtrics(survey_clean.CleanQualtrics):
 
     """
 
-    def __init__(self, proj_dir, qualtrics_token, sql_pass):
+    def __init__(self, proj_dir, qualtrics_token):
         """Initialize."""
         self._proj_dir = proj_dir
         pilot_list = report_helper.pilot_list()
@@ -237,7 +235,7 @@ class GetQualtrics(survey_clean.CleanQualtrics):
         part_comp.status_change("withdrew")
         withdrew_list = [x for x in part_comp.all.keys()]
         super().__init__(self._proj_dir, pilot_list, withdrew_list)
-        self._db_con = sql_database.DbConnect(sql_pass)
+        self._db_con = sql_database.DbConnect()
 
     def _download_qualtrics(self, survey_list: list) -> dict:
         """Get, write, and return Qualtrics survey info.
