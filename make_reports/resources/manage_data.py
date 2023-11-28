@@ -72,6 +72,7 @@ class GetRedcap(survey_clean.CleanRedcap):
         self._proj_dir = proj_dir
         pilot_list = report_helper.pilot_list()
         super().__init__(self._proj_dir, pilot_list)
+        self._db_con = sql_database.DbConnect()
 
     def _download_redcap(self, survey_list: list) -> dict:
         """Get, write, and return RedCap survey info.
@@ -167,6 +168,9 @@ class GetRedcap(survey_clean.CleanRedcap):
                 self._write_redcap(self.df_study, sur_name, dir_name, False)
                 self._write_redcap(self.df_pilot, sur_name, dir_name, True)
 
+            if key_name == "BDI":
+                self._update_sql_db(self.df_study, key_name, visit)
+
     def _write_redcap(
         self, df: pd.DataFrame, sur_name: str, dir_name: str, is_pilot: bool
     ):
@@ -180,6 +184,16 @@ class GetRedcap(survey_clean.CleanRedcap):
             f"df_{out_name}.csv",
         )
         _write_dfs(df, out_file)
+
+    def _update_sql_db(
+        self,
+        df: pd.DataFrame,
+        sur_name: str,
+        visit: str,
+    ):
+        """Title."""
+        sess_id = int(visit[-1])
+        sql_database.update_redcap(self._db_con, df, sur_name, sess_id)
 
 
 class GetQualtrics(survey_clean.CleanQualtrics):
@@ -229,8 +243,7 @@ class GetQualtrics(survey_clean.CleanQualtrics):
         super().__init__(self._proj_dir, pilot_list, withdrew_list)
 
         #
-        db_con = sql_database.DbConnect()
-        self._up_qual = sql_database.UpdateQualtrics(db_con)
+        self._db_con = sql_database.DbConnect()
 
     def _download_qualtrics(self, survey_list: list) -> dict:
         """Get, write, and return Qualtrics survey info.
@@ -341,7 +354,7 @@ class GetQualtrics(survey_clean.CleanQualtrics):
     ):
         """Title."""
         sess_id = int(visit[-1])
-        self._up_qual.db_update(df, sur_name, sess_id)
+        sql_database.update_qualtrics(self._db_con, df, sur_name, sess_id)
 
 
 class GetRest:

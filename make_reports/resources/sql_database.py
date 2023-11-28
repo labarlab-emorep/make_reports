@@ -1,5 +1,8 @@
 """Title.
 
+DbConnect :
+UpdateQualtrics :
+
 """
 # %%
 import os
@@ -48,72 +51,113 @@ class DbConnect:
 
 
 # %%
-def _subj_col(df: pd.DataFrame, subj_col: str) -> pd.DataFrame:
-    """Return df containing db_emorep subj_id col."""
-    df["subj_id"] = df[subj_col].str[2:].astype(int)
-    return df
+class _DfManip:
+    def subj_col(self, df, subj_col):
+        """Title."""
+        df["subj_id"] = df[subj_col].str[2:].astype(int)
+        return df
+
+    def convert_wide_long(self, df, sur_name, item_type=int):
+        """Title."""
+        df["id"] = df.index
+        df_long = pd.wide_to_long(
+            df,
+            stubnames=f"{sur_name}",
+            sep="_",
+            suffix=".*",
+            i=["subj_id", "sess_id"],
+            j="item",
+        ).reset_index()
+        df_long = df_long.drop(["id"], axis=1)
+        df_long["item"] = df_long["item"].astype(item_type)
+        df_long = df_long.rename(columns={sur_name: "resp"})
+        df_long["resp"] = df_long["resp"].astype(int)
+        return df_long
 
 
-# %%
-def update_ref_subj(
-    db_con: DbConnect,
-    df: pd.DataFrame,
-    subj_col: str = "study_id",
-):
-    """Update mysql db_emorep.ref_subj."""
-    # TODO update ref_subj with e/table update?
-    df = _subj_col(df, subj_col)
-    tbl_input = list(
-        df[["subj_id", subj_col]].itertuples(index=False, name=None)
-    )
-    db_con.exec_many(
-        "insert ignore into ref_subj (subj_id, subj_name) values (%s, %s)",
-        tbl_input,
-    )
-
-
-# %%
-def _update_survey_date(
-    db_con: DbConnect,
-    df: pd.DataFrame,
-    sur_name: str,
-    date_col: str = "datetime",
-):
-    """Update mysql db_emorep.tbl_survey_date."""
-    df = df.copy()
-    df["sur_name"] = sur_name.lower()
-    print(f"\tUpdating db_emorep.tbl_survey_date for {sur_name.lower()} ...")
-    tbl_input = list(
-        df[["subj_id", "sess_id", "sur_name", date_col]].itertuples(
-            index=False, name=None
-        )
-    )
-    db_con.exec_many(
-        "insert ignore into tbl_survey_date "
-        + "(subj_id, sess_id, sur_name, sur_date) "
-        + "values (%s, %s, %s, %s)",
-        tbl_input,
-    )
-
-
-# %%
-def _convert_wide_long(df, sur_name):
+class _DbUpdateRecipes:
     """Title."""
-    df["id"] = df.index
-    df_long = pd.wide_to_long(
-        df,
-        stubnames=f"{sur_name}",
-        sep="_",
-        i=["subj_id", "sess_id"],
-        j="item",
-    ).reset_index()
-    df_long = df_long.drop(["id"], axis=1)
-    df_long["item"] = df_long["item"].astype(int)
-    df_long = df_long.rename(columns={sur_name: "resp"})
-    df_long["resp"] = df_long["resp"].astype(int)
-    return df_long
+
+    def __init__(self, db_con):
+        self._db_con = db_con
+
+    def update_ref_subj(
+        self,
+        df: pd.DataFrame,
+        subj_col: str = "study_id",
+    ):
+        """Update mysql db_emorep.ref_subj."""
+        #
+        print("\tUpdating db_emorep.ref_subj ...")
+        tbl_input = list(
+            df[["subj_id", subj_col]].itertuples(index=False, name=None)
+        )
+        self._db_con.exec_many(
+            "insert ignore into ref_subj (subj_id, subj_name) values (%s, %s)",
+            tbl_input,
+        )
+
+    def update_survey_date(
+        self,
+        df: pd.DataFrame,
+        sur_low: str,
+        date_col: str = "datetime",
+    ):
+        """Update mysql db_emorep.tbl_survey_date."""
+        print(f"\tUpdating db_emorep.tbl_survey_date for {sur_low} ...")
+        tbl_input = list(
+            df[["subj_id", "sess_id", "sur_name", date_col]].itertuples(
+                index=False, name=None
+            )
+        )
+        self._db_con.exec_many(
+            "insert ignore into tbl_survey_date "
+            + "(subj_id, sess_id, sur_name, sur_date) "
+            + "values (%s, %s, %s, %s)",
+            tbl_input,
+        )
+
+    def update_basic_tbl(self, df, sur_low):
+        print(f"\tUpdating db_emorep.tbl_{sur_low} ...")
+        tbl_input = list(
+            df[["subj_id", "sess_id", "item", "resp"]].itertuples(
+                index=False, name=None
+            )
+        )
+        self._db_con.exec_many(
+            f"insert ignore into tbl_{sur_low} "
+            + f"(subj_id, sess_id, item_{sur_low}, resp_{sur_low}) "
+            + "values (%s, %s, %s, %s)",
+            tbl_input,
+        )
+
+    def update_psr(self, df, sur_low):
+        #
+        print(f"\tUpdating db_emorep.tbl_{sur_low} ...")
+        tbl_input = list(
+            df[
+                [
+                    "subj_id",
+                    "sess_id",
+                    "task_id",
+                    "emo_id",
+                    "stim_name",
+                    "resp_arousal",
+                    "resp_endorse",
+                    "resp_valence",
+                ]
+            ].itertuples(index=False, name=None)
+        )
+        self._db_con.exec_many(
+            f"insert ignore into tbl_{sur_low} "
+            + "(subj_id, sess_id, task_id, emo_id, stim_name,"
+            + " resp_arousal, resp_endorse, resp_valence)"
+            + " values (%s, %s, %s, %s, %s, %s, %s, %s)",
+            tbl_input,
+        )
 
 
+# %%
 def _emo_map():
     return {
         "amusement": 1,
@@ -141,45 +185,19 @@ def _task_map():
     }
 
 
-class _UpdatePsr:
+class _PrepPsr:
     """Title."""
 
-    def __init__(self, db_con, df, sess_id, subj_col="study_id"):
-        self._db_con = db_con
+    def __init__(self, df, sess_id, subj_col="study_id"):
         self._df = df.copy()
         self._sess_id = sess_id
         self._sur_name = "post_scan_ratings"
         self._subj_col = subj_col
 
-    def _update_psr(self):
-        """Title."""
+    def prep_dfs(self):
+        """Make attrs df_tidy, df_date."""
         self._prep_tidy()
         self._prep_date()
-        _update_survey_date(self._db_con, self._df_date, self._sur_name)
-
-        #
-        print(f"\tUpdating db_emorep.tbl_{self._sur_name.lower()} ...")
-        tbl_input = list(
-            self._df_tidy[
-                [
-                    "subj_id",
-                    "sess_id",
-                    "task_id",
-                    "emo_id",
-                    "stim_name",
-                    "resp_arousal",
-                    "resp_endorse",
-                    "resp_valence",
-                ]
-            ].itertuples(index=False, name=None)
-        )
-        self._db_con.exec_many(
-            f"insert ignore into tbl_{self._sur_name.lower()} "
-            + "(subj_id, sess_id, task_id, emo_id, stim_name,"
-            + " resp_arousal, resp_endorse, resp_valence)"
-            + " values (%s, %s, %s, %s, %s, %s, %s, %s)",
-            tbl_input,
-        )
 
     def _prep_tidy(self):
         """Title."""
@@ -190,7 +208,7 @@ class _UpdatePsr:
         self._df["emo_id"] = self._df.apply(self._emo_label, axis=1)
 
         #
-        self._df_tidy = self._df.pivot(
+        self.df_tidy = self._df.pivot(
             index=[
                 "study_id",
                 "subj_id",
@@ -208,7 +226,7 @@ class _UpdatePsr:
             ],
             values="response",
         ).reset_index()
-        self._df_tidy = self._df_tidy.rename(
+        self.df_tidy = self.df_tidy.rename(
             columns={
                 "stimulus": "stim_name",
                 "arousal": "resp_arousal",
@@ -219,7 +237,7 @@ class _UpdatePsr:
 
         #
         char_list = ["stim_name", "resp_endorse"]
-        self._df_tidy[char_list] = self._df_tidy[char_list].astype(str)
+        self.df_tidy[char_list] = self.df_tidy[char_list].astype(str)
         int_list = [
             "subj_id",
             "sess_id",
@@ -228,14 +246,15 @@ class _UpdatePsr:
             "resp_arousal",
             "resp_valence",
         ]
-        self._df_tidy[int_list] = self._df_tidy[int_list].astype(int)
+        self.df_tidy[int_list] = self.df_tidy[int_list].astype(int)
 
     def _prep_date(self):
         """Title."""
-        idx = list(np.unique(self._df_tidy["subj_id"], return_index=True)[1])
-        self._df_date = self._df_tidy.loc[
+        idx = list(np.unique(self.df_tidy["subj_id"], return_index=True)[1])
+        self.df_date = self.df_tidy.loc[
             idx, ["subj_id", "sess_id", "datetime"]
         ]
+        self.df_date["sur_name"] = self._sur_name
 
     def _task_label(self, row):
         """Title."""
@@ -252,43 +271,74 @@ class _UpdatePsr:
                 return emo_id
 
 
-class UpdateQualtrics:
+def update_qualtrics(db_con, df, sur_name, sess_id, subj_col="study_id"):
+    """Title."""
+    #
+    sur_low = sur_name.lower()
+    df = df.copy()
+    df["sess_id"] = sess_id
+
+    #
+    rsc_up = _DbUpdateRecipes(db_con)
+    rsc_df = _DfManip()
+    df = rsc_df.subj_col(df, subj_col)
+
+    #
+    if sur_name == "post_scan_ratings":
+        prep_psr = _PrepPsr(df, sess_id)
+        prep_psr.prep_dfs()
+        rsc_up.update_psr(prep_psr.df_tidy, sur_low)
+        rsc_up.update_survey_date(prep_psr.df_date, sur_low)
+        return
+
+    #
+    df_date = df.copy()
+    df_date["sur_name"] = sur_low
+    rsc_up.update_survey_date(df_date, sur_low)
+    del df_date
+
+    #
+    df_long = rsc_df.convert_wide_long(df, sur_name)
+    rsc_up.update_basic_tbl(df_long, sur_low)
+
+
+# %%
+def update_redcap(db_con, df, sur_name, sess_id, subj_col="study_id"):
+    """Title."""
+    #
+    sur_low = sur_name.lower()
+    df = df.copy()
+    df["sess_id"] = sess_id
+
+    #
+    rsc_df = _DfManip()
+    rsc_up = _DbUpdateRecipes(db_con)
+
+    #
+    df = rsc_df.subj_col(df, subj_col)
+    df = df.where(pd.notnull(df), None)
+    df_date = df.copy()
+    df_date["sur_name"] = sur_low
+    rsc_up.update_survey_date(df_date, sur_low)
+    del df_date
+
+    #
+    df_long = rsc_df.convert_wide_long(df, sur_name, item_type=str)
+    rsc_up.update_basic_tbl(df_long, sur_low)
+
+
+class UpdateRest:
     """Title."""
 
-    def __init__(self, db_con):
-        self._db_con = db_con
+    def __init__(self):
+        pass
 
-    def db_update(self, df, sur_name, sess_id, subj_col="study_id"):
-        """Title."""
-        #
-        self._df = df.copy()
-        self._sur_name = sur_name
-        self._df = _subj_col(self._df, subj_col)
-        self._df["sess_id"] = sess_id
 
-        #
-        if self._sur_name == "post_scan_ratings":
-            up_psr = _UpdatePsr(self._db_con, self._df, sess_id)
-            up_psr._update_psr()
-        else:
-            self._update_reg()
+class UpdateTask:
+    """Title."""
 
-    def _update_reg(self):
-        """Title."""
-        sur_low = self._sur_name.lower()
-        _update_survey_date(self._db_con, self._df, sur_low)
+    def __init__(self):
+        pass
 
-        #
-        self._df_long = _convert_wide_long(self._df, self._sur_name)
-        print(f"\tUpdating db_emorep.tbl_{sur_low} ...")
-        tbl_input = list(
-            self._df_long[["subj_id", "sess_id", "item", "resp"]].itertuples(
-                index=False, name=None
-            )
-        )
-        self._db_con.exec_many(
-            f"insert ignore into tbl_{sur_low} "
-            + f"(subj_id, sess_id, item_{sur_low}, resp_{sur_low}) "
-            + "values (%s, %s, %s, %s)",
-            tbl_input,
-        )
+
+# %%
