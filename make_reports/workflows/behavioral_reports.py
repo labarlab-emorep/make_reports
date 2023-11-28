@@ -39,19 +39,15 @@ class _Visit1:
     def __init__(
         self,
         proj_dir: Union[str, os.PathLike],
-        qualtrics_token: str,
     ):
         """Initialize."""
         self._proj_dir = proj_dir
-        self._qualtrics_token = qualtrics_token
         self.sur_descript = {}
         self._mk_subscale()
 
     def visit1_data(self):
         """Make clean_visit1 attr {survey_name: pd.DataFrame}."""
-        get_qual = manage_data.GetQualtrics(
-            self._proj_dir, self._qualtrics_token
-        )
+        get_qual = manage_data.GetQualtrics(self._proj_dir)
         get_qual.get_qualtrics(["EmoRep_Session_1"])
         self._clean_visit1 = get_qual.clean_qualtrics["study"]["visit_day1"]
 
@@ -159,18 +155,14 @@ class _Visit23:
     def __init__(
         self,
         proj_dir: Union[str, os.PathLike],
-        redcap_token: str,
-        qualtrics_token: str,
     ):
         """Initialize."""
         self._proj_dir = proj_dir
-        self._redcap_token = redcap_token
-        self._qualtrics_token = qualtrics_token
         self.sur_descript = {}
 
     def _visit23_redcap_data(self):
         """Make clean_visit23_rc attr {visit: {survey_name: pd.DataFrame}}."""
-        get_red = manage_data.GetRedcap(self._proj_dir, self._redcap_token)
+        get_red = manage_data.GetRedcap(self._proj_dir)
         get_red.get_redcap(survey_list=["bdi_day2", "bdi_day3"])
         self._clean_visit23_rc = get_red.clean_redcap["study"]
 
@@ -178,9 +170,7 @@ class _Visit23:
         """Make clean_visit23_qual attr in format
         {visit: {survey_name: pd.DataFrame}}.
         """
-        get_qual = manage_data.GetQualtrics(
-            self._proj_dir, self._qualtrics_token
-        )
+        get_qual = manage_data.GetQualtrics(self._proj_dir)
         get_qual.get_qualtrics(["Session 2 & 3 Survey"])
         self._clean_visit23_qual = get_qual.clean_qualtrics["study"]
 
@@ -268,9 +258,7 @@ class CalcRedcapQualtricsStats:
     Example
     -------
     survey_stats = CalcRedcapQualtricsStats("/path/to/project/dir")
-    survey_stats.gen_stats_plots(
-        ["AIM", "ALS"], True, True, qualtrics_token="foo",
-    )
+    survey_stats.gen_stats_plots(["AIM", "ALS"], True, True)
     all_stats = survey_stats.survey_descriptives
 
     """
@@ -290,8 +278,6 @@ class CalcRedcapQualtricsStats:
         sur_list,
         draw_plot,
         write_json,
-        qualtrics_token=None,
-        redcap_token=None,
     ):
         """Coordinate plot and statistic generation.
 
@@ -307,12 +293,6 @@ class CalcRedcapQualtricsStats:
         write_json : bool
             Whether to save generated descriptive
             statistics to JSON
-        qualtrics_token : str, optional
-            API token for Qualtrics. Required when sur_list contains
-            qualtrics survey names.
-        redcap_token : str, optional
-            API token for RedCap. Required when sur_list contains
-            redcap survey names.
 
         """
         # Validate types, setup
@@ -326,10 +306,6 @@ class CalcRedcapQualtricsStats:
         for sur in sur_list:
             if sur not in self._visit1_list + self._visit23_list:
                 raise ValueError(f"Unexpected survey requested : {sur}")
-            if not redcap_token and sur in self._visit23_rc:
-                raise ValueError(f"Survey {sur} requires RedCap API token")
-            if not qualtrics_token and sur in self._qualtrics_list:
-                raise ValueError(f"Survey {sur} requires Qualtrics API token")
 
         # Unpack list of surveys
         get_visit1 = [x for x in sur_list if x in self._visit1_list]
@@ -338,10 +314,7 @@ class CalcRedcapQualtricsStats:
 
         # Get visit1 (qualtrics) data and generate stats/plots
         if get_visit1:
-            v1 = _Visit1(
-                self._proj_dir,
-                qualtrics_token,
-            )
+            v1 = _Visit1(self._proj_dir)
             v1.visit1_data()
             for sur_name in get_visit1:
                 v1.visit1_stats_plots(
@@ -352,7 +325,7 @@ class CalcRedcapQualtricsStats:
         # Get visit2/3 redcap data, generate stats/plots
         if not get_visit23_rc and not get_visit23_qual:
             return
-        v23 = _Visit23(self._proj_dir, redcap_token, qualtrics_token)
+        v23 = _Visit23(self._proj_dir)
 
         if get_visit23_rc:
             v23._visit23_redcap_data()
@@ -401,7 +374,7 @@ class CalcRedcapQualtricsStats:
 
 
 # %%
-def calc_task_stats(proj_dir, survey_list, draw_plot, qualtrics_token=None):
+def calc_task_stats(proj_dir, survey_list, draw_plot):
     """Calculate stats for in- and post-scanner surveys.
 
     Generate dataframes for the requested surveys, calculcate
@@ -418,9 +391,6 @@ def calc_task_stats(proj_dir, survey_list, draw_plot, qualtrics_token=None):
         Survey names, for triggering different workflows
     draw_plot : bool
         Whether to draw plots
-    qualtrics_token : str, optional
-        API token for Qualtrics. Required when sur_list contains
-        qualtrics survey names.
 
     Returns
     -------
@@ -474,7 +444,7 @@ def calc_task_stats(proj_dir, survey_list, draw_plot, qualtrics_token=None):
 
     # Process post-scan stimulus response task
     if "stim" in survey_list:
-        gq = manage_data.GetQualtrics(proj_dir, qualtrics_token)
+        gq = manage_data.GetQualtrics(proj_dir)
         gq.get_qualtrics(
             survey_list=["FINAL - EmoRep Stimulus Ratings - fMRI Study"]
         )
@@ -499,9 +469,7 @@ def calc_task_stats(proj_dir, survey_list, draw_plot, qualtrics_token=None):
 
 
 # %%
-def make_survey_table(
-    proj_dir, sur_online, sur_scanner, qualtrics_token, redcap_token
-):
+def make_survey_table(proj_dir, sur_online, sur_scanner):
     """Generate tables from REDCap, Qualtrics, and task survey data.
 
     Trigger workflows.CalcRedcapQualtricsStats and workflows.calc_task_stats
@@ -523,8 +491,6 @@ def make_survey_table(
         sur_online,
         False,
         False,
-        qualtrics_token=qualtrics_token,
-        redcap_token=redcap_token,
     )
     data_rcq = calc_rcq.survey_descriptives
 
@@ -546,9 +512,7 @@ def make_survey_table(
     df_all.to_csv(out_stats, index=False)
 
     # Trigger task methods
-    _ = calc_task_stats(
-        proj_dir, sur_scanner, draw_plot=True, qualtrics_token=qualtrics_token
-    )
+    _ = calc_task_stats(proj_dir, sur_scanner, draw_plot=True)
 
 
 # %%

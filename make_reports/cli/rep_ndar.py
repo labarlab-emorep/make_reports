@@ -9,24 +9,19 @@ Required data (e.g. image03) are copied to:
 
 Notes
 -----
-Available reports:
+* Available reports:
     affim01, als01, bdi01, brd01, demo_info01, emrq01,
     image03, panas01, pswq01, restsurv01, rrs01,
     stai01, tas01
+* Requires global variables 'PAT_REDCAP_EMOREP' and
+    'PAT_QUALTRICS_EMOREP' in user env, which hold the
+    personal access tokens to the emorep REDCap and
+    Qualtrics databases, respectively.
 
 Examples
 --------
-rep_ndar \
-    -c 2022-12-01 \
-    -r $PAT_REDCAP_EMOREP \
-    -q $PAT_QUALTRICS_EMOREP \
-    --report-names demo_info01 affim01
-
-rep_ndar \
-    -c 2022-12-01 \
-    -r $PAT_REDCAP_EMOREP \
-    -q $PAT_QUALTRICS_EMOREP \
-    --report-all
+rep_ndar -c 2022-12-01 --report-names demo_info01 affim01
+rep_ndar -c 2022-12-01 --report-all
 
 """
 import sys
@@ -34,6 +29,7 @@ import textwrap
 from datetime import datetime
 from argparse import ArgumentParser, RawTextHelpFormatter
 from make_reports.workflows import required_reports
+from make_reports.resources import report_helper
 
 
 def _get_args():
@@ -91,20 +87,6 @@ def _get_args():
         ),
         required=True,
     )
-    required_args.add_argument(
-        "-q",
-        "--qualtrics-token",
-        type=str,
-        help="API token for Qualtrics project",
-        required=True,
-    )
-    required_args.add_argument(
-        "-r",
-        "--redcap-token",
-        type=str,
-        help="API token for RedCap project",
-        required=True,
-    )
 
     if len(sys.argv) <= 1:
         parser.print_help(sys.stderr)
@@ -119,9 +101,11 @@ def main():
     ndar_reports = args.report_names
     ndar_reports_all = args.report_all
     proj_dir = args.proj_dir
-    redcap_token = args.redcap_token
-    qualtrics_token = args.qualtrics_token
     close_date = datetime.strptime(args.close_date, "%Y-%m-%d").date()
+
+    # Chek for pats
+    report_helper.check_qualtrics_pat()
+    report_helper.check_redcap_pat()
 
     # Set, validate report names
     valid_reports = [
@@ -146,9 +130,7 @@ def main():
             raise ValueError(f"Unexpected report name : {chk_rep}")
 
     # Generate requested reports
-    make_ndar = required_reports.MakeNdarReports(
-        proj_dir, close_date, redcap_token, qualtrics_token
-    )
+    make_ndar = required_reports.MakeNdarReports(proj_dir, close_date)
     make_ndar.make_report(ndar_reports)
 
 

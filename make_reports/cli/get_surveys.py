@@ -4,11 +4,19 @@ Download RedCap and Qualtrics data, and aggregate all rest-rating
 responses. Clean dataframes, and write raw and clean dataframes to
 <proj-dir>/data_survey according to visit.
 
+Notes
+-----
+* --get-redcap requires global variable 'PAT_REDCAP_EMOREP' in user
+    env, which holds the personal access token to the emorep REDCap database.
+* --get-qulatrics requires global variable 'PAT_QUALTRICS_EMOREP' in
+    user env, which holds the personal access token to the emorep
+    Qualtrics database.
+
 Example
 -------
 rep_get \
-    --get-redcap --redcap-token $PAT_REDCAP_EMOREP \
-    --get-qualtrics --qualtrics-token $PAT_QUALTRICS_EMOREP \
+    --get-redcap \
+    --get-qualtrics \
     --get-rest
 
 """
@@ -16,6 +24,7 @@ import sys
 import textwrap
 from argparse import ArgumentParser, RawTextHelpFormatter
 from make_reports.resources import manage_data
+from make_reports.resources import report_helper
 
 
 def _get_args():
@@ -26,12 +35,12 @@ def _get_args():
     parser.add_argument(
         "--get-redcap",
         action="store_true",
-        help="Requires --redcap-token, download and clean RedCap surveys",
+        help="Download and clean RedCap surveys",
     )
     parser.add_argument(
         "--get-qualtrics",
         action="store_true",
-        help="Requires --qualtrics-token, download and clean Qualtrics surveys",  # noqa: E501
+        help="Download and clean Qualtrics surveys",
     )
     parser.add_argument(
         "--get-rest",
@@ -49,18 +58,6 @@ def _get_args():
             """
         ),
     )
-    parser.add_argument(
-        "--qualtrics-token",
-        type=str,
-        default=None,
-        help="API token for Qualtrics project",
-    )
-    parser.add_argument(
-        "--redcap-token",
-        type=str,
-        default=None,
-        help="API token for RedCap project",
-    )
 
     if len(sys.argv) <= 1:
         parser.print_help(sys.stderr)
@@ -74,29 +71,26 @@ def main():
     """Capture arguments and trigger workflow."""
     args = _get_args().parse_args()
     proj_dir = args.proj_dir
-    qualtrics_token = args.qualtrics_token
-    redcap_token = args.redcap_token
     manage_redcap = args.get_redcap
     manage_qualtrics = args.get_qualtrics
     manage_rest = args.get_rest
 
-    if manage_redcap and not redcap_token:
-        raise ValueError("--get-redcap requires --redcap-token")
-    if manage_qualtrics and not qualtrics_token:
-        raise ValueError("--get-qualtrics requires --qualtrics-token")
+    # Check for required tokens
+    if manage_redcap:
+        report_helper.check_redcap_pat()
+    if manage_qualtrics:
+        report_helper.check_qualtrics_pat()
 
     if manage_rest:
         dl_clean_rest = manage_data.GetRest(proj_dir)
         dl_clean_rest.get_rest()
 
     if manage_redcap:
-        dl_clean_redcap = manage_data.GetRedcap(proj_dir, redcap_token)
+        dl_clean_redcap = manage_data.GetRedcap(proj_dir)
         dl_clean_redcap.get_redcap()
 
     if manage_qualtrics:
-        dl_clean_qualtrics = manage_data.GetQualtrics(
-            proj_dir, qualtrics_token
-        )
+        dl_clean_qualtrics = manage_data.GetQualtrics(proj_dir)
         dl_clean_qualtrics.get_qualtrics()
 
 

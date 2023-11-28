@@ -16,18 +16,25 @@ Make plots and reports to give snapshots of the data:
 Plots and reports are written to:
     <proj-dir>/analyses/metrics_recruit
 
+Notes
+-----
+Options --recruit-demo, --participant-flow, --scan-pace require
+global variable 'PAT_REDCAP_EMOREP' in user env, which holds the
+personal access token to the emorep REDCap database.
+
 Examples
 --------
 rep_metrics --prop-motion
-rep_metrics --recruit-demo --redcap-token $PAT_REDCAP_EMOREP
-rep_metrics --participant-flow --redcap-token $PAT_REDCAP_EMOREP
-rep_metrics --scan-pace --redcap-token $PAT_REDCAP_EMOREP
+rep_metrics --recruit-demo
+rep_metrics --participant-flow
+rep_metrics --scan-pace
 
 """
 import sys
 import textwrap
 from argparse import ArgumentParser, RawTextHelpFormatter
 from make_reports.workflows import data_metrics
+from make_reports.resources import report_helper
 
 
 def _get_args():
@@ -38,12 +45,7 @@ def _get_args():
     parser.add_argument(
         "--participant-flow",
         action="store_true",
-        help=textwrap.dedent(
-            """\
-            Requires --redcap-token.
-            Draw participant PRISMA flowchart.
-            """
-        ),
+        help="Draw participant PRISMA flowchart",
     )
     parser.add_argument(
         "--proj-dir",
@@ -64,28 +66,12 @@ def _get_args():
     parser.add_argument(
         "--recruit-demo",
         action="store_true",
-        help=textwrap.dedent(
-            """\
-            Requires --redcap-token.
-            Calculate recruitment demographics.
-            """
-        ),
-    )
-    parser.add_argument(
-        "--redcap-token",
-        type=str,
-        default=None,
-        help="API token for RedCap project",
+        help="Calculate recruitment demographics",
     )
     parser.add_argument(
         "--scan-pace",
         action="store_true",
-        help=textwrap.dedent(
-            """\
-            Requires --redcap-token.
-            Plot weekly scanning pace.
-            """
-        ),
+        help="Plot weekly scanning pace",
     )
 
     if len(sys.argv) <= 1:
@@ -101,19 +87,11 @@ def main():
     proj_dir = args.proj_dir
     recruit_demo = args.recruit_demo
     prop_motion = args.prop_motion
-    redcap_token = args.redcap_token
     participant_flow = args.participant_flow
     scan_pace = args.scan_pace
 
-    if not redcap_token:
-        if scan_pace:
-            raise ValueError("Option --scan-pace requires --redcap-token.")
-        if participant_flow:
-            raise ValueError(
-                "Option --participant-flow requires --redcap-token."
-            )
-        if recruit_demo:
-            raise ValueError("Option --recruit-demo requires --redcap-token.")
+    if scan_pace or participant_flow or recruit_demo:
+        report_helper.check_redcap_pat()
 
     data_metrics.get_metrics(
         proj_dir,
@@ -121,7 +99,6 @@ def main():
         prop_motion,
         scan_pace,
         participant_flow,
-        redcap_token,
     )
 
 

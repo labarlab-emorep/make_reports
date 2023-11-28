@@ -42,8 +42,6 @@ class GetRedcap(survey_clean.CleanRedcap):
     ----------
     proj_dir : str, os.PathLike
         Location of project parent directory
-    redcap_token : str
-        API token for RedCap
 
     Attributes
     ----------
@@ -69,11 +67,10 @@ class GetRedcap(survey_clean.CleanRedcap):
 
     """
 
-    def __init__(self, proj_dir, redcap_token):
+    def __init__(self, proj_dir):
         """Initialize."""
         self._proj_dir = proj_dir
         pilot_list = report_helper.pilot_list()
-        self._redcap_token = redcap_token
         super().__init__(self._proj_dir, pilot_list)
 
     def _download_redcap(self, survey_list: list) -> dict:
@@ -87,9 +84,7 @@ class GetRedcap(survey_clean.CleanRedcap):
             {"demographics": (False, pd.DataFrame)}
 
         """
-        raw_redcap = survey_download.dl_redcap(
-            self._proj_dir, self._redcap_token, survey_list
-        )
+        raw_redcap = survey_download.dl_redcap(self._proj_dir, survey_list)
 
         # Write rawdata to csv, skip writing PHI
         for sur_name in raw_redcap:
@@ -199,8 +194,6 @@ class GetQualtrics(survey_clean.CleanQualtrics):
     ----------
     proj_dir : str, os.PathLike
         Location of project parent directory
-    qualtrics_token : str
-        API token for Qualtrics
 
     Attributes
     ----------
@@ -226,11 +219,10 @@ class GetQualtrics(survey_clean.CleanQualtrics):
 
     """
 
-    def __init__(self, proj_dir, qualtrics_token):
+    def __init__(self, proj_dir):
         """Initialize."""
         self._proj_dir = proj_dir
         pilot_list = report_helper.pilot_list()
-        self._qualtrics_token = qualtrics_token
         part_comp = report_helper.CheckStatus()
         part_comp.status_change("withdrew")
         withdrew_list = [x for x in part_comp.all.keys()]
@@ -248,7 +240,7 @@ class GetQualtrics(survey_clean.CleanQualtrics):
 
         """
         raw_qualtrics = survey_download.dl_qualtrics(
-            self._proj_dir, self._qualtrics_token, survey_list
+            self._proj_dir, survey_list
         )
 
         # Coordinate writing to disk -- write session2&3 surveys to

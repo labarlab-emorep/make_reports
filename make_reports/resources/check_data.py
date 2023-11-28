@@ -466,8 +466,6 @@ class CheckEmorepComplete(build_reports.DemoAll, report_helper.AddStatus):
     ----------
     proj_dir : str, os.PathLike
         Location of project parent directory
-    redcap_token : str
-        Personal access token for RedCap
 
     Attributes
     ----------
@@ -487,14 +485,14 @@ class CheckEmorepComplete(build_reports.DemoAll, report_helper.AddStatus):
 
     """
 
-    def __init__(self, proj_dir, redcap_token):
+    def __init__(self, proj_dir):
         """Initialize.
 
         Build _df_demo attr via DemoAll and AddStatus.
 
         """
         print("Initializing CheckEmorepComplete")
-        super().__init__(proj_dir, redcap_token)
+        super().__init__(proj_dir)
         self.remove_withdrawn()
         self._df_demo = self.enroll_status(self.final_demo, "src_subject_id")
         self._setup()

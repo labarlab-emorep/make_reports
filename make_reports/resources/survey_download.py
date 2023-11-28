@@ -14,17 +14,12 @@ from make_reports.resources import report_helper
 from make_reports import reference_files
 
 
-def dl_mri_log(redcap_token):
+def dl_mri_log():
     """Download and combine MRI Visit Logs by session.
 
     Returns a reduced report, containing only a datetime column
     and visit identifier. Used for calculating weekly scan
     attempts.
-
-    Parameters
-    ----------
-    redcap_token : str
-        API token for RedCap
 
     Returns
     -------
@@ -43,7 +38,7 @@ def dl_mri_log(redcap_token):
         col_value = col_switch[day][1]
 
         # Download dataframe, clean up
-        df_visit = report_helper.pull_redcap_data(redcap_token, rep_key)
+        df_visit = report_helper.pull_redcap_data(rep_key)
         df_visit = df_visit[df_visit[col_value].notna()].reset_index(drop=True)
         df_visit.rename(columns={col_date: "datetime"}, inplace=True)
         df_visit["datetime"] = df_visit["datetime"].astype("datetime64[ns]")
@@ -67,16 +62,11 @@ def dl_mri_log(redcap_token):
     return df
 
 
-def dl_completion_log(redcap_token):
+def dl_completion_log():
     """Return Completion log.
 
     Only includes participants who have a value in the
     'prescreening_completed' field.
-
-    Parameters
-    ----------
-    redcap_token : str
-        API token for RedCap
 
     Returns
     -------
@@ -87,22 +77,15 @@ def dl_completion_log(redcap_token):
         reference_files, "log_keys_redcap.json"
     ) as jf:
         report_keys = json.load(jf)
-    df_compl = report_helper.pull_redcap_data(
-        redcap_token, report_keys["completion_log"]
-    )
+    df_compl = report_helper.pull_redcap_data(report_keys["completion_log"])
     df_compl = df_compl[
         df_compl["prescreening_completed"].notna()
     ].reset_index(drop=True)
     return df_compl
 
 
-def dl_prescreening(redcap_token):
+def dl_prescreening():
     """Return reduced prescreening survey.
-
-    Parameters
-    ----------
-    redcap_token : str
-        API token for RedCap
 
     Returns
     -------
@@ -113,9 +96,7 @@ def dl_prescreening(redcap_token):
         reference_files, "report_keys_redcap.json"
     ) as jf:
         report_keys = json.load(jf)
-    df_pre = report_helper.pull_redcap_data(
-        redcap_token, report_keys["prescreen"]
-    )
+    df_pre = report_helper.pull_redcap_data(report_keys["prescreen"])
     df_pre = df_pre[df_pre["permission"] == 1].reset_index(drop=True)
     df_out = df_pre[
         ["record_id", "permission", "prescreening_survey_complete"]
@@ -176,15 +157,13 @@ def _dl_info(database, survey_name):
     return (report_org, report_keys)
 
 
-def dl_redcap(proj_dir, redcap_token, survey_list):
+def dl_redcap(proj_dir, survey_list):
     """Download EmoRep survey data from RedCap.
 
     Parameters
     ----------
     proj_dir : path
         Location of parent directory for project
-    redcap_token : str
-        API token for RedCap
     survey_list : list
         RedCap survey names
 
@@ -213,7 +192,7 @@ def dl_redcap(proj_dir, redcap_token, survey_list):
     out_dict = {}
     for sur_name in survey_list:
         rep_org, rep_key = _dl_info("redcap", sur_name)
-        df = report_helper.pull_redcap_data(redcap_token, rep_key[sur_name])
+        df = report_helper.pull_redcap_data(rep_key[sur_name])
         out_dict[sur_name] = (rep_org[sur_name], df)
     return out_dict
 
@@ -250,7 +229,6 @@ def dl_qualtrics(proj_dir, qualtrics_token, survey_list):
     # Get survey names, keys, directory mapping
     out_dict = {}
     for sur_name in survey_list:
-
         # Setup for data pull
         report_org, report_keys = _dl_info("qualtrics", sur_name)
         datacenter_id = report_keys["datacenter_ID"]
@@ -270,7 +248,7 @@ def dl_qualtrics(proj_dir, qualtrics_token, survey_list):
             qualtrics_token,
             post_labels,
         )
-        if type(dir_name) == list:
+        if isinstance(dir_name, list):
             out_dict[sur_name] = ("visit_day23", df)
         else:
             out_dict[sur_name] = (dir_name, df)
