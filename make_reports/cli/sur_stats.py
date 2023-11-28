@@ -15,26 +15,10 @@ Notes
 Examples
 --------
 sur_stats --survey-avail
-
-sur_stats \
-    --survey-all \
-    --draw-plots \
-    --qualtrics-token $PAT_QUALTRICS_EMOREP \
-    --redcap-token $PAT_REDCAP_EMOREP
-
-sur_stats \
-    --survey-names AIM ALS stim \
-    --write-json \
-    --qualtrics-token $PAT_QUALTRICS_EMOREP
-
-sur_stats \
-    --survey-names rest task \
-    --write-json --draw-plots
-
-sur_stats \
-    --make-tables --draw-plots \
-    --qualtrics-token $PAT_QUALTRICS_EMOREP \
-    --redcap-token $PAT_REDCAP_EMOREP
+sur_stats --survey-all --draw-plots
+sur_stats --survey-names AIM ALS stim --write-json
+sur_stats --survey-names rest task --write-json --draw-plots
+sur_stats --make-tables --draw-plots
 
 """
 import sys

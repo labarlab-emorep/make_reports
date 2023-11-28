@@ -61,6 +61,7 @@ def update_ref_subj(
     subj_col: str = "study_id",
 ):
     """Update mysql db_emorep.ref_subj."""
+    # TODO update ref_subj with e/table update?
     df = _subj_col(df, subj_col)
     tbl_input = list(
         df[["subj_id", subj_col]].itertuples(index=False, name=None)
@@ -79,7 +80,9 @@ def _update_survey_date(
     date_col: str = "datetime",
 ):
     """Update mysql db_emorep.tbl_survey_date."""
+    df = df.copy()
     df["sur_name"] = sur_name.lower()
+    print(f"\tUpdating db_emorep.tbl_survey_date for {sur_name.lower()} ...")
     tbl_input = list(
         df[["subj_id", "sess_id", "sur_name", date_col]].itertuples(
             index=False, name=None
@@ -143,7 +146,7 @@ class _UpdatePsr:
 
     def __init__(self, db_con, df, sess_id, subj_col="study_id"):
         self._db_con = db_con
-        self._df = df
+        self._df = df.copy()
         self._sess_id = sess_id
         self._sur_name = "post_scan_ratings"
         self._subj_col = subj_col
@@ -155,6 +158,7 @@ class _UpdatePsr:
         _update_survey_date(self._db_con, self._df_date, self._sur_name)
 
         #
+        print(f"\tUpdating db_emorep.tbl_{self._sur_name.lower()} ...")
         tbl_input = list(
             self._df_tidy[
                 [
@@ -184,6 +188,8 @@ class _UpdatePsr:
         self._df["prompt"] = self._df["prompt"].str.lower()
         self._df["task_id"] = self._df.apply(self._task_label, axis=1)
         self._df["emo_id"] = self._df.apply(self._emo_label, axis=1)
+
+        #
         self._df_tidy = self._df.pivot(
             index=[
                 "study_id",
@@ -202,8 +208,6 @@ class _UpdatePsr:
             ],
             values="response",
         ).reset_index()
-
-        #
         self._df_tidy = self._df_tidy.rename(
             columns={
                 "stimulus": "stim_name",
@@ -212,6 +216,8 @@ class _UpdatePsr:
                 "valence": "resp_valence",
             }
         )
+
+        #
         char_list = ["stim_name", "resp_endorse"]
         self._df_tidy[char_list] = self._df_tidy[char_list].astype(str)
         int_list = [
@@ -249,27 +255,31 @@ class _UpdatePsr:
 class UpdateQualtrics:
     """Title."""
 
-    def __init__(self, db_con, df, sur_name, sess_id, subj_col="study_id"):
+    def __init__(self, db_con):
         self._db_con = db_con
-        self._df = df
-        self._sess_id = sess_id
-        self._sur_name = sur_name
-        self._subj_col = subj_col
 
-    def db_update(self):
+    def db_update(self, df, sur_name, sess_id, subj_col="study_id"):
         """Title."""
-        self._df = _subj_col(self._df, self._subj_col)
-        self._df["sess_id"] = self._sess_id
+        #
+        self._df = df.copy()
+        self._sur_name = sur_name
+        self._df = _subj_col(self._df, subj_col)
+        self._df["sess_id"] = sess_id
 
+        #
         if self._sur_name == "post_scan_ratings":
-            up_psr = _UpdatePsr(self._db_con, self._df, self._sess_id)
+            up_psr = _UpdatePsr(self._db_con, self._df, sess_id)
             up_psr._update_psr()
         else:
             self._update_reg()
 
     def _update_reg(self):
+        """Title."""
         _update_survey_date(self._db_con, self._df, self._sur_name.lower())
+
+        #
         self._df_long = _convert_wide_long(self._df, self._sur_name)
+        print(f"\tUpdating db_emorep.tbl_{self._sur_name.lower()} ...")
         tbl_input = list(
             self._df_long[["subj_id", "sess_id", "item", "resp"]].itertuples(
                 index=False, name=None

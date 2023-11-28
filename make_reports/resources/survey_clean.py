@@ -542,7 +542,7 @@ class CleanQualtrics:
         data_study = {}
         data_pilot = {}
         for sur_name in surveys_visit1:
-            print(f"\tCleaning survey data : day1, {sur_name}")
+            print(f"Cleaning survey data : day1, {sur_name}")
             sur_cols = [x for x in col_names if sur_name in x]
             ext_cols = subj_cols + sur_cols
             df_sur = df_raw[ext_cols]
@@ -633,7 +633,7 @@ class CleanQualtrics:
             data_study[f"visit_{day_str}"] = {}
             data_pilot[f"visit_{day_str}"] = {}
             for sur_key in surveys_visit23:
-                print(f"\tCleaning survey data : {day_str}, {sur_key}")
+                print(f"Cleaning survey data : {day_str}, {sur_key}")
                 sur_cols = [x for x in col_names if sur_key in x]
                 ext_cols = subj_cols + sur_cols
                 df_sub = df_raw[ext_cols]
@@ -710,7 +710,7 @@ class CleanQualtrics:
 
         """
         self._df_raw = df_raw
-        print("\tCleaning survey data : post_scan_ratings ...")
+        print("Cleaning survey data : post_scan_ratings ...")
 
         # Remove header rows, test IDs, txtFile NaNs, and restarted
         # sessions (Finished=False).

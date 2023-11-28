@@ -197,15 +197,13 @@ def dl_redcap(proj_dir, survey_list):
     return out_dict
 
 
-def dl_qualtrics(proj_dir, qualtrics_token, survey_list):
+def dl_qualtrics(proj_dir, survey_list):
     """Download EmoRep survey data from Qualtrics.
 
     Parameters
     ----------
     proj_dir : path
         Location of parent directory for project
-    qualtrics_token : str
-        API token for Qualtrics
     survey_name : list
         Qualtrics survey names
 
@@ -245,7 +243,6 @@ def dl_qualtrics(proj_dir, qualtrics_token, survey_list):
             sur_name,
             survey_id,
             datacenter_id,
-            qualtrics_token,
             post_labels,
         )
         if isinstance(dir_name, list):

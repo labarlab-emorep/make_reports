@@ -58,13 +58,6 @@ def _get_args():
     required_args.add_argument(
         "-n", "--user-name", type=str, required=True, help="NDA user name"
     )
-    required_args.add_argument(
-        "-t",
-        "--redcap-token",
-        type=str,
-        default=None,
-        help="API token for RedCap project",
-    )
 
     if len(sys.argv) <= 1:
         parser.print_help(sys.stderr)

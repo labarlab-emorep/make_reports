@@ -227,7 +227,10 @@ class GetQualtrics(survey_clean.CleanQualtrics):
         part_comp.status_change("withdrew")
         withdrew_list = [x for x in part_comp.all.keys()]
         super().__init__(self._proj_dir, pilot_list, withdrew_list)
-        self._db_con = sql_database.DbConnect()
+
+        #
+        db_con = sql_database.DbConnect()
+        self._up_qual = sql_database.UpdateQualtrics(db_con)
 
     def _download_qualtrics(self, survey_list: list) -> dict:
         """Get, write, and return Qualtrics survey info.
@@ -315,7 +318,6 @@ class GetQualtrics(survey_clean.CleanQualtrics):
                     self._write_qualtrics(df, sur_name, visit, is_pilot)
                     if is_pilot:
                         continue
-                    continue
                     self._update_sql_db(df, sur_name, visit)
 
     def _write_qualtrics(
@@ -338,9 +340,8 @@ class GetQualtrics(survey_clean.CleanQualtrics):
         visit: str,
     ):
         """Title."""
-        # sur_name = sur_name.lower()
         sess_id = int(visit[-1])
-        sql_database.update_qualtrics(self._db_con, df, sur_name, sess_id)
+        self._up_qual.db_update(df, sur_name, sess_id)
 
 
 class GetRest:
