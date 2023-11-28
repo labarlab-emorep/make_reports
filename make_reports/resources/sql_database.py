@@ -275,19 +275,20 @@ class UpdateQualtrics:
 
     def _update_reg(self):
         """Title."""
-        _update_survey_date(self._db_con, self._df, self._sur_name.lower())
+        sur_low = self._sur_name.lower()
+        _update_survey_date(self._db_con, self._df, sur_low)
 
         #
         self._df_long = _convert_wide_long(self._df, self._sur_name)
-        print(f"\tUpdating db_emorep.tbl_{self._sur_name.lower()} ...")
+        print(f"\tUpdating db_emorep.tbl_{sur_low} ...")
         tbl_input = list(
             self._df_long[["subj_id", "sess_id", "item", "resp"]].itertuples(
                 index=False, name=None
             )
         )
         self._db_con.exec_many(
-            f"insert ignore into tbl_{self._sur_name.lower()} "
-            + "(subj_id, sess_id, item, resp) "
+            f"insert ignore into tbl_{sur_low} "
+            + f"(subj_id, sess_id, item_{sur_low}, resp_{sur_low}) "
             + "values (%s, %s, %s, %s)",
             tbl_input,
         )
