@@ -106,6 +106,13 @@ class _DbUpdateRecipes:
     ):
         """Update mysql db_emorep.tbl_survey_date."""
         print(f"\tUpdating db_emorep.tbl_survey_date for {sur_low} ...")
+
+        #
+        df = df.copy()
+        df["sur_name"] = sur_low
+        df = df.where(pd.notnull(df), None)
+
+        #
         tbl_input = list(
             df[["subj_id", "sess_id", "sur_name", date_col]].itertuples(
                 index=False, name=None
@@ -185,8 +192,9 @@ class _DbUpdateRecipes:
 class _TaskMaps:
     """Title."""
 
-    def __init__(self):
-        self.emo_map = {
+    @property
+    def emo_map(self):
+        return {
             "amusement": 1,
             "anger": 2,
             "anxiety": 3,
@@ -203,7 +211,10 @@ class _TaskMaps:
             "sadness": 14,
             "surprise": 15,
         }
-        self.task_map = {
+
+    @property
+    def task_map(self):
+        return {
             "movies": 1,
             "scenarios": 2,
         }
@@ -227,9 +238,7 @@ class _PrepPsr(_TaskMaps):
     def __init__(self, df, sess_id, subj_col="study_id"):
         self._df = df.copy()
         self._sess_id = sess_id
-        self._sur_name = "post_scan_ratings"
         self._subj_col = subj_col
-        super().__init__()
 
     def prep_dfs(self):
         """Make attrs df_tidy, df_date."""
@@ -295,114 +304,111 @@ class _PrepPsr(_TaskMaps):
         self.df_date = self.df_tidy.loc[
             idx, ["subj_id", "sess_id", "datetime"]
         ]
-        self.df_date["sur_name"] = self._sur_name
-
-
-def _basic_prep(df, sess_id, subj_col):
-    """Title."""
-    df = df.copy()
-    df["sess_id"] = sess_id
-    rsc_df = _DfManip()
-    df = rsc_df.subj_col(df, subj_col)
-    return (df, rsc_df)
-
-
-def update_qualtrics(db_con, df, sur_name, sess_id, subj_col="study_id"):
-    """Title."""
-    #
-    sur_low = sur_name.lower()
-    rsc_up = _DbUpdateRecipes(db_con)
-    df, rsc_df = _basic_prep(df, sess_id, subj_col)
-
-    #
-    if sur_name == "post_scan_ratings":
-        prep_psr = _PrepPsr(df, sess_id)
-        prep_psr.prep_dfs()
-        rsc_up.update_psr(prep_psr.df_tidy, sur_low)
-        rsc_up.update_survey_date(prep_psr.df_date, sur_low)
-        return
-
-    #
-    df_date = df.copy()
-    df_date["sur_name"] = sur_low
-    rsc_up.update_survey_date(df_date, sur_low)
-    del df_date
-
-    #
-    df_long = rsc_df.convert_wide_long(df, sur_name)
-    rsc_up.update_basic_tbl(df_long, sur_low)
 
 
 # %%
-def update_redcap(db_con, df, sur_name, sess_id, subj_col="study_id"):
+class MysqlUpdate(_DbUpdateRecipes, _DfManip, _TaskMaps):
     """Title."""
-    #
-    sur_low = sur_name.lower()
-    rsc_up = _DbUpdateRecipes(db_con)
-    df, rsc_df = _basic_prep(df, sess_id, subj_col)
 
-    #
-    df = df.where(pd.notnull(df), None)
-    df_date = df.copy()
-    df_date["sur_name"] = sur_low
-    rsc_up.update_survey_date(df_date, sur_low)
-    del df_date
+    def __init__(self, db_con):
+        super().__init__(db_con)
 
-    #
-    df_long = rsc_df.convert_wide_long(df, sur_name, item_type=str)
-    rsc_up.update_basic_tbl(df_long, sur_low)
+    def update_db(
+        self, df, sur_name, sess_id, data_source, subj_col="study_id"
+    ):
+        """Title."""
+        if not isinstance(sess_id, int):
+            raise TypeError("Expected type int for sess_id parameter")
+        if data_source not in ["qualtrics", "redcap", "rest_ratings"]:
+            raise ValueError("Unexpected data_source parameter")
+        if subj_col not in df.columns:
+            raise KeyError(f"Column '{subj_col}' not found in df")
 
+        self._df = df
+        self._sur_name = sur_name
+        self._sur_low = sur_name.lower()
+        self._sess_id = sess_id
+        self._subj_col = subj_col
+        self._basic_prep()
 
-# %%
-def update_rest_ratings(db_con, df, sess_id, subj_col="study_id"):
-    """Title."""
-    #
-    sur_low = "rest_ratings"
-    rsc_map = _TaskMaps()
-    rsc_up = _DbUpdateRecipes(db_con)
-    df, rsc_df = _basic_prep(df, sess_id, subj_col)
+        #
+        up_meth = getattr(self, f"_update_{data_source}")
+        up_meth()
 
-    #
-    df_date = df.loc[df["resp_type"] == "resp_int"]
-    df_date = df_date.where(pd.notnull(df_date), None)
-    df_date["sur_name"] = sur_low
-    rsc_up.update_survey_date(df_date, sur_low)
-    del df_date
+    def _basic_prep(self):
+        """Title."""
+        self._df = self._df.copy()
+        self._df["sess_id"] = self._sess_id
+        self._df = self.subj_col(self._df, self._subj_col)
 
-    #
-    df["task_id"] = df.apply(lambda x: rsc_map.task_label(x, "task"), axis=1)
-    df = df.drop([subj_col, "visit", "datetime", "task"], axis=1)
-    for col_name in df.columns:
-        if col_name.lower() in rsc_map.emo_map.keys():
-            df = df.rename(columns={col_name: f"rsp_{col_name.lower()}"})
+    def _update_qualtrics(self):
+        """Title."""
+        #
+        if self._sur_name == "post_scan_ratings":
+            prep_psr = _PrepPsr(self._df, self._sess_id)
+            prep_psr.prep_dfs()
+            self.update_psr(prep_psr.df_tidy, self._sur_low)
+            self.update_survey_date(prep_psr.df_date, self._sur_low)
+            return
 
-    #
-    df["id"] = df.index
-    df_long = pd.wide_to_long(
-        df,
-        stubnames="rsp",
-        sep="_",
-        suffix=".*",
-        i="id",
-        j="emo_name",
-    ).reset_index()
-    df_long.drop(["id"], axis=1, inplace=True)
-    df_tidy = df_long.pivot(
-        index=["emo_name", "task_id", "sess_id", "subj_id"],
-        columns=["resp_type"],
-        values="rsp",
-    ).reset_index()
-    del df_long
+        #
+        self.update_survey_date(self._df.copy(), self._sur_low)
+        df_long = self.convert_wide_long(self._df, self._sur_name)
+        self.update_basic_tbl(df_long, self._sur_low)
 
-    #
-    df_tidy["emo_id"] = df_tidy.apply(
-        lambda x: rsc_map.emo_label(x, "emo_name"), axis=1
-    )
-    int_list = ["subj_id", "sess_id", "task_id", "emo_id", "resp_int"]
-    for col_name in int_list:
-        df_tidy[col_name] = df_tidy[col_name].astype(int)
-    df_tidy["resp_alpha"] = df_tidy["resp_alpha"].astype(str)
-    rsc_up.update_rest_ratings(df_tidy, sur_low)
+    def _update_redcap(self):
+        """Title."""
+        self.update_survey_date(self._df.copy(), self._sur_low)
+        df_long = self.convert_wide_long(
+            self._df, self._sur_name, item_type=str
+        )
+        self.update_basic_tbl(df_long, self._sur_low)
+
+    def _update_rest_ratings(self):
+        """Title."""
+        #
+        df_date = self._df.loc[self._df["resp_type"] == "resp_int"]
+        self.update_survey_date(df_date, self._sur_low)
+        del df_date
+
+        #
+        self._df["task_id"] = self._df.apply(
+            lambda x: self.task_label(x, "task"), axis=1
+        )
+        df = self._df.drop(
+            [self._subj_col, "visit", "datetime", "task"], axis=1
+        )
+        for col_name in df.columns:
+            if col_name.lower() in self.emo_map.keys():
+                df = df.rename(columns={col_name: f"rsp_{col_name.lower()}"})
+
+        #
+        df["id"] = df.index
+        df_long = pd.wide_to_long(
+            df,
+            stubnames="rsp",
+            sep="_",
+            suffix=".*",
+            i="id",
+            j="emo_name",
+        ).reset_index()
+        df_long.drop(["id"], axis=1, inplace=True)
+        df_tidy = df_long.pivot(
+            index=["emo_name", "task_id", "sess_id", "subj_id"],
+            columns=["resp_type"],
+            values="rsp",
+        ).reset_index()
+        del df_long
+
+        #
+        df_tidy["emo_id"] = df_tidy.apply(
+            lambda x: self.emo_label(x, "emo_name"), axis=1
+        )
+        int_list = ["subj_id", "sess_id", "task_id", "emo_id", "resp_int"]
+        for col_name in int_list:
+            df_tidy[col_name] = df_tidy[col_name].astype(int)
+        df_tidy["resp_alpha"] = df_tidy["resp_alpha"].astype(str)
+        self.update_rest_ratings(df_tidy, self._sur_low)
 
 
 class UpdateTask:

@@ -72,7 +72,10 @@ class GetRedcap(survey_clean.CleanRedcap):
         self._proj_dir = proj_dir
         pilot_list = report_helper.pilot_list()
         super().__init__(self._proj_dir, pilot_list)
-        self._db_con = sql_database.DbConnect()
+
+        #
+        db_con = sql_database.DbConnect()
+        self._up_mysql = sql_database.MysqlUpdate(db_con)
 
     def _download_redcap(self, survey_list: list) -> dict:
         """Get, write, and return RedCap survey info.
@@ -170,8 +173,8 @@ class GetRedcap(survey_clean.CleanRedcap):
 
             # Update mysql db_emorep.tbl_bdi
             if key_name == "BDI":
-                sql_database.update_redcap(
-                    self._db_con, self.df_study, key_name, int(visit[-1])
+                self._up_mysql.update_db(
+                    self.df_study, key_name, int(visit[-1]), "redcap"
                 )
 
     def _write_redcap(
@@ -236,7 +239,8 @@ class GetQualtrics(survey_clean.CleanQualtrics):
         super().__init__(self._proj_dir, pilot_list, withdrew_list)
 
         #
-        self._db_con = sql_database.DbConnect()
+        db_con = sql_database.DbConnect()
+        self._up_mysql = sql_database.MysqlUpdate(db_con)
 
     def _download_qualtrics(self, survey_list: list) -> dict:
         """Get, write, and return Qualtrics survey info.
@@ -330,8 +334,8 @@ class GetQualtrics(survey_clean.CleanQualtrics):
                     # Update mysql db_emorep with study (not pilot) data
                     if is_pilot:
                         continue
-                    sql_database.update_qualtrics(
-                        self._db_con, df, sur_name, int(visit[-1])
+                    self._up_mysql.update_db(
+                        df, sur_name, int(visit[-1]), "qualtrics"
                     )
 
     def _write_qualtrics(
@@ -378,7 +382,8 @@ class GetRest:
     def __init__(self, proj_dir):
         """Initialize."""
         self._proj_dir = proj_dir
-        self._db_con = sql_database.DbConnect()
+        db_con = sql_database.DbConnect()
+        self._up_mysql = sql_database.MysqlUpdate(db_con)
 
     def get_rest(self):
         """Coordinate cleaning of rest ratings survey.
@@ -414,8 +419,8 @@ class GetRest:
                 # Update mysql db_emorep.tbl_rest_ratings with study data
                 if data_type == "pilot":
                     continue
-                sql_database.update_rest_ratings(
-                    self._db_con, df_sess, int(day[-1])
+                self._up_mysql.update_db(
+                    df_sess, "rest_ratings", int(day[-1]), "rest_ratings"
                 )
 
     def _rest_paths(self, data_type: str) -> Tuple:
