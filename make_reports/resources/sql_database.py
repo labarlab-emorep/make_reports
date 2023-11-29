@@ -1,7 +1,8 @@
 """Title.
 
 DbConnect :
-UpdateQualtrics :
+update_qualtrics :
+update_redcap :
 
 """
 # %%
@@ -156,36 +157,71 @@ class _DbUpdateRecipes:
             tbl_input,
         )
 
+    def update_rest_ratings(self, df, sur_low):
+        """Title."""
+        #
+        print(f"\tUpdating db_emorep.tbl_{sur_low} ...")
+        tbl_input = list(
+            df[
+                [
+                    "subj_id",
+                    "sess_id",
+                    "task_id",
+                    "emo_id",
+                    "resp_int",
+                    "resp_alpha",
+                ]
+            ].itertuples(index=False, name=None)
+        )
+        self._db_con.exec_many(
+            f"insert ignore into tbl_{sur_low} "
+            + "(subj_id, sess_id, task_id, emo_id, resp_int, resp_alpha) "
+            + "values (%s, %s, %s, %s, %s, %s)",
+            tbl_input,
+        )
+
 
 # %%
-def _emo_map():
-    return {
-        "amusement": 1,
-        "anger": 2,
-        "anxiety": 3,
-        "awe": 4,
-        "calmness": 5,
-        "craving": 6,
-        "disgust": 7,
-        "excitement": 8,
-        "fear": 9,
-        "horror": 10,
-        "joy": 11,
-        "neutral": 12,
-        "romance": 13,
-        "sadness": 14,
-        "surprise": 15,
-    }
+class _TaskMaps:
+    """Title."""
+
+    def __init__(self):
+        self.emo_map = {
+            "amusement": 1,
+            "anger": 2,
+            "anxiety": 3,
+            "awe": 4,
+            "calmness": 5,
+            "craving": 6,
+            "disgust": 7,
+            "excitement": 8,
+            "fear": 9,
+            "horror": 10,
+            "joy": 11,
+            "neutral": 12,
+            "romance": 13,
+            "sadness": 14,
+            "surprise": 15,
+        }
+        self.task_map = {
+            "movies": 1,
+            "scenarios": 2,
+        }
+
+    def task_label(self, row, row_name):
+        """Title."""
+        for task_name, task_id in self.task_map.items():
+            if row[row_name] == task_name:
+                return task_id
+
+    def emo_label(self, row, row_name):
+        """Title."""
+        for emo_name, emo_id in self.emo_map.items():
+            if row[row_name] == emo_name:
+                return emo_id
 
 
-def _task_map():
-    return {
-        "movies": 1,
-        "scenarios": 2,
-    }
-
-
-class _PrepPsr:
+class _PrepPsr(_TaskMaps):
     """Title."""
 
     def __init__(self, df, sess_id, subj_col="study_id"):
@@ -193,6 +229,7 @@ class _PrepPsr:
         self._sess_id = sess_id
         self._sur_name = "post_scan_ratings"
         self._subj_col = subj_col
+        super().__init__()
 
     def prep_dfs(self):
         """Make attrs df_tidy, df_date."""
@@ -204,8 +241,12 @@ class _PrepPsr:
         # convert for sql compat
         self._df["type"] = self._df["type"].str.lower()
         self._df["prompt"] = self._df["prompt"].str.lower()
-        self._df["task_id"] = self._df.apply(self._task_label, axis=1)
-        self._df["emo_id"] = self._df.apply(self._emo_label, axis=1)
+        self._df["task_id"] = self._df.apply(
+            lambda x: self.task_label(x, "type"), axis=1
+        )
+        self._df["emo_id"] = self._df.apply(
+            lambda x: self.emo_label(x, "emotion"), axis=1
+        )
 
         #
         self.df_tidy = self._df.pivot(
@@ -256,32 +297,22 @@ class _PrepPsr:
         ]
         self.df_date["sur_name"] = self._sur_name
 
-    def _task_label(self, row):
-        """Title."""
-        task_map = _task_map()
-        for task_name, task_id in task_map.items():
-            if row["type"] == task_name:
-                return task_id
 
-    def _emo_label(self, row):
-        """Title."""
-        emo_map = _emo_map()
-        for emo_name, emo_id in emo_map.items():
-            if row["emotion"] == emo_name:
-                return emo_id
+def _basic_prep(df, sess_id, subj_col):
+    """Title."""
+    df = df.copy()
+    df["sess_id"] = sess_id
+    rsc_df = _DfManip()
+    df = rsc_df.subj_col(df, subj_col)
+    return (df, rsc_df)
 
 
 def update_qualtrics(db_con, df, sur_name, sess_id, subj_col="study_id"):
     """Title."""
     #
     sur_low = sur_name.lower()
-    df = df.copy()
-    df["sess_id"] = sess_id
-
-    #
     rsc_up = _DbUpdateRecipes(db_con)
-    rsc_df = _DfManip()
-    df = rsc_df.subj_col(df, subj_col)
+    df, rsc_df = _basic_prep(df, sess_id, subj_col)
 
     #
     if sur_name == "post_scan_ratings":
@@ -307,15 +338,10 @@ def update_redcap(db_con, df, sur_name, sess_id, subj_col="study_id"):
     """Title."""
     #
     sur_low = sur_name.lower()
-    df = df.copy()
-    df["sess_id"] = sess_id
-
-    #
-    rsc_df = _DfManip()
     rsc_up = _DbUpdateRecipes(db_con)
+    df, rsc_df = _basic_prep(df, sess_id, subj_col)
 
     #
-    df = rsc_df.subj_col(df, subj_col)
     df = df.where(pd.notnull(df), None)
     df_date = df.copy()
     df_date["sur_name"] = sur_low
@@ -327,11 +353,56 @@ def update_redcap(db_con, df, sur_name, sess_id, subj_col="study_id"):
     rsc_up.update_basic_tbl(df_long, sur_low)
 
 
-class UpdateRest:
+# %%
+def update_rest_ratings(db_con, df, sess_id, subj_col="study_id"):
     """Title."""
+    #
+    sur_low = "rest_ratings"
+    rsc_map = _TaskMaps()
+    rsc_up = _DbUpdateRecipes(db_con)
+    df, rsc_df = _basic_prep(df, sess_id, subj_col)
 
-    def __init__(self):
-        pass
+    #
+    df_date = df.loc[df["resp_type"] == "resp_int"]
+    df_date = df_date.where(pd.notnull(df_date), None)
+    df_date["sur_name"] = sur_low
+    rsc_up.update_survey_date(df_date, sur_low)
+    del df_date
+
+    #
+    df["task_id"] = df.apply(lambda x: rsc_map.task_label(x, "task"), axis=1)
+    df = df.drop([subj_col, "visit", "datetime", "task"], axis=1)
+    for col_name in df.columns:
+        if col_name.lower() in rsc_map.emo_map.keys():
+            df = df.rename(columns={col_name: f"rsp_{col_name.lower()}"})
+
+    #
+    df["id"] = df.index
+    df_long = pd.wide_to_long(
+        df,
+        stubnames="rsp",
+        sep="_",
+        suffix=".*",
+        i="id",
+        j="emo_name",
+    ).reset_index()
+    df_long.drop(["id"], axis=1, inplace=True)
+    df_tidy = df_long.pivot(
+        index=["emo_name", "task_id", "sess_id", "subj_id"],
+        columns=["resp_type"],
+        values="rsp",
+    ).reset_index()
+    del df_long
+
+    #
+    df_tidy["emo_id"] = df_tidy.apply(
+        lambda x: rsc_map.emo_label(x, "emo_name"), axis=1
+    )
+    int_list = ["subj_id", "sess_id", "task_id", "emo_id", "resp_int"]
+    for col_name in int_list:
+        df_tidy[col_name] = df_tidy[col_name].astype(int)
+    df_tidy["resp_alpha"] = df_tidy["resp_alpha"].astype(str)
+    rsc_up.update_rest_ratings(df_tidy, sur_low)
 
 
 class UpdateTask:

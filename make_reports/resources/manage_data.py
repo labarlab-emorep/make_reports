@@ -168,8 +168,11 @@ class GetRedcap(survey_clean.CleanRedcap):
                 self._write_redcap(self.df_study, sur_name, dir_name, False)
                 self._write_redcap(self.df_pilot, sur_name, dir_name, True)
 
+            # Update mysql db_emorep.tbl_bdi
             if key_name == "BDI":
-                self._update_sql_db(self.df_study, key_name, visit)
+                sql_database.update_redcap(
+                    self._db_con, self.df_study, key_name, int(visit[-1])
+                )
 
     def _write_redcap(
         self, df: pd.DataFrame, sur_name: str, dir_name: str, is_pilot: bool
@@ -184,16 +187,6 @@ class GetRedcap(survey_clean.CleanRedcap):
             f"df_{out_name}.csv",
         )
         _write_dfs(df, out_file)
-
-    def _update_sql_db(
-        self,
-        df: pd.DataFrame,
-        sur_name: str,
-        visit: str,
-    ):
-        """Title."""
-        sess_id = int(visit[-1])
-        sql_database.update_redcap(self._db_con, df, sur_name, sess_id)
 
 
 class GetQualtrics(survey_clean.CleanQualtrics):
@@ -320,18 +313,26 @@ class GetQualtrics(survey_clean.CleanQualtrics):
     def _unpack_qualtrics(self):
         """Organize cleaned qualtrics data, trigger writing."""
         for data_type in self.clean_qualtrics.keys():
+            # Get attr data_study|pilot
             is_pilot = True if data_type == "pilot" else False
             data_dict = getattr(self, f"data_{data_type}")
+
+            # Unpack data_dict
             for visit, sur_dict in data_dict.items():
                 for sur_name, df in sur_dict.items():
+                    # Build attr clean_qualtrics, write
                     if visit not in self.clean_qualtrics[data_type].keys():
                         self.clean_qualtrics[data_type][visit] = {sur_name: df}
                     else:
                         self.clean_qualtrics[data_type][visit][sur_name] = df
                     self._write_qualtrics(df, sur_name, visit, is_pilot)
+
+                    # Update mysql db_emorep with study (not pilot) data
                     if is_pilot:
                         continue
-                    self._update_sql_db(df, sur_name, visit)
+                    sql_database.update_qualtrics(
+                        self._db_con, df, sur_name, int(visit[-1])
+                    )
 
     def _write_qualtrics(
         self, df: pd.DataFrame, sur_name: str, visit: str, is_pilot: bool
@@ -345,16 +346,6 @@ class GetQualtrics(survey_clean.CleanQualtrics):
             f"df_{sur_name}.csv",
         )
         _write_dfs(df, out_file)
-
-    def _update_sql_db(
-        self,
-        df: pd.DataFrame,
-        sur_name: str,
-        visit: str,
-    ):
-        """Title."""
-        sess_id = int(visit[-1])
-        sql_database.update_qualtrics(self._db_con, df, sur_name, sess_id)
 
 
 class GetRest:
@@ -387,6 +378,7 @@ class GetRest:
     def __init__(self, proj_dir):
         """Initialize."""
         self._proj_dir = proj_dir
+        self._db_con = sql_database.DbConnect()
 
     def get_rest(self):
         """Coordinate cleaning of rest ratings survey.
@@ -418,6 +410,13 @@ class GetRest:
                     f"visit_{day}/df_rest-ratings.csv",
                 )
                 _write_dfs(df_sess, out_file)
+
+                # Update mysql db_emorep.tbl_rest_ratings with study data
+                if data_type == "pilot":
+                    continue
+                sql_database.update_rest_ratings(
+                    self._db_con, df_sess, int(day[-1])
+                )
 
     def _rest_paths(self, data_type: str) -> Tuple:
         """Return paths to rawdata, output directory."""
