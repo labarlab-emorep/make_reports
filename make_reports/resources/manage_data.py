@@ -174,7 +174,7 @@ class GetRedcap(survey_clean.CleanRedcap):
             # Update mysql db_emorep.tbl_bdi
             if key_name == "BDI":
                 self._up_mysql.update_db(
-                    self.df_study, key_name, int(visit[-1]), "redcap"
+                    self.df_study.copy(), key_name, int(visit[-1]), "redcap"
                 )
 
     def _write_redcap(
@@ -335,7 +335,7 @@ class GetQualtrics(survey_clean.CleanQualtrics):
                     if is_pilot:
                         continue
                     self._up_mysql.update_db(
-                        df, sur_name, int(visit[-1]), "qualtrics"
+                        df.copy(), sur_name, int(visit[-1]), "qualtrics"
                     )
 
     def _write_qualtrics(
@@ -420,7 +420,10 @@ class GetRest:
                 if data_type == "pilot":
                     continue
                 self._up_mysql.update_db(
-                    df_sess, "rest_ratings", int(day[-1]), "rest_ratings"
+                    df_sess.copy(),
+                    "rest_ratings",
+                    int(day[-1]),
+                    "rest_ratings",
                 )
 
     def _rest_paths(self, data_type: str) -> Tuple:

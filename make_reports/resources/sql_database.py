@@ -236,7 +236,7 @@ class _PrepPsr(_TaskMaps):
     """Title."""
 
     def __init__(self, df, sess_id, subj_col="study_id"):
-        self._df = df.copy()
+        self._df = df
         self._sess_id = sess_id
         self._subj_col = subj_col
 
@@ -337,7 +337,6 @@ class MysqlUpdate(_DbUpdateRecipes, _DfManip, _TaskMaps):
 
     def _basic_prep(self):
         """Title."""
-        self._df = self._df.copy()
         self._df["sess_id"] = self._sess_id
         self._df = self.subj_col(self._df, self._subj_col)
 
@@ -345,20 +344,20 @@ class MysqlUpdate(_DbUpdateRecipes, _DfManip, _TaskMaps):
         """Title."""
         #
         if self._sur_name == "post_scan_ratings":
-            prep_psr = _PrepPsr(self._df, self._sess_id)
+            prep_psr = _PrepPsr(self._df.copy(), self._sess_id)
             prep_psr.prep_dfs()
             self.update_psr(prep_psr.df_tidy, self._sur_low)
             self.update_survey_date(prep_psr.df_date, self._sur_low)
             return
 
         #
-        self.update_survey_date(self._df.copy(), self._sur_low)
+        self.update_survey_date(self._df, self._sur_low)
         df_long = self.convert_wide_long(self._df, self._sur_name)
         self.update_basic_tbl(df_long, self._sur_low)
 
     def _update_redcap(self):
         """Title."""
-        self.update_survey_date(self._df.copy(), self._sur_low)
+        self.update_survey_date(self._df, self._sur_low)
         df_long = self.convert_wide_long(
             self._df, self._sur_name, item_type=str
         )
