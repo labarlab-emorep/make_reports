@@ -234,6 +234,37 @@ class CleanRedcap:
         ]
         self._df_raw = self._df_raw[col_reorder]
 
+    def _clean_middle_name(self):
+        """Clean middle name field.
+
+        Accounts for:
+            - Any single special char
+            - Period after middle initial
+            - space, na, NA, n/a, N/A
+
+        """
+        # Clean middle name responses for NA
+        na_mask = (
+            self._df_raw.middle_name.eq("na")
+            | self._df_raw.middle_name.eq("NA")
+            | self._df_raw.middle_name.eq("n/a")
+            | self._df_raw.middle_name.eq("N/A")
+            | self._df_raw.middle_name.eq(" ")
+        )
+        self._df_raw.loc[na_mask, ["middle_name"]] = np.nan
+
+        # Clean middle name single special chars
+        special_list = [x for x in punctuation]
+        sp_mask = (self._df_raw["middle_name"].str.len() == 1) & self._df_raw[
+            "middle_name"
+        ].astype("str").isin(special_list)
+        self._df_raw.loc[sp_mask, ["middle_name"]] = np.nan
+
+        # Drop period after initials
+        self._df_raw["middle_name"] = self._df_raw["middle_name"].str.replace(
+            ".", "", regex=False
+        )
+
     def _res_idx(self):
         """Reset df_[pilot|study] indices."""
         self.df_study.reset_index(drop=True, inplace=True)
@@ -274,23 +305,9 @@ class CleanRedcap:
         # Fix years of education
         self._df_raw["years_education"] = self._get_educ_years()
 
-        # Fix City, State of birth
+        # Fix place of birth, middle name responses
         self._clean_city_state()
-
-        # Clean middle name responses for NA and special characters
-        na_mask = (
-            self._df_raw.middle_name.eq("na")
-            | self._df_raw.middle_name.eq("NA")
-            | self._df_raw.middle_name.eq("N/A")
-            | self._df_raw.middle_name.eq(" ")
-        )
-        self._df_raw.loc[na_mask, ["middle_name"]] = np.nan
-
-        special_list = [x for x in punctuation]
-        sp_mask = (self._df_raw["middle_name"].str.len() == 1) & self._df_raw[
-            "middle_name"
-        ].astype("str").isin(special_list)
-        self._df_raw.loc[sp_mask, ["middle_name"]] = np.nan
+        self._clean_middle_name()
 
         # Drop participants
         self._df_raw = self._drop_subj(self._df_raw)
