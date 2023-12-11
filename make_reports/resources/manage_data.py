@@ -12,8 +12,10 @@ GetRest : aggregate, clean, write, and return rest rating responses
 """
 # %%
 import os
+import glob
 from typing import Union, Tuple
 import pandas as pd
+from multiprocessing import Pool
 from make_reports.resources import survey_download
 from make_reports.resources import survey_clean
 from make_reports.resources import report_helper
@@ -437,3 +439,85 @@ class GetRest:
             raw_dir = os.path.join(self._proj_dir, "data_scanner_BIDS/rawdata")
             out_dir = os.path.join(self._proj_dir, "data_survey")
         return (raw_dir, out_dir)
+
+
+# %%
+class GetTask:
+    """Title.
+
+    Attributes
+    ----------
+    clean_task : dict
+        {study: visit: {"emorep_task": pd.DataFrame}}
+
+    """
+
+    def __init__(self, proj_dir):
+        """Initialize."""
+        self._proj_dir = proj_dir
+
+    def get_task(self):
+        """Title."""
+
+        #
+        self._build_df()
+        db_con = sql_database.DbConnect()
+        self._up_mysql = sql_database.MysqlUpdate(db_con)
+
+    def _build_df(self):
+        """Title."""
+        print("Finding all project events.tsv ...")
+        mri_rawdata = os.path.join(
+            self._proj_dir, "data_scanner_BIDS", "rawdata"
+        )
+        events_all = sorted(
+            glob.glob(f"{mri_rawdata}/sub-*/ses-*/func/*_events.tsv")
+        )
+        if not events_all:
+            raise ValueError(
+                f"Expected to find BIDS events files in : {mri_rawdata}"
+            )
+
+        #
+        events_dfs = Pool().starmap(
+            self._load_event, [(event_path,) for event_path in events_all]
+        )
+        self._df_all = pd.concat(events_dfs, axis=0, ignore_index=True)
+        self._clean_df()
+
+        #
+
+    def _load_event(self, event_path) -> pd.DataFrame:
+        """Title."""
+        #
+        print(f"Loading {os.path.basename(event_path)} ...")
+        subj, sess, task, run, _ = os.path.basename(event_path).split("_")
+        df = pd.read_csv(event_path, sep="\t")
+        df["subj"] = subj.split("-")[-1]
+        df["sess"] = sess.split("-")[-1]
+        df["task"] = task.split("-")[-1]
+
+        #
+        df["run"] = int(run[-1])
+        return df
+        # self._df_all = pd.concat([self._df_all, df], ignore_index=True)
+
+    def _clean_df(self):
+        """Title."""
+        # Get participant responses
+        self._df_all = self._df_all.loc[
+            self._df_all["trial_type"].isin(
+                ["movie", "scenario", "emotion", "intensity"]
+            )
+        ].reset_index(drop=True)
+
+        # Organize dataframe
+        self._df_all["emotion"] = self._df_all["emotion"].fillna(
+            method="ffill"
+        )
+        self._df_all = self._df_all.loc[
+            ~self._df_all["trial_type"].isin(["movie", "scenario"])
+        ].reset_index(drop=True)
+        self._df_all = self._df_all.drop(
+            ["onset", "duration", "accuracy", "stim_info"], axis=1
+        )
