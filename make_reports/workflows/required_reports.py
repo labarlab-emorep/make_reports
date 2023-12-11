@@ -84,8 +84,14 @@ class _GetData:
     Download, clean, and return necessary data for
     generating NDAR reports.
 
-    Intended to be inherited by MakeNdarReports,
-    references attrs set by child.
+    Parameters
+    ----------
+    proj_dir : str, os.PathLike
+        Location of project directory
+    redcap_token : str
+        Personal access token for RedCap
+    qualtrics_token : str
+        Personal access token for Qualtrics
 
     Attributes
     ----------
@@ -103,13 +109,21 @@ class _GetData:
 
     """
 
-    def get_data(self):
+    def __init__(self, proj_dir, redcap_token, qualtrics_token):
+        """Initialize."""
+        self._proj_dir = proj_dir
+        self._redcap_token = redcap_token
+        self._qualtrics_token = qualtrics_token
+
+    def get_data(self, report_names: list, close_date: datetime.date):
         """Build df_demo and data_dict attrs."""
+        self._report_names = report_names
+
         # Get redcap demographic data, use only consented data in
         # submission cycle.
         redcap_demo = build_reports.DemoAll(self._proj_dir, self._redcap_token)
         redcap_demo.remove_withdrawn()
-        redcap_demo.submission_cycle(self._close_date)
+        redcap_demo.submission_cycle(close_date)
         self.df_demo = redcap_demo.final_demo
 
         # Build data_dict with redcap, qualtrics, and rest data
@@ -127,7 +141,7 @@ class _GetData:
         self._merge_dict(redcap_data.clean_redcap)
 
     def _get_qual(self):
-        """Title."""
+        """Add Qualtrics surveys to data_dict."""
         # Align ndar reports to qualtrics surveys
         qual_s1 = [
             "affim01",
@@ -195,18 +209,21 @@ class _BuildArgs:
     """Build arguments for build_ndar.Ndar* classes.
 
     Unpack data_dict attr, return list of dataframes for
-    attr _df_name. Used to supply each build_ndar.Ndar*
+    df_name. Used to supply each build_ndar.Ndar*
     class the appropriate number of dataframes.
 
     Methods
     -------
     build_args()
-        Return list of dataframes for _df_name
+        Return list of dataframes for df_name
 
     """
 
-    def build_args(self) -> list:
-        """Return list of pd.DataFrame for _df_name."""
+    def build_args(self, data_dict: dict, df_name: str) -> list:
+        """Return list of pd.DataFrame for df_name."""
+        self._data_dict = data_dict
+        self._df_name = df_name
+
         # Align report name to unpacking method
         v1_list = ["AIM", "ALS", "ERQ", "PSWQ", "RRS", "TAS"]
         v23_list = ["BDI", "PANAS", "rest_ratings", "post_scan_ratings"]
@@ -262,10 +279,10 @@ class _BuildArgs:
         ]
 
 
-class MakeNdarReports(_GetData, _BuildArgs):
+class MakeNdarReports(_BuildArgs):
     """Make reports and organize data for NDAR upload.
 
-    Inherits _GetData, _BuildArgs
+    Inherits _BuildArgs.
 
     Generate requested NDAR reports and organize data (if required) for the
     biannual upload.
@@ -304,6 +321,7 @@ class MakeNdarReports(_GetData, _BuildArgs):
         self._close_date = close_date
         self._redcap_token = redcap_token
         self._qualtrics_token = qualtrics_token
+        super().__init__()
 
     @property
     def _nda_switch(self):
@@ -329,7 +347,7 @@ class MakeNdarReports(_GetData, _BuildArgs):
 
         Parameters
         ----------
-        ndar_reports : list
+        report_names : list
             Names of desired NDA reports e.g. ["demo_info01", "affim01"]
 
         """
@@ -338,11 +356,17 @@ class MakeNdarReports(_GetData, _BuildArgs):
         for report in report_names:
             if report not in self._nda_switch.keys():
                 raise ValueError(f"Unexpected ndar_report value : {report}")
-        self._report_names = report_names
-        self.get_data()
+
+        # Download and clean data for requested reports
+        gd = _GetData(
+            self._proj_dir, self._redcap_token, self._qualtrics_token
+        )
+        gd.get_data(report_names, self._close_date)
+        self.df_demo = gd.df_demo
+        self.data_dict = gd.data_dict
 
         # Build each requested report
-        for self._report in self._report_names:
+        for self._report in report_names:
             self._build_report()
 
     def _build_report(self):
@@ -356,9 +380,9 @@ class MakeNdarReports(_GetData, _BuildArgs):
             args = args + [self._close_date]
 
         # Identify class name and get data if needed
-        class_name, self._df_name = self._nda_switch[self._report]
-        if self._df_name:
-            args = args + self.build_args()
+        class_name, df_name = self._nda_switch[self._report]
+        if df_name:
+            args = args + self.build_args(self.data_dict, df_name)
 
         # Get appropriate class for report, generate report.
         mod = __import__(
