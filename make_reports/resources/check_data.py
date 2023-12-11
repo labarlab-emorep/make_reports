@@ -255,6 +255,11 @@ class _CheckEmorep(_ChkRsc):
                 "func/*level-first_name-lss*.feat/stats/cope1.nii.gz",
                 150,
             ),
+            "dot-sep-stim": (
+                os.path.join(self._deriv_dir, "classify_rest"),
+                "func/df_dot-product_model-sep_con-stim_*.csv",
+                1,
+            ),
         }
 
         col_names = [
@@ -420,6 +425,11 @@ class CheckMri(_CheckEmorep):
             "fsl-rest": (
                 os.path.join(self._deriv_dir, "model_fsl"),
                 "func/run-01_level-first_name-rest.feat/stats/cope1.nii.gz",
+                1,
+            ),
+            "dot-sep-stim": (
+                os.path.join(self._deriv_dir, "classify_rest"),
+                "func/df_dot-product_model-sep_con-stim_*.csv",
                 1,
             ),
         }
