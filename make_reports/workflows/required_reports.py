@@ -242,18 +242,18 @@ class _BuildArgs:
 
     def _v1_pilot_study(self) -> list:
         """Return visit_day1 dataframes."""
-        df_pilot = self.data_dict["pilot"]["visit_day1"][self._df_name]
-        df_study = self.data_dict["study"]["visit_day1"][self._df_name]
+        df_pilot = self._data_dict["pilot"]["visit_day1"][self._df_name]
+        df_study = self._data_dict["study"]["visit_day1"][self._df_name]
 
         # RRS does not have pilot data in qualtrics
         return [df_pilot, df_study] if self._df_name != "RRS" else [df_study]
 
     def _v23_pilot_study(self) -> list:
         """Return visit_day2 and visit_day3 dataframes."""
-        df_pilot_2 = self.data_dict["pilot"]["visit_day2"][self._df_name]
-        df_study_2 = self.data_dict["study"]["visit_day2"][self._df_name]
-        df_pilot_3 = self.data_dict["pilot"]["visit_day3"][self._df_name]
-        df_study_3 = self.data_dict["study"]["visit_day3"][self._df_name]
+        df_pilot_2 = self._data_dict["pilot"]["visit_day2"][self._df_name]
+        df_study_2 = self._data_dict["study"]["visit_day2"][self._df_name]
+        df_pilot_3 = self._data_dict["pilot"]["visit_day3"][self._df_name]
+        df_study_3 = self._data_dict["study"]["visit_day3"][self._df_name]
 
         # PANAS and post_scan_ratings do not have pilot data in qualtrics
         if self._df_name in ["PANAS", "post_scan_ratings"]:
@@ -263,12 +263,12 @@ class _BuildArgs:
 
     def _v123_pilot_study(self) -> list:
         """Return STAI dataframes."""
-        df_pilot_1 = self.data_dict["pilot"]["visit_day1"]["STAI_Trait"]
-        df_study_1 = self.data_dict["study"]["visit_day1"]["STAI_Trait"]
-        df_pilot_2 = self.data_dict["pilot"]["visit_day2"]["STAI_State"]
-        df_study_2 = self.data_dict["study"]["visit_day2"]["STAI_State"]
-        df_pilot_3 = self.data_dict["pilot"]["visit_day3"]["STAI_State"]
-        df_study_3 = self.data_dict["study"]["visit_day3"]["STAI_State"]
+        df_pilot_1 = self._data_dict["pilot"]["visit_day1"]["STAI_Trait"]
+        df_study_1 = self._data_dict["study"]["visit_day1"]["STAI_Trait"]
+        df_pilot_2 = self._data_dict["pilot"]["visit_day2"]["STAI_State"]
+        df_study_2 = self._data_dict["study"]["visit_day2"]["STAI_State"]
+        df_pilot_3 = self._data_dict["pilot"]["visit_day3"]["STAI_State"]
+        df_study_3 = self._data_dict["study"]["visit_day3"]["STAI_State"]
         return [
             df_pilot_1,
             df_study_1,
