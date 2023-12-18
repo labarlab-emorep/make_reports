@@ -69,7 +69,7 @@ class GetRedcap(survey_clean.CleanRedcap):
     gr.get_redcap()
     rc_dict = gr.clean_redcap
 
-    gr.get_redcap(["bdi_day2", "bdi_day3"])
+    gr.get_redcap(survey_list=["bdi_day2", "bdi_day3"])
     rc_bdi_dict = gr.clean_redcap
 
     """
@@ -80,7 +80,7 @@ class GetRedcap(survey_clean.CleanRedcap):
         pilot_list = report_helper.pilot_list()
         super().__init__(self._proj_dir, pilot_list)
 
-        #
+        # Start mysql connection
         db_con = sql_database.DbConnect()
         self._up_mysql = sql_database.MysqlUpdate(db_con)
 
@@ -232,7 +232,7 @@ class GetQualtrics(survey_clean.CleanQualtrics):
     gq.get_qualtrics()
     q_dict = gq.clean_qualtrics
 
-    gq.get_qualtrics(["EmoRep_Session_1"])
+    gq.get_qualtrics(survey_list=["EmoRep_Session_1"])
     q_s1_dict = gq.clean_qualtrics
 
     """
@@ -246,7 +246,7 @@ class GetQualtrics(survey_clean.CleanQualtrics):
         withdrew_list = [x for x in part_comp.all.keys()]
         super().__init__(self._proj_dir, pilot_list, withdrew_list)
 
-        #
+        # Start mysql server connection
         db_con = sql_database.DbConnect()
         self._up_mysql = sql_database.MysqlUpdate(db_con)
 

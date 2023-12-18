@@ -15,6 +15,7 @@ from string import punctuation
 from make_reports.resources import report_helper
 import importlib.resources as pkg_resources
 from make_reports import reference_files
+from make_reports.resources import sql_database
 
 
 class CleanRedcap:
@@ -396,6 +397,13 @@ class CleanRedcap:
         self.df_pilot = df_raw.loc[idx_pilot]
         self.df_study = df_raw.loc[idx_study]
         self._res_idx()
+
+        # Update db_emorep.ref_subj for enrolled study subjs
+        db_con = sql_database.DbConnect()
+        up_mysql = sql_database.MysqlUpdate(db_con)
+        df_sql = self.df_study.copy()
+        df_sql = df_sql.rename(columns={"record_id": "subj_id"})
+        up_mysql.update_ref_subj(df_sql)
 
     def clean_bdi_day23(self, df_raw):
         """Cleaning method for RedCap BDI surveys.

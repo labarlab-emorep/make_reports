@@ -112,6 +112,11 @@ class _DbUpdateRecipes:
     ):
         """Update mysql db_emorep.ref_subj."""
         print("\tUpdating db_emorep.ref_subj ...")
+        for chk_col in ["subj_id", subj_col]:
+            if chk_col not in df.columns:
+                raise KeyError(
+                    f"Expected col {chk_col} in df, found : {df.columns}"
+                )
         tbl_input = list(
             df[["subj_id", subj_col]].itertuples(index=False, name=None)
         )
