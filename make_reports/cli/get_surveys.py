@@ -6,6 +6,8 @@ responses. Clean dataframes, and write raw and clean dataframes to
 
 Notes
 -----
+* requires global variable 'SQL_PASS' in user environment, which holds
+    user password to mysql db_emorep database.
 * --get-redcap requires global variable 'PAT_REDCAP_EMOREP' in user
     env, which holds the personal access token to the emorep REDCap database.
 * --get-qulatrics requires global variable 'PAT_QUALTRICS_EMOREP' in
@@ -17,7 +19,8 @@ Example
 rep_get \
     --get-redcap \
     --get-qualtrics \
-    --get-rest
+    --get-rest \
+    --get-task
 
 """
 import sys
@@ -48,6 +51,11 @@ def _get_args():
         help="Clean and aggregate resting state ratings",
     )
     parser.add_argument(
+        "--get-task",
+        action="store_true",
+        help="Clean and aggregate task ratings",
+    )
+    parser.add_argument(
         "--proj-dir",
         type=str,
         default="/mnt/keoki/experiments2/EmoRep/Exp2_Compute_Emotion",
@@ -74,8 +82,10 @@ def main():
     manage_redcap = args.get_redcap
     manage_qualtrics = args.get_qualtrics
     manage_rest = args.get_rest
+    manage_task = args.get_task
 
     # Check for required tokens
+    report_helper.check_sql_pass()
     if manage_redcap:
         report_helper.check_redcap_pat()
     if manage_qualtrics:
@@ -92,6 +102,10 @@ def main():
     if manage_qualtrics:
         dl_clean_qualtrics = manage_data.GetQualtrics(proj_dir)
         dl_clean_qualtrics.get_qualtrics()
+
+    if manage_task:
+        dl_clean_task = manage_data.GetTask(proj_dir)
+        dl_clean_task.get_task()
 
 
 if __name__ == "__main__":

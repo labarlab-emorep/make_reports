@@ -5,9 +5,12 @@ resting task data from the scanner. Split omnibus dataframes into
 survey-specific dataframes, clean, and organize according
 to the EmoRep scheme.
 
-GetRedcap : download, clean, write, and return RedCap report data
-GetQualtrics : download, clean, write, and return Qualtrics survey data
-GetRest : aggregate, clean, write, and return rest rating responses
+Mysql database db_emorep is also updated with participant responses.
+
+GetRedcap : download, clean, and write RedCap report data
+GetQualtrics : download, clean, and write Qualtrics survey data
+GetRest : aggregate, clean, and write rest rating responses (rest_ratings)
+GetTask : aggregate and write emorep task responses (in_scan_ratings)
 
 """
 # %%
@@ -40,6 +43,7 @@ class GetRedcap(survey_clean.CleanRedcap):
 
     Download RedCap data and coordinate cleaning methods. Write both
     raw and cleaned dataframes to disk, except for reports containing PHI.
+    Update mysql db_emorep.
 
     Parameters
     ----------
@@ -112,6 +116,7 @@ class GetRedcap(survey_clean.CleanRedcap):
 
         Coordinate RedCap survey download, then match survey to cleaning
         method. Write certain raw and cleaned dataframes to disk.
+        Update mysql db_emorep.
 
         Parameters
         ----------
@@ -201,7 +206,7 @@ class GetQualtrics(survey_clean.CleanQualtrics):
     Inherits survey_clean.CleanQualtrics.
 
     Download Qualtrics data and coordinate cleaning methods. Write both
-    raw and cleaned dataframes to disk.
+    raw and cleaned dataframes to disk. Update mysql db_emorep.
 
     Parameters
     ----------
@@ -274,7 +279,8 @@ class GetQualtrics(survey_clean.CleanQualtrics):
         """Get and clean Qualtrics survey info.
 
         Coordinate Qualtrics survey download, then match survey to cleaning
-        method. Write raw and cleaned dataframes to disk.
+        method. Write raw and cleaned dataframes to disk. Update mysql
+        db_emorep.
 
         Parameters
         ----------
@@ -357,6 +363,8 @@ class GetQualtrics(survey_clean.CleanQualtrics):
 
 class GetRest:
     """Aggregate rest-rating survey responses.
+
+    Writes cleaned dataframe to disk. Updates mysql db_emorep.
 
     Parameters
     ----------
@@ -444,12 +452,31 @@ class GetRest:
 
 # %%
 class GetTask:
-    """Title.
+    """Aggregate in-scanner task responses from BIDS events files.
+
+    Writes cleaned dataframe to disk. Updates mysql db_emorep.
+
+    Parameters
+    ----------
+    proj_dir : str, os.PathLike
+        Location of project parent directory
 
     Attributes
     ----------
     clean_task : dict
-        {study: visit: {"emorep_task": pd.DataFrame}}
+        All cleaned task responses
+        {study: visit: {"in_scan_task": pd.DataFrame}}
+
+    Methods
+    -------
+    get_task()
+        Get and clean in-scanner task responses
+
+    Example
+    -------
+    gt = GetTask(*args)
+    gt.get_task()
+    task_dict = gt.clean_task
 
     """
 
@@ -458,15 +485,34 @@ class GetTask:
         self._proj_dir = proj_dir
 
     def get_task(self):
-        """Title."""
+        """Coordinate finding and cleaning task responses.
+
+        Data are written to disk, used to update mysql db_emorep,
+        and available on clean_task attr.
+
+        Attributes
+        ----------
+        clean_task : dict
+            {study: visit: {"in_scan_task": pd.DataFrame}}
+
+        """
         # Start DbConnect here to avoid pickle issue
         db_con = sql_database.DbConnect()
         up_mysql = sql_database.MysqlUpdate(db_con)
 
+        # Aggregate data
         print("Aggregating in-scanner task responses ...")
+        self.clean_task = {"study": {}}
         self._build_df()
+
+        # Build clean_task attr
         for sess in ["day2", "day3"]:
             df_sess = self._df_all[self._df_all["visit"] == sess]
+            self.clean_task["study"][f"visit_{sess}"] = {
+                "in_scan_task": df_sess
+            }
+
+            # Write out and update database
             out_path = os.path.join(
                 self._proj_dir,
                 f"data_survey/visit_{sess}",
@@ -474,11 +520,15 @@ class GetTask:
             )
             _write_dfs(df_sess, out_path)
             up_mysql.update_db(
-                df_sess, "in_scan_ratings", int(sess[-1]), "in_scan_ratings"
+                df_sess.copy(),
+                "in_scan_ratings",
+                int(sess[-1]),
+                "in_scan_ratings",
             )
 
     def _build_df(self):
-        """Title."""
+        """Build attr df_all from rawdata events files."""
+        # Find all events files
         mri_rawdata = os.path.join(
             self._proj_dir, "data_scanner_BIDS", "rawdata"
         )
@@ -490,29 +540,28 @@ class GetTask:
                 f"Expected to find BIDS events files in : {mri_rawdata}"
             )
 
-        #
+        # Load (in parallel) all dfs, build df_all, trigger cleaning
         events_dfs = Pool().starmap(
             self._load_event, [(event_path,) for event_path in events_all]
         )
         self._df_all = pd.concat(events_dfs, axis=0, ignore_index=True)
         self._clean_df()
 
-    def _load_event(self, event_path) -> pd.DataFrame:
-        """Title."""
-        #
+    def _load_event(self, event_path: Union[str, os.PathLike]) -> pd.DataFrame:
+        """Return organized pd.DataFrame of events file."""
         print(f"\tLoading {os.path.basename(event_path)} ...")
         subj, sess, task, run, _ = os.path.basename(event_path).split("_")
         df = pd.read_csv(event_path, sep="\t")
+
+        # Add columns for keeping subj, sess straight
         df["subj"] = subj.split("-")[-1]
         df["sess"] = sess.split("-")[-1]
         df["task"] = task.split("-")[-1]
-
-        #
         df["run"] = int(run[-1])
         return df
 
     def _clean_df(self):
-        """Title."""
+        """Tidy-format attr df_all."""
         print("\tCleaning dataframe ...")
         # Get participant responses
         self._df_all = self._df_all.loc[

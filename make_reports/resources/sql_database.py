@@ -11,6 +11,7 @@ import numpy as np
 from typing import Type
 import mysql.connector
 from contextlib import contextmanager
+from make_reports.resources import report_helper
 
 
 # %%
@@ -40,15 +41,7 @@ class DbConnect:
 
     def __init__(self):
         """Set db_con attr as mysql connection."""
-        # Check for user password
-        try:
-            os.environ["SQL_PASS"]
-        except KeyError as e:
-            raise Exception(
-                "No global variable 'SQL_PASS' defined in user env"
-            ) from e
-
-        # Connect to server
+        report_helper.check_sql_pass()
         self.db_con = mysql.connector.connect(
             host="localhost",
             user=os.environ["USER"],

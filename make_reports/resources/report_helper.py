@@ -1,6 +1,9 @@
 """Supporting functions for making reports.
 
 drop_participant : drop participant from dataframe
+check_redcap_pat : check for redcap token
+check_qualtrics_pat : check for qualtrics token
+check_sql_pass : check for mysql db_emorep password
 pull_redcap_data : download survey data from REDCAP
 pull_qualtrics_data : download survey data from Qualtrics
 mine_template : extract values from NDA templates
@@ -75,6 +78,16 @@ def check_qualtrics_pat():
     except KeyError as e:
         raise Exception(
             "No global variable 'PAT_QUALTRICS_EMOREP' defined in user env"
+        ) from e
+
+
+def check_sql_pass():
+    """Check if SQL_PASS exists in env."""
+    try:
+        os.environ["SQL_PASS"]
+    except KeyError as e:
+        raise Exception(
+            "No global variable 'SQL_PASS' defined in user env"
         ) from e
 
 
