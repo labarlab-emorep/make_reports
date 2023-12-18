@@ -1,8 +1,7 @@
 """Title.
 
 DbConnect :
-update_qualtrics :
-update_redcap :
+MysqlUpdate
 
 """
 # %%
@@ -187,6 +186,31 @@ class _DbUpdateRecipes:
             tbl_input,
         )
 
+    def update_in_scan_ratings(self, df, sur_low):
+        """Title."""
+        #
+        print(f"\tUpdating db_emorep.tbl_{sur_low} ...")
+        tbl_input = list(
+            df[
+                [
+                    "subj_id",
+                    "sess_id",
+                    "task_id",
+                    "run",
+                    "block_id",
+                    "resp_emo_id",
+                    "resp_intensity",
+                ]
+            ].itertuples(index=False, name=None)
+        )
+        self._db_con.exec_many(
+            f"insert ignore into tbl_{sur_low} "
+            + "(subj_id, sess_id, task_id, run, block_id, "
+            + "resp_emo_id, resp_intensity) "
+            + "values (%s, %s, %s, %s, %s, %s, %s)",
+            tbl_input,
+        )
+
 
 # %%
 class _TaskMaps:
@@ -319,7 +343,12 @@ class MysqlUpdate(_DbUpdateRecipes, _DfManip, _TaskMaps):
         """Title."""
         if not isinstance(sess_id, int):
             raise TypeError("Expected type int for sess_id parameter")
-        if data_source not in ["qualtrics", "redcap", "rest_ratings"]:
+        if data_source not in [
+            "qualtrics",
+            "redcap",
+            "rest_ratings",
+            "in_scan_ratings",
+        ]:
             raise ValueError("Unexpected data_source parameter")
         if subj_col not in df.columns:
             raise KeyError(f"Column '{subj_col}' not found in df")
@@ -409,12 +438,26 @@ class MysqlUpdate(_DbUpdateRecipes, _DfManip, _TaskMaps):
         df_tidy["resp_alpha"] = df_tidy["resp_alpha"].astype(str)
         self.update_rest_ratings(df_tidy, self._sur_low)
 
+    def _update_in_scan_ratings(self):
+        """Title."""
+        # No survey date due to BIDS format of events files
+        self._df["task_id"] = self._df.apply(
+            lambda x: self.task_label(x, "task"), axis=1
+        )
+        self._df["block_id"] = self._df.apply(
+            lambda x: self.emo_label(x, "block"), axis=1
+        )
 
-class UpdateTask:
-    """Title."""
-
-    def __init__(self):
-        pass
+        #
+        self._df["resp_emo_id"] = self._df.apply(
+            lambda x: self.emo_label(x, "resp_emotion"), axis=1
+        )
+        self._df["resp_emo_id"] = self._df["resp_emo_id"].replace(np.nan, "")
+        self._df["resp_intensity"] = self._df["resp_intensity"].astype(str)
+        self._df["resp_intensity"] = self._df["resp_intensity"].replace(
+            "<NA>", ""
+        )
+        self.update_in_scan_ratings(self._df, self._sur_low)
 
 
 # %%

@@ -15,6 +15,7 @@ import os
 import glob
 from typing import Union, Tuple
 import pandas as pd
+import numpy as np
 from multiprocessing import Pool
 from make_reports.resources import survey_download
 from make_reports.resources import survey_clean
@@ -458,15 +459,26 @@ class GetTask:
 
     def get_task(self):
         """Title."""
-
-        #
-        self._build_df()
+        # Start DbConnect here to avoid pickle issue
         db_con = sql_database.DbConnect()
-        self._up_mysql = sql_database.MysqlUpdate(db_con)
+        up_mysql = sql_database.MysqlUpdate(db_con)
+
+        print("Aggregating in-scanner task responses ...")
+        self._build_df()
+        for sess in ["day2", "day3"]:
+            df_sess = self._df_all[self._df_all["visit"] == sess]
+            out_path = os.path.join(
+                self._proj_dir,
+                f"data_survey/visit_{sess}",
+                "df_in_scan_ratings.csv",
+            )
+            _write_dfs(df_sess, out_path)
+            up_mysql.update_db(
+                df_sess, "in_scan_ratings", int(sess[-1]), "in_scan_ratings"
+            )
 
     def _build_df(self):
         """Title."""
-        print("Finding all project events.tsv ...")
         mri_rawdata = os.path.join(
             self._proj_dir, "data_scanner_BIDS", "rawdata"
         )
@@ -485,12 +497,10 @@ class GetTask:
         self._df_all = pd.concat(events_dfs, axis=0, ignore_index=True)
         self._clean_df()
 
-        #
-
     def _load_event(self, event_path) -> pd.DataFrame:
         """Title."""
         #
-        print(f"Loading {os.path.basename(event_path)} ...")
+        print(f"\tLoading {os.path.basename(event_path)} ...")
         subj, sess, task, run, _ = os.path.basename(event_path).split("_")
         df = pd.read_csv(event_path, sep="\t")
         df["subj"] = subj.split("-")[-1]
@@ -500,10 +510,10 @@ class GetTask:
         #
         df["run"] = int(run[-1])
         return df
-        # self._df_all = pd.concat([self._df_all, df], ignore_index=True)
 
     def _clean_df(self):
         """Title."""
+        print("\tCleaning dataframe ...")
         # Get participant responses
         self._df_all = self._df_all.loc[
             self._df_all["trial_type"].isin(
@@ -520,4 +530,37 @@ class GetTask:
         ].reset_index(drop=True)
         self._df_all = self._df_all.drop(
             ["onset", "duration", "accuracy", "stim_info"], axis=1
+        )
+        self._df_all = self._df_all.drop("response_time", axis=1)
+
+        # Tidy format with resp_emotion, resp_intensity cols
+        self._df_all = self._df_all.rename(columns={"emotion": "block"})
+        self._df_all = self._df_all.pivot(
+            index=[
+                "subj",
+                "sess",
+                "task",
+                "run",
+                "block",
+            ],
+            columns=["trial_type"],
+            values="response",
+        ).reset_index()
+        self._df_all = self._df_all.rename(
+            columns={
+                "emotion": "resp_emotion",
+                "intensity": "resp_intensity",
+            }
+        )
+
+        # Update column names, types
+        self._df_all = self._df_all.rename(
+            columns={"subj": "study_id", "sess": "visit"}
+        )
+        self._df_all["resp_emotion"] = self._df_all["resp_emotion"].str.lower()
+        self._df_all["resp_intensity"] = self._df_all[
+            "resp_intensity"
+        ].replace("NONE", np.nan)
+        self._df_all["resp_intensity"] = self._df_all["resp_intensity"].astype(
+            "Int64"
         )
