@@ -8,16 +8,15 @@ Reports are written to:
 
 Previous submissions can also be generated via --query-date.
 
+Notes
+-----
+Requires global variable 'PAT_REDCAP_EMOREP' in user env, which
+holds the personal access token to the emorep REDCap database.
+
 Examples
 --------
-rep_regular \
-    -t $PAT_REDCAP_EMOREP \
-    --names nih4 nih12 duke3
-
-rep_regular \
-    -t $PAT_REDCAP_EMOREP \
-    --names nih4 \
-    --query-date 2022-06-29
+rep_regular --names nih4 nih12 duke3
+rep_regular --names nih4 --query-date 2022-06-29
 
 """
 import sys
@@ -25,6 +24,7 @@ import textwrap
 from datetime import date
 from argparse import ArgumentParser, RawTextHelpFormatter
 from make_reports.workflows import required_reports
+from make_reports.resources import report_helper
 
 
 def _get_args():
@@ -76,13 +76,6 @@ def _get_args():
             """
         ),
     )
-    required_args.add_argument(
-        "-t",
-        "--redcap-token",
-        type=str,
-        default=None,
-        help="API token for RedCap project",
-    )
 
     if len(sys.argv) <= 1:
         parser.print_help(sys.stderr)
@@ -97,10 +90,10 @@ def main():
     regular_reports = args.names
     proj_dir = args.proj_dir
     query_date = args.query_date
-    redcap_token = args.redcap_token
 
+    report_helper.check_redcap_pat()
     required_reports.make_regular_reports(
-        regular_reports, query_date, proj_dir, redcap_token
+        regular_reports, query_date, proj_dir
     )
 
 

@@ -29,8 +29,6 @@ class DemoAll(manage_data.GetRedcap):
     ----------
     proj_dir : str, os.PathLike
         Project's parent directory
-    redcap_token : str
-        Personal access token for RedCap
 
     Attributes
     ----------
@@ -49,7 +47,7 @@ class DemoAll(manage_data.GetRedcap):
 
     Example
     -------
-    get_demo = DemoAll("/path/to/proj", "token")
+    get_demo = DemoAll("/path/to/proj")
     df_demo_all = get_demo.final_demo
 
     get_demo.remove_withdrawn()
@@ -58,10 +56,10 @@ class DemoAll(manage_data.GetRedcap):
 
     """
 
-    def __init__(self, proj_dir, redcap_token):
+    def __init__(self, proj_dir):
         """Initialize, build final_demo."""
         print("Initializing DemoAll")
-        super().__init__(proj_dir, redcap_token)
+        super().__init__(proj_dir)
         self._get_demo()
 
         # Generate final_demo
@@ -308,8 +306,6 @@ class ManagerRegular(DemoAll):
         Date for finding report range
     proj_dir : str, os.PathLike
         Project's experiment directory
-    redcap_token : str
-        Personal access token for RedCap
 
     Attributes
     ----------
@@ -339,9 +335,9 @@ class ManagerRegular(DemoAll):
 
     """
 
-    def __init__(self, query_date, proj_dir, redcap_token):
+    def __init__(self, query_date, proj_dir):
         """Generate requested report."""
-        super().__init__(proj_dir, redcap_token)
+        super().__init__(proj_dir)
         self._query_date = query_date
 
     def make_report(self, report):
@@ -693,8 +689,6 @@ class GenerateGuids(manage_data.GetRedcap):
         NDA user name
     user_pass : str
         NDA user password
-    redcap_token : str
-        Personal access token for RedCap
 
     Attributes
     ----------
@@ -713,9 +707,9 @@ class GenerateGuids(manage_data.GetRedcap):
 
     """
 
-    def __init__(self, proj_dir, user_pass, user_name, redcap_token):
+    def __init__(self, proj_dir, user_pass, user_name):
         """Setup instance and compile demographic information."""
-        super().__init__(proj_dir, redcap_token)
+        super().__init__(proj_dir)
         self._user_name = user_name
         self._user_pass = user_pass
         self._get_demo()

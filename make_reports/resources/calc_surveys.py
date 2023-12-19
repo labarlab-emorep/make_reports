@@ -15,7 +15,6 @@ EmorepTask : generate stats, plots emorep task
 """
 # %%
 import os
-import glob
 from typing import Tuple
 import pandas as pd
 from pandas.api.types import is_numeric_dtype, is_string_dtype
@@ -29,11 +28,12 @@ from make_reports.resources import manage_data
 class _DescStat:
     """Supply statistic and plotting methods.
 
-    Intended to be inherited, references attrs set by child:
-        - df : pd.DataFrame
-            Wide- or long-formatted survey dataframe
-        - col_data : list
-            List of df columns containing numeric type data
+    Parameters
+    ----------
+    df : pd.DataFrame
+        Wide- or long-formatted survey dataframe
+    col_data : list, optional
+        List of df columns containing numeric type data
 
     Methods
     -------
@@ -58,6 +58,19 @@ class _DescStat:
         Generate and write a boxplot of row totals
 
     """
+
+    def __init__(self, df, col_data=None):
+        """Initialize."""
+        self.df = df
+        self.col_data = col_data
+
+    def _valid_cols(self):
+        """Validate supplied cols in df."""
+        if not hasattr(self, "col_data"):
+            raise AttributeError("Missing required col_data attr.")
+        for col in self.col_data:
+            if col not in self.df.columns:
+                raise KeyError(f"Missing expected column in df : {col}")
 
     def calc_row_stats(self):
         """Calculate descriptive stats for dataframe rows.
@@ -88,11 +101,7 @@ class _DescStat:
 
         """
         # Validate attrs
-        if not hasattr(self, "col_data"):
-            raise AttributeError("Missing required col_data attr.")
-        for col in self.col_data:
-            if col not in self.df.columns:
-                raise KeyError(f"Missing expected column in df : {col}")
+        self._valid_cols()
 
         # Total row values, avoid editing original df
         df_calc = self.df.copy()
@@ -135,9 +144,7 @@ class _DescStat:
 
         Example
         -------
-        stat_obj = _DescStat(
-            pd.DataFrame, col_data=["col_a", "col_b", "col_c"]
-        )
+        stat_obj = _DescStat(pd.DataFrame)
         stat_dict = stat_obj.calc_factor_stats("visit", "Visit 2", "Visit 3")
 
         """
@@ -179,6 +186,7 @@ class _DescStat:
 
         """
         # Get needed data and setup dataframe
+        self._valid_cols()
         stat_dict = self.calc_row_stats()
         df_plot = self.df.copy()
         df_plot["total"] = df_plot[self.col_data].sum(axis=1)
@@ -200,7 +208,7 @@ class _DescStat:
         plt.title(main_title)
 
         # Write and close plot
-        plt.savefig(out_path)
+        plt.savefig(out_path, dpi=300)
         plt.close()
         print(f"\t\tDrew boxplot : {out_path}")
 
@@ -238,6 +246,7 @@ class _DescStat:
 
         """
         # Get needed data and setup dataframes
+        self._valid_cols()
         stat_dict = self.calc_factor_stats(fac_col, fac_a, fac_b)
         df_plot = self.df.copy()
         df_plot["total"] = df_plot[self.col_data].sum(axis=1)
@@ -267,7 +276,7 @@ class _DescStat:
         plt.title(main_title)
 
         # Write and close
-        plt.savefig(out_path)
+        plt.savefig(out_path, dpi=300)
         print(f"\t\tDrew boxplot : {out_path}")
         plt.close()
 
@@ -409,7 +418,7 @@ class _DescStat:
         plt.xlabel(x_lab)
         plt.xticks(rotation=45, ha="right")
         plt.title(main_title)
-        plt.savefig(out_path, bbox_inches="tight")
+        plt.savefig(out_path, bbox_inches="tight", dpi=300)
         print(f"\t\tDrew boxplot : {out_path}")
         plt.close()
 
@@ -544,8 +553,8 @@ class _DescStat:
         # Draw and write
         ax = sns.heatmap(df_conf)
         ax.set(xlabel=x_lab, ylabel=y_lab)
-        ax.set_title(main_title)
-        plt.savefig(out_path, bbox_inches="tight")
+        ax.set_title(main_title, weight="bold", fontsize=15)
+        plt.savefig(out_path, bbox_inches="tight", dpi=300)
         print(f"\t\tDrew heatmap plot : {out_path}")
         plt.close()
 
@@ -595,7 +604,8 @@ class Visit1Stats(_DescStat):
                 f"Expected dataframe column name that contains {survey_name}"
             )
         self.df = df
-        self.col_data = self._prep_df(survey_name)
+        col_data = self._prep_df(survey_name)
+        super().__init__(df, col_data=col_data)
 
     def _prep_df(self, survey_name: str) -> list:
         """Prep df for analyses, return relevant column names."""
@@ -673,8 +683,8 @@ class Visit23Stats(_DescStat):
             raise ValueError("Dataframes do not have identical column names.")
 
         # Make single df
-        self.df = pd.concat([df_day2_clean, df_day3_clean], ignore_index=True)
-        self.col_data = col_day2
+        df = pd.concat([df_day2_clean, df_day3_clean], ignore_index=True)
+        super().__init__(df, col_data=col_day2)
 
     def _make_df(
         self, df: pd.DataFrame, survey_name: str, fac: str, fac_col: str
@@ -736,7 +746,8 @@ class RestRatings(manage_data.GetRest, _DescStat):
         """
         super().__init__(proj_dir)
         self.get_rest()
-        self.df = self._make_df()
+        df = self._make_df()
+        _DescStat.__init__(self, df)
 
     def _make_df(self) -> pd.DataFrame:
         """Construct dataframe from clean visit 2, 3 data."""
@@ -754,7 +765,7 @@ class RestRatings(manage_data.GetRest, _DescStat):
             by=["study_id", "visit", "resp_type"]
         ).reset_index(drop=True)
         df_rest_all["task"] = df_rest_all["task"].str.title()
-        df_rest_all["task"] = df_rest_all["task"].replace("Movies", "Videos")
+        # df_rest_all["task"] = df_rest_all["task"].replace("Movies", "Videos")
 
         # Subset df for integer responses
         df_rest_int = df_rest_all[
@@ -836,8 +847,8 @@ class StimRatings(_DescStat):
     Example
     -------
     stim_stats = StimRatings("/path/to/project/dir", True)
-    stim_stats.endorsement("Videos")
-    stim_stats.arousal_valence("Videos")
+    stim_stats.endorsement("Movies")
+    stim_stats.arousal_valence("Movies")
 
     """
 
@@ -864,6 +875,7 @@ class StimRatings(_DescStat):
 
         # Trigger dataframe construction, initialize helper
         self.df, self._emo_list = self._get_data(df_day2, df_day3)
+        super().__init__(self.df)
 
     def _get_data(
         self, df_day2: pd.DataFrame, df_day3: pd.DataFrame
@@ -891,7 +903,7 @@ class StimRatings(_DescStat):
         Parameters
         ----------
         stim_type : str
-            [Videos | Scenarios]
+            [Movies | Scenarios]
             Stimulus modality of session
 
         Returns
@@ -906,7 +918,7 @@ class StimRatings(_DescStat):
             Unexpected stimulus type
 
         """
-        if stim_type not in ["Videos", "Scenarios"]:
+        if stim_type not in ["Movies", "Scenarios"]:
             raise ValueError(f"Unexpected stimulus type : {stim_type}")
         print(f"\tGenerating descriptives of endorsement for : {stim_type}")
 
@@ -940,7 +952,7 @@ class StimRatings(_DescStat):
             )
             self.confusion_heatmap(
                 df_prop,
-                main_title=f"Post-Scan {stim_type[:-1]} "
+                main_title=f"Post-Scan {stim_type} "
                 + "Endorsement Proportion",
                 out_path=out_plot,
             )
@@ -956,7 +968,7 @@ class StimRatings(_DescStat):
         Parameters
         ----------
         stim_type : str
-            [Videos | Scenarios]
+            [Movies | Scenarios]
             Stimulus modality of task
 
         Returns
@@ -973,7 +985,7 @@ class StimRatings(_DescStat):
 
         """
         # Validate
-        if stim_type not in ["Videos", "Scenarios"]:
+        if stim_type not in ["Movies", "Scenarios"]:
             raise ValueError(f"Unexpected stimulus type : {stim_type}")
 
         # Get relevant data
@@ -1007,7 +1019,7 @@ class StimRatings(_DescStat):
                 y_lab="Rating",
                 hue_order=["Arousal", "Valence"],
                 hue_col="prompt",
-                main_title=f"Post-Scan {stim_type[:-1]} Ratings",
+                main_title=f"Post-Scan {stim_type} Ratings",
                 out_path=out_plot,
             )
         self.df = df_all.copy()
@@ -1047,7 +1059,7 @@ class EmorepTask(_DescStat):
     -------
     stim_stats = EmorepTask("/path/to/project/dir", True)
     stim_stats.select_intensity()
-    stim_stats.select_emotion("Videos")
+    stim_stats.select_emotion("Movies")
 
     """
 
@@ -1076,69 +1088,18 @@ class EmorepTask(_DescStat):
         self._draw_plot = draw_plot
         self.out_dir = os.path.join(proj_dir, "analyses/metrics_surveys")
 
-        # Find all events files, make and initialize dataframe
-        mri_rawdata = os.path.join(proj_dir, "data_scanner_BIDS", "rawdata")
-        events_all = sorted(
-            glob.glob(f"{mri_rawdata}/**/*_events.tsv", recursive=True)
-        )
-        if not events_all:
-            raise ValueError(
-                f"Expected to find BIDS events files in : {mri_rawdata}"
-            )
-        self.df = self._get_data(events_all)
+        # Get and organize cleaned data
+        gt = manage_data.GetTask(proj_dir)
+        gt.get_task()
+        df_day2 = gt.clean_task["study"]["visit_day2"]["in_scan_task"]
+        df_day3 = gt.clean_task["study"]["visit_day3"]["in_scan_task"]
+        self.df = pd.concat([df_day2, df_day3], axis=0, ignore_index=True)
+        self.df["task"] = self.df["task"].str.title()
+        self.df["block"] = self.df["block"].str.title()
+        self.df["resp_emotion"] = self.df["resp_emotion"].str.title()
 
-    def _get_data(self, events_all: list) -> pd.DataFrame:
-        """Combine all events files into dataframe."""
-        print("\tBuilding dataframe of all participant events.tsv")
-        df_all = pd.DataFrame(
-            columns=[
-                "onset",
-                "duration",
-                "trial_type",
-                "stim_info",
-                "response",
-                "response_time",
-                "accuracy",
-                "emotion",
-                "subj",
-                "sess",
-                "task",
-                "run",
-            ]
-        )
-        for event_path in events_all:
-            subj, sess, task, run, _ = os.path.basename(event_path).split("_")
-            df = pd.read_csv(event_path, sep="\t")
-            df["subj"] = subj.split("-")[-1]
-            df["sess"] = sess.split("-")[-1]
-            df["task"] = task.split("-")[-1]
-            df["run"] = int(run[-1])
-            df_all = pd.concat([df_all, df], ignore_index=True)
-            del df
-
-        # Extract participant response rows
-        df_resp = df_all.loc[
-            df_all["trial_type"].isin(
-                ["movie", "scenario", "emotion", "intensity"]
-            )
-        ].reset_index(drop=True)
-        del df_all
-
-        # Organize dataframe
-        df_resp["emotion"] = df_resp["emotion"].fillna(method="ffill")
-        df_resp = df_resp.loc[
-            ~df_resp["trial_type"].isin(["movie", "scenario"])
-        ].reset_index(drop=True)
-        df_resp = df_resp.drop(
-            ["onset", "duration", "accuracy", "stim_info"], axis=1
-        )
-
-        # Clean up column values and types
-        df_resp["emotion"] = df_resp["emotion"].str.title()
-        df_resp["task"] = df_resp["task"].str.title()
-        df_resp["task"] = df_resp["task"].replace("Movies", "Videos")
-        df_resp["run"] = df_resp["run"].astype("Int64")
-        return df_resp
+        # Initialize stat helper
+        super().__init__(self.df)
 
     def select_intensity(self):
         """Generate descriptive stats and plots for intensity selection.
@@ -1154,23 +1115,16 @@ class EmorepTask(_DescStat):
         """
         # Subset dataframe for intensity selection
         df_all = self.df.copy()
-        df_int = df_all.loc[df_all["trial_type"] == "intensity"].copy()
-        df_int["response"] = df_int["response"].replace("NONE", np.nan)
-        df_int = df_int.reset_index(drop=True)
-        df_int = df_int.drop(
-            ["response_time", "run", "trial_type", "sess"], axis=1
-        )
+        df_int = df_all.drop(["visit", "run", "resp_emotion"], axis=1)
 
         # Organize dataframe for _DescStat.calc_long_stats
-        df_int["task"] = df_int["task"].str.title()
-        df_int["response"] = df_int["response"].astype("Int64")
-        for str_col in ["emotion", "task"]:
+        for str_col in ["task", "block"]:
             df_int[str_col] = df_int[str_col].astype(pd.StringDtype())
-        df_int = df_int.sort_values(by=["subj", "emotion", "task"])
+        df_int = df_int.sort_values(by=["study_id", "block", "task"])
 
         # Calculate and write stats
         self.df = df_int
-        df_stats = self.calc_long_stats(grp_a="task", grp_b="emotion")
+        df_stats = self.calc_long_stats("task", "block")
         out_csv = os.path.join(self.out_dir, "table_task-intensity.csv")
         df_stats.to_csv(out_csv)
         print(f"\tWrote csv : {out_csv}")
@@ -1182,11 +1136,11 @@ class EmorepTask(_DescStat):
                 "plot_task-intensity_boxplot-long.png",
             )
             self.draw_long_boxplot(
-                x_col="emotion",
+                x_col="block",
                 x_lab="Emotion",
-                y_col="response",
+                y_col="resp_intensity",
                 y_lab="Intensity",
-                hue_order=["Scenarios", "Videos"],
+                hue_order=["Scenarios", "Movies"],
                 hue_col="task",
                 main_title="In-Scan Stimulus Ratings",
                 out_path=out_plot,
@@ -1203,7 +1157,7 @@ class EmorepTask(_DescStat):
         Parameters
         ----------
         task : str
-            [Videos | Scenarios]
+            [Movies | Scenarios]
             Stimulus modality of task
 
         Returns
@@ -1218,24 +1172,23 @@ class EmorepTask(_DescStat):
             Unexpected input parameter
 
         """
-        if task not in ["Videos", "Scenarios"]:
+        if task not in ["Movies", "Scenarios"]:
             raise ValueError(f"Unexpected task value : {task}")
 
         # Subset dataframe for emotion selection
         df_all = self.df.copy()
-        df_emo = df_all.loc[
-            (df_all["trial_type"] == "emotion") & (df_all["task"] == task)
-        ].copy()
-        df_emo["response"] = df_emo["response"].str.title()
-        df_emo = df_emo.reset_index(drop=True)
+        df_emo = df_all.loc[df_all["task"] == task].copy()
+        df_emo = df_emo.drop(["resp_intensity", "visit"], axis=1)
 
         # Determine emotions
-        emo_all = df_emo["emotion"].unique().tolist()
+        emo_all = df_emo["block"].unique().tolist()
         emo_all.sort()
 
         # Calculate confusion matrix, write out
         self.df = df_emo
-        df_prop, df_count = self.confusion_matrix(emo_all, "subj", 2)
+        df_prop, df_count = self.confusion_matrix(
+            emo_all, "study_id", 2, emo_col="block", resp_col="resp_emotion"
+        )
         out_prop = os.path.join(
             self.out_dir,
             f"table_task-emotion_endorsement-prop_{task.lower()}.csv",
@@ -1254,7 +1207,7 @@ class EmorepTask(_DescStat):
             )
             self.confusion_heatmap(
                 df_count,
-                main_title=f"In-Scan {task[:-1]} Endorsement Proportion",
+                main_title=f"In-Scan {task} Endorsement Proportion",
                 out_path=out_plot,
             )
         self.df = df_all.copy()

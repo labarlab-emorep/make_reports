@@ -36,8 +36,6 @@ class _CalcProp(build_reports.DemoAll):
     ----------
     proj_dir : str, os.PathLike
         Project's experiment directory
-    redcap_token : str
-        API token for RedCap project
 
     Attributes
     ----------
@@ -55,10 +53,10 @@ class _CalcProp(build_reports.DemoAll):
 
     """
 
-    def __init__(self, proj_dir, redcap_token):
+    def __init__(self, proj_dir):
         """Initialize."""
         print("\tInitializing _CalcProp")
-        super().__init__(proj_dir, redcap_token)
+        super().__init__(proj_dir)
         self.remove_withdrawn()
         self._total_rec = self.final_demo.shape[0]
         self._planned_demo()
@@ -198,7 +196,7 @@ class _CalcProp(build_reports.DemoAll):
 
 
 # %%
-def demographics(proj_dir, redcap_token, plot_var="Count", ref_num=170):
+def demographics(proj_dir, plot_var="Count", ref_num=170):
     """Check on demographic recruitment.
 
     Currently only supports a subset of total planned demographics.
@@ -213,8 +211,6 @@ def demographics(proj_dir, redcap_token, plot_var="Count", ref_num=170):
     ----------
     proj_dir : path
         Project's experiment directory
-    redcap_token : str
-        API token for RedCap project
     plot_var : str, optional
         [Count | Proportion]
         Whether to plot count or proportion values
@@ -240,7 +236,7 @@ def demographics(proj_dir, redcap_token, plot_var="Count", ref_num=170):
 
     # Make a single factor dataframe
     plot_dict = {}
-    calc_props = _CalcProp(proj_dir, redcap_token)
+    calc_props = _CalcProp(proj_dir)
     for h_col, h_val in plot_plan_all:
         calc_props.get_demo_props([h_col], [h_val])
         plot_dict[h_val] = {
@@ -422,7 +418,7 @@ def demographics(proj_dir, redcap_token, plot_var="Count", ref_num=170):
 
 
 # %%
-def scan_pace(redcap_token, proj_dir):
+def scan_pace(proj_dir):
     """Generate barplot of attempted scans per calender week.
 
     Mine REDCap Visit 2, 3 Logs (MRI) for timestamps, indicating a log was
@@ -434,8 +430,6 @@ def scan_pace(redcap_token, proj_dir):
 
     Parameters
     ----------
-    redcap_token : str
-        API token for RedCap project
     proj_dir : path
         Project's experiment directory
 
@@ -446,7 +440,7 @@ def scan_pace(redcap_token, proj_dir):
 
     """
     # Get data, ready for weekly totals
-    df_log = survey_download.dl_mri_log(redcap_token)
+    df_log = survey_download.dl_mri_log()
     df_log["datetime"] = df_log["datetime"] - pd.to_timedelta(7, unit="d")
     df_log["count"] = 1
 
@@ -509,7 +503,7 @@ def scan_pace(redcap_token, proj_dir):
     out_plot = os.path.join(
         proj_dir,
         "analyses/metrics_recruit",
-        "plot_barplot-wide_scan-attempts.png",
+        "plot_scan-attempts_barplot-wide.png",
     )
     plt.savefig(out_plot, bbox_inches="tight")
     print(f"\t\tDrew barplot : {out_plot}")
@@ -597,7 +591,7 @@ def censored_volumes(proj_dir):
     out_path = os.path.join(
         proj_dir,
         "analyses/metrics_recruit",
-        "plot_boxplot-double_epi-motion.png",
+        "plot_epi-motion_boxplot-double.png",
     )
     plt.savefig(out_path, bbox_inches="tight")
     print(f"\t\tDrew boxplot : {out_path}")
@@ -606,10 +600,10 @@ def censored_volumes(proj_dir):
 
 
 # %%
-class ParticipantFlow(build_reports.DemoAll, report_helper.AddStatus):
+class ParticipantFlow(build_reports.DemoAll, report_helper.CheckStatus):
     """Generate PRISMA flowchart of participants in study.
 
-    Inherits build_reports.DemoAll, report_helper.AddStatus.
+    Inherits build_reports.DemoAll, report_helper.CheckStatus.
 
     PRISMA main flow includes recruitment, visits 1-3, and
     final participant numbers. Offshoots include numbers
@@ -620,8 +614,6 @@ class ParticipantFlow(build_reports.DemoAll, report_helper.AddStatus):
     ----------
     proj_dir : str, os.PathLike
         Project's experiment directory
-    redcap_token : str
-        API token for RedCap project
 
     Methods
     -------
@@ -635,15 +627,12 @@ class ParticipantFlow(build_reports.DemoAll, report_helper.AddStatus):
 
     """
 
-    def __init__(self, proj_dir, redcap_token):
+    def __init__(self, proj_dir):
         """Initialize."""
         print("Initializing ParticipantFlow")
-        super().__init__(proj_dir, redcap_token)
-        self._status_list = ["lost", "excluded", "withdrew", "incomplete"]
-
-        # Get record dataframes
-        self._df_compl = self._dl_compl()
-        self._df_demo = self.enroll_status(self.final_demo, "src_subject_id")
+        super().__init__(proj_dir)
+        self._status_list = ["lost", "excluded", "withdrew"]
+        self._df_demo = self.add_status(self.final_demo, clear_following=True)
 
     def draw_prisma(self):
         """Generate PRISMA flowchart of participants in study.
@@ -657,12 +646,12 @@ class ParticipantFlow(build_reports.DemoAll, report_helper.AddStatus):
             <proj-dir>/analyses_metrics/plot_flow-participant.png
 
         """
-        # Visit0 node
+        # Recruitment node
         flo = Digraph("participant_flow")
         flo.attr(label="Participant Flow", labelloc="t", fontsize="18")
         flo.node(
             "0",
-            f"Visit0: Recruitment\nn={self._get_recruit()}",
+            f"Recruitment\nn={self._get_recruit()}",
             shape="box",
         )
 
@@ -680,7 +669,6 @@ class ParticipantFlow(build_reports.DemoAll, report_helper.AddStatus):
             c.node(
                 "2",
                 f"Excluded: {len(v1_dict['excluded'])}\l"  # noqa: W605
-                + f"Incomplete: {len(v1_dict['incomplete'])}\l"  # noqa: W605
                 + f"Lost: {len(v1_dict['lost'])}\l"  # noqa: W605
                 + f"Withdrawn: {len(v1_dict['withdrew'])}\l",  # noqa: W605
                 shape="box",
@@ -703,7 +691,6 @@ class ParticipantFlow(build_reports.DemoAll, report_helper.AddStatus):
                 c.node(
                     str(count),
                     f"Excluded: {len(v_dict['excluded'])}\l"  # noqa: W605
-                    + f"Incomplete: {len(v_dict['incomplete'])}\l"  # noqa: W605 E501
                     + f"Lost: {len(v_dict['lost'])}\l"  # noqa: W605
                     + f"Withdrawn: {len(v_dict['withdrew'])}\l",  # noqa: W605
                     shape="box",
@@ -721,14 +708,7 @@ class ParticipantFlow(build_reports.DemoAll, report_helper.AddStatus):
                 + f"{self._get_age(final_dict['final'])}\l",  # noqa: W605
                 shape="box",
             )
-            c.node(
-                str(count + 1),
-                "Complete Data:\l"  # noqa: W605
-                + f"n={len(final_dict['complete'])} {self._get_female(final_dict['complete'])}\l"  # noqa: W605 E501
-                + f"{self._get_age(final_dict['complete'])}\l",  # noqa: W605
-                shape="box",
-            )
-        flo.edges(["01", "12", "13", "34", "35", "56", "57", "78"])
+        flo.edges(["01", "12", "13", "34", "35", "56", "57"])
         flo.format = "png"
         out_plot = os.path.join(
             self._proj_dir,
@@ -740,37 +720,16 @@ class ParticipantFlow(build_reports.DemoAll, report_helper.AddStatus):
 
     def _get_recruit(self) -> int:
         """Determine number of participants recruited."""
-        df_pre = survey_download.dl_prescreening(self._redcap_token)
+        df_pre = survey_download.dl_prescreening()
         return df_pre.shape[0]
-
-    def _dl_compl(self) -> pd.DataFrame:
-        """Return completion log of enrolled participants."""
-        df_compl = survey_download.dl_completion_log(self._redcap_token)
-        df_compl = df_compl.loc[
-            (df_compl["day_1_fully_completed"] == 1.0)
-            | (
-                (df_compl["consent_form_completed"] == 1.0)
-                & (df_compl["demographics_completed"] == 1.0)
-            )
-        ].reset_index(drop=True)
-        df_compl["record_id"] = df_compl["record_id"].astype(str)
-        df_compl["record_id"] = df_compl["record_id"].str.zfill(4)
-        df_compl["record_id"] = "ER" + df_compl["record_id"]
-        return df_compl
 
     def _v1_subj(self) -> dict:
         """Return visit1 status info."""
-        # Particpants who start V1, completed all or
-        # completed consent & demo.
+        # Particpants who start visit1
         out_dict = {}
-        idx_subj = self._df_compl.index[
-            (self._df_compl["day_1_fully_completed"] == 1.0)
-            | (
-                (self._df_compl["consent_form_completed"] == 1.0)
-                & (self._df_compl["demographics_completed"] == 1.0)
-            )
+        out_dict["start"] = self._df_demo.loc[
+            self._df_demo["visit1_status"].notna(), "src_subject_id"
         ].to_list()
-        out_dict["start"] = self._df_compl.loc[idx_subj, "record_id"].to_list()
 
         # Participants with status change
         for stat in self._status_list:
@@ -779,13 +738,6 @@ class ParticipantFlow(build_reports.DemoAll, report_helper.AddStatus):
 
     def _stat_change(self, visit: str, status: str) -> list:
         """Return list of participants of status in visit."""
-        # Validate args
-        if visit not in ["visit1", "visit2", "visit3"]:
-            raise ValueError("Unexpected visit name.")
-        if status not in self._status_list:
-            raise ValueError("Unexpected status name.")
-
-        # Find subjects of visit status
         idx_subj = self._df_demo.index[
             self._df_demo[f"{visit}_status"] == status
         ].to_list()
@@ -793,17 +745,11 @@ class ParticipantFlow(build_reports.DemoAll, report_helper.AddStatus):
 
     def _v23_subj(self, day: int) -> dict:
         """Return visit 2,3 status info."""
-        # Validate args
-        if day not in [2, 3]:
-            raise ValueError(f"Unexpected day identifier : {day}")
-
-        # Participants who start V2/3 -- completed all or BDI
+        # Participants that started visit
         out_dict = {}
-        idx_subj = self._df_compl.index[
-            (self._df_compl[f"day_{day}_fully_completed"] == 1.0)
-            | (self._df_compl[f"bdi_day{day}_completed"] == 1.0)
-        ].tolist()
-        out_dict["start"] = self._df_compl.loc[idx_subj, "record_id"].to_list()
+        out_dict["start"] = self._df_demo.loc[
+            self._df_demo[f"visit{day}_status"].notna(), "src_subject_id"
+        ].to_list()
 
         # Participants with status change
         for stat in self._status_list:
@@ -811,25 +757,14 @@ class ParticipantFlow(build_reports.DemoAll, report_helper.AddStatus):
         return out_dict
 
     def _final_subj(self) -> dict:
-        """Return final (enrolled+incomplete) and complete participants."""
+        """Return final participants."""
         # Participants still enrolled at end of study
         out_dict = {}
         idx_final = self._df_demo.index[
             (self._df_demo["visit3_status"] == "enrolled")
-            | (self._df_demo["visit3_status"] == "incomplete")
         ].to_list()
         out_dict["final"] = self._df_demo.loc[
             idx_final, "src_subject_id"
-        ].to_list()
-
-        # Participants from whom we have complete data
-        idx_compl = self._df_compl.index[
-            (self._df_compl["day_1_fully_completed"] == 1.0)
-            & (self._df_compl["day_2_fully_completed"] == 1.0)
-            & (self._df_compl["day_3_fully_completed"] == 1.0)
-        ].tolist()
-        out_dict["complete"] = self._df_compl.loc[
-            idx_compl, "record_id"
         ].to_list()
         return out_dict
 

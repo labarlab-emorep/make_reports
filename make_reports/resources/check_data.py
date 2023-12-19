@@ -17,19 +17,14 @@ from make_reports.resources import report_helper
 
 
 class _ChkRsc:
-    """Supporting resources for checking pipeline progress.
+    """Supporting resources for checking pipeline progress."""
 
-    Intended to be inherited, references attrs set by child.
-
-    """
-
-    def start_df(self, col_names: list):
-        """Generate pd.DataFrame from subject, session values."""
-        df_mri = pd.DataFrame(columns=col_names)
-        df_mri["subid"] = self._subj_list * len(self._sess_list)
-        df_mri = df_mri.sort_values(by=["subid"], ignore_index=True)
-        self.df_mri = df_mri
-        self.df_mri["sess"] = self._sess_list * len(self._subj_list)
+    def start_df(self, col_names: list, sess_list: list, subj_list: list):
+        """Start df_mri attr from subject, session values."""
+        self.df_mri = pd.DataFrame(columns=col_names)
+        self.df_mri["subid"] = subj_list * len(sess_list)
+        self.df_mri = self.df_mri.sort_values(by=["subid"], ignore_index=True)
+        self.df_mri["sess"] = sess_list * len(subj_list)
 
     def get_time(self, mri_path: Union[str, os.PathLike]) -> str:
         """Return datetime string of file maketime."""
@@ -38,7 +33,7 @@ class _ChkRsc:
             time.strptime(time.ctime(os.path.getmtime(mri_path))),
         )
 
-    def compare_count(self, subj: str):
+    def _compare_count(self, subj: str):
         """Compare encountered files to desired number.
 
         Search through directories to make a list of files. Compare length
@@ -65,14 +60,27 @@ class _ChkRsc:
         else:
             return np.nan
 
-    def multi_chk(self, num_proc: int = 10):
+    def multi_chk(
+        self,
+        sess: str,
+        step: str,
+        search_path: Union[str, os.PathLike],
+        search_str: Union[str, os.PathLike],
+        subj_list: list,
+        num_exp: int,
+        num_proc: int = 10,
+    ):
         """Multiprocess compare_count, write df column."""
-        print(f"\t\tChecking {self._step}")
+        print(f"\t\tChecking {step}")
+        self._sess = sess
+        self._search_path = search_path
+        self._search_str = search_str
+        self._num_exp = num_exp
         col_out = Pool(num_proc).starmap(
-            self.compare_count,
-            [(subj,) for subj in self._subj_list],
+            self._compare_count,
+            [(subj,) for subj in subj_list],
         )
-        self.update_df(col_out, self._step)
+        self.update_df(col_out, step)
 
     def update_df(self, in_val: list, col_name: str):
         """Update column of df_mri."""
@@ -88,6 +96,20 @@ class _CheckEmorep(_ChkRsc):
     Inherits _ChkRsc.
 
     """
+
+    def __init__(
+        self,
+        subj_list: list,
+        raw_dir: Union[str, os.PathLike],
+        deriv_dir: Union[str, os.PathLike],
+        sess: str = "ses-day2",
+    ):
+        """Initialize."""
+        self._sess = sess
+        self._subj_list = subj_list
+        self._raw_dir = raw_dir
+        self._deriv_dir = deriv_dir
+        super().__init__()
 
     def check_bids(self):
         """Check for BIDS organization, update dataframe."""
@@ -233,6 +255,11 @@ class _CheckEmorep(_ChkRsc):
                 "func/*level-first_name-lss*.feat/stats/cope1.nii.gz",
                 150,
             ),
+            "dot-sep-stim": (
+                os.path.join(self._deriv_dir, "classify_rest"),
+                "func/df_dot-product_model-sep_con-stim_*.csv",
+                1,
+            ),
         }
 
         col_names = [
@@ -298,6 +325,7 @@ class CheckMri(_CheckEmorep):
         self._sess_list = sess_list
         self._raw_dir = raw_dir
         self._deriv_dir = deriv_dir
+        super().__init__(self._subj_list, self._raw_dir, self._deriv_dir)
 
     def check_emorep(self):
         """Check for expected EmoRep files.
@@ -320,9 +348,9 @@ class CheckMri(_CheckEmorep):
             Dataframe of subj, MRI encountered
 
         """
-        # Get info for checking, start df
+        # Get info for checking, start df_mri attr
         col_names, check_info = self.info_emorep()
-        self.start_df(col_names)
+        self.start_df(col_names, self._sess_list, self._subj_list)
 
         # Check for each scan session
         for self._sess in self._sess_list:
@@ -334,9 +362,16 @@ class CheckMri(_CheckEmorep):
             self.check_dcmnii()
 
             # Check steps in check_info, add session to search string
-            for self._step, trip in check_info.items():
-                self._search_path, self._search_str, self._num_exp = trip
-                self.multi_chk()
+            for step, trip in check_info.items():
+                search_path, search_str, num_exp = trip
+                self.multi_chk(
+                    self._sess,
+                    step,
+                    search_path,
+                    search_str,
+                    self._subj_list,
+                    num_exp,
+                )
 
     def check_archival(self):
         """Check for expected archival files.
@@ -355,14 +390,21 @@ class CheckMri(_CheckEmorep):
         """
         # Get info for checking, start df
         col_names, check_info = self._info_archival()
-        self.start_df(col_names)
+        self.start_df(col_names, self._sess_list, self._subj_list)
 
         # Check for each scan session
-        for self._sess in self._sess_list:
-            print(f"\tChecking session : {self._sess}")
-            for self._step, trip in check_info.items():
-                self._search_path, self._search_str, self._num_exp = trip
-                self.multi_chk()
+        for sess in self._sess_list:
+            print(f"\tChecking session : {sess}")
+            for step, trip in check_info.items():
+                search_path, search_str, num_exp = trip
+                self.multi_chk(
+                    sess,
+                    step,
+                    search_path,
+                    search_str,
+                    self._subj_list,
+                    num_exp,
+                )
 
     def _info_archival(self) -> Tuple[list, dict]:
         """Return list of column names, dict of expected data."""
@@ -385,6 +427,11 @@ class CheckMri(_CheckEmorep):
                 "func/run-01_level-first_name-rest.feat/stats/cope1.nii.gz",
                 1,
             ),
+            "dot-sep-stim": (
+                os.path.join(self._deriv_dir, "classify_rest"),
+                "func/df_dot-product_model-sep_con-stim_*.csv",
+                1,
+            ),
         }
 
         col_names = [
@@ -398,6 +445,8 @@ class CheckMri(_CheckEmorep):
 
 class CheckEmorepComplete(build_reports.DemoAll, report_helper.AddStatus):
     """Compare encountered EmoRep data to expected.
+
+    DEPRECATED
 
     Inherits build_reports.DemoAll, report_helper.AddStatus.
 
@@ -427,8 +476,6 @@ class CheckEmorepComplete(build_reports.DemoAll, report_helper.AddStatus):
     ----------
     proj_dir : str, os.PathLike
         Location of project parent directory
-    redcap_token : str
-        Personal access token for RedCap
 
     Attributes
     ----------
@@ -448,14 +495,14 @@ class CheckEmorepComplete(build_reports.DemoAll, report_helper.AddStatus):
 
     """
 
-    def __init__(self, proj_dir, redcap_token):
+    def __init__(self, proj_dir):
         """Initialize.
 
         Build _df_demo attr via DemoAll and AddStatus.
 
         """
         print("Initializing CheckEmorepComplete")
-        super().__init__(proj_dir, redcap_token)
+        super().__init__(proj_dir)
         self.remove_withdrawn()
         self._df_demo = self.enroll_status(self.final_demo, "src_subject_id")
         self._setup()

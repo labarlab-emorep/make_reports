@@ -15,7 +15,7 @@ from make_reports.resources import manage_data
 
 
 # %%
-def make_regular_reports(regular_reports, query_date, proj_dir, redcap_token):
+def make_regular_reports(regular_reports, query_date, proj_dir):
     """Make reports for the lab manager.
 
     Coordinate the use of build_reports.ManagerRegular to generate
@@ -32,8 +32,6 @@ def make_regular_reports(regular_reports, query_date, proj_dir, redcap_token):
         Date for finding report range
     proj_dir : str, os.PathLike
         Project's experiment directory
-    redcap_token : str
-        Personal access token for RedCap
 
     Raises
     ------
@@ -63,7 +61,7 @@ def make_regular_reports(regular_reports, query_date, proj_dir, redcap_token):
         os.makedirs(manager_dir)
 
     # Generate reports
-    make_rep = build_reports.ManagerRegular(query_date, proj_dir, redcap_token)
+    make_rep = build_reports.ManagerRegular(query_date, proj_dir)
     for report in regular_reports:
         make_rep.make_report(report)
 
@@ -84,8 +82,10 @@ class _GetData:
     Download, clean, and return necessary data for
     generating NDAR reports.
 
-    Intended to be inherited by MakeNdarReports,
-    references attrs set by child.
+    Parameters
+    ----------
+    proj_dir : str, os.PathLike
+        Location of project directory
 
     Attributes
     ----------
@@ -103,13 +103,19 @@ class _GetData:
 
     """
 
-    def get_data(self):
+    def __init__(self, proj_dir):
+        """Initialize."""
+        self._proj_dir = proj_dir
+
+    def get_data(self, report_names: list, close_date: datetime.date):
         """Build df_demo and data_dict attrs."""
+        self._report_names = report_names
+
         # Get redcap demographic data, use only consented data in
         # submission cycle.
-        redcap_demo = build_reports.DemoAll(self._proj_dir, self._redcap_token)
+        redcap_demo = build_reports.DemoAll(self._proj_dir)
         redcap_demo.remove_withdrawn()
-        redcap_demo.submission_cycle(self._close_date)
+        redcap_demo.submission_cycle(close_date)
         self.df_demo = redcap_demo.final_demo
 
         # Build data_dict with redcap, qualtrics, and rest data
@@ -122,12 +128,12 @@ class _GetData:
 
     def _get_red(self):
         """Add RedCap BDI to data_dict."""
-        redcap_data = manage_data.GetRedcap(self._proj_dir, self._redcap_token)
+        redcap_data = manage_data.GetRedcap(self._proj_dir)
         redcap_data.get_redcap(survey_list=["bdi_day2", "bdi_day3"])
         self._merge_dict(redcap_data.clean_redcap)
 
     def _get_qual(self):
-        """Title."""
+        """Add Qualtrics surveys to data_dict."""
         # Align ndar reports to qualtrics surveys
         qual_s1 = [
             "affim01",
@@ -149,9 +155,7 @@ class _GetData:
 
         # Initialize getting qualtrics
         if get_qs1 or get_qs23 or get_qs123 or get_qsf:
-            qc_data = manage_data.GetQualtrics(
-                self._proj_dir, self._qualtrics_token
-            )
+            qc_data = manage_data.GetQualtrics(self._proj_dir)
 
         # Get appropriate data
         if get_qsf:
@@ -195,18 +199,21 @@ class _BuildArgs:
     """Build arguments for build_ndar.Ndar* classes.
 
     Unpack data_dict attr, return list of dataframes for
-    attr _df_name. Used to supply each build_ndar.Ndar*
+    df_name. Used to supply each build_ndar.Ndar*
     class the appropriate number of dataframes.
 
     Methods
     -------
     build_args()
-        Return list of dataframes for _df_name
+        Return list of dataframes for df_name
 
     """
 
-    def build_args(self) -> list:
-        """Return list of pd.DataFrame for _df_name."""
+    def build_args(self, data_dict: dict, df_name: str) -> list:
+        """Return list of pd.DataFrame for df_name."""
+        self._data_dict = data_dict
+        self._df_name = df_name
+
         # Align report name to unpacking method
         v1_list = ["AIM", "ALS", "ERQ", "PSWQ", "RRS", "TAS"]
         v23_list = ["BDI", "PANAS", "rest_ratings", "post_scan_ratings"]
@@ -225,18 +232,18 @@ class _BuildArgs:
 
     def _v1_pilot_study(self) -> list:
         """Return visit_day1 dataframes."""
-        df_pilot = self.data_dict["pilot"]["visit_day1"][self._df_name]
-        df_study = self.data_dict["study"]["visit_day1"][self._df_name]
+        df_pilot = self._data_dict["pilot"]["visit_day1"][self._df_name]
+        df_study = self._data_dict["study"]["visit_day1"][self._df_name]
 
         # RRS does not have pilot data in qualtrics
         return [df_pilot, df_study] if self._df_name != "RRS" else [df_study]
 
     def _v23_pilot_study(self) -> list:
         """Return visit_day2 and visit_day3 dataframes."""
-        df_pilot_2 = self.data_dict["pilot"]["visit_day2"][self._df_name]
-        df_study_2 = self.data_dict["study"]["visit_day2"][self._df_name]
-        df_pilot_3 = self.data_dict["pilot"]["visit_day3"][self._df_name]
-        df_study_3 = self.data_dict["study"]["visit_day3"][self._df_name]
+        df_pilot_2 = self._data_dict["pilot"]["visit_day2"][self._df_name]
+        df_study_2 = self._data_dict["study"]["visit_day2"][self._df_name]
+        df_pilot_3 = self._data_dict["pilot"]["visit_day3"][self._df_name]
+        df_study_3 = self._data_dict["study"]["visit_day3"][self._df_name]
 
         # PANAS and post_scan_ratings do not have pilot data in qualtrics
         if self._df_name in ["PANAS", "post_scan_ratings"]:
@@ -246,12 +253,12 @@ class _BuildArgs:
 
     def _v123_pilot_study(self) -> list:
         """Return STAI dataframes."""
-        df_pilot_1 = self.data_dict["pilot"]["visit_day1"]["STAI_Trait"]
-        df_study_1 = self.data_dict["study"]["visit_day1"]["STAI_Trait"]
-        df_pilot_2 = self.data_dict["pilot"]["visit_day2"]["STAI_State"]
-        df_study_2 = self.data_dict["study"]["visit_day2"]["STAI_State"]
-        df_pilot_3 = self.data_dict["pilot"]["visit_day3"]["STAI_State"]
-        df_study_3 = self.data_dict["study"]["visit_day3"]["STAI_State"]
+        df_pilot_1 = self._data_dict["pilot"]["visit_day1"]["STAI_Trait"]
+        df_study_1 = self._data_dict["study"]["visit_day1"]["STAI_Trait"]
+        df_pilot_2 = self._data_dict["pilot"]["visit_day2"]["STAI_State"]
+        df_study_2 = self._data_dict["study"]["visit_day2"]["STAI_State"]
+        df_pilot_3 = self._data_dict["pilot"]["visit_day3"]["STAI_State"]
+        df_study_3 = self._data_dict["study"]["visit_day3"]["STAI_State"]
         return [
             df_pilot_1,
             df_study_1,
@@ -262,10 +269,10 @@ class _BuildArgs:
         ]
 
 
-class MakeNdarReports(_GetData, _BuildArgs):
+class MakeNdarReports(_BuildArgs):
     """Make reports and organize data for NDAR upload.
 
-    Inherits _GetData, _BuildArgs
+    Inherits _BuildArgs.
 
     Generate requested NDAR reports and organize data (if required) for the
     biannual upload.
@@ -276,10 +283,6 @@ class MakeNdarReports(_GetData, _BuildArgs):
         Project's experiment directory
     close_date : datetime.date
         Submission cycle close date
-    redcap_token : str
-        Personal access token for RedCap
-    qualtrics_token : str
-        Personal access token for Qualtrics
 
     Methods
     -------
@@ -298,12 +301,11 @@ class MakeNdarReports(_GetData, _BuildArgs):
 
     """
 
-    def __init__(self, proj_dir, close_date, redcap_token, qualtrics_token):
+    def __init__(self, proj_dir, close_date):
         """Initialize."""
         self._proj_dir = proj_dir
         self._close_date = close_date
-        self._redcap_token = redcap_token
-        self._qualtrics_token = qualtrics_token
+        super().__init__()
 
     @property
     def _nda_switch(self):
@@ -329,7 +331,7 @@ class MakeNdarReports(_GetData, _BuildArgs):
 
         Parameters
         ----------
-        ndar_reports : list
+        report_names : list
             Names of desired NDA reports e.g. ["demo_info01", "affim01"]
 
         """
@@ -338,11 +340,15 @@ class MakeNdarReports(_GetData, _BuildArgs):
         for report in report_names:
             if report not in self._nda_switch.keys():
                 raise ValueError(f"Unexpected ndar_report value : {report}")
-        self._report_names = report_names
-        self.get_data()
+
+        # Download and clean data for requested reports
+        gd = _GetData(self._proj_dir)
+        gd.get_data(report_names, self._close_date)
+        self.df_demo = gd.df_demo
+        self.data_dict = gd.data_dict
 
         # Build each requested report
-        for self._report in self._report_names:
+        for self._report in report_names:
             self._build_report()
 
     def _build_report(self):
@@ -356,9 +362,9 @@ class MakeNdarReports(_GetData, _BuildArgs):
             args = args + [self._close_date]
 
         # Identify class name and get data if needed
-        class_name, self._df_name = self._nda_switch[self._report]
-        if self._df_name:
-            args = args + self.build_args()
+        class_name, df_name = self._nda_switch[self._report]
+        if df_name:
+            args = args + self.build_args(self.data_dict, df_name)
 
         # Get appropriate class for report, generate report.
         mod = __import__(
@@ -396,9 +402,7 @@ class MakeNdarReports(_GetData, _BuildArgs):
 
 
 # %%
-def generate_guids(
-    proj_dir, user_name, user_pass, find_mismatch, redcap_token
-):
+def generate_guids(proj_dir, user_name, user_pass, find_mismatch):
     """Compile needed demographic info and make GUIDs.
 
     Also supports checking newly generated GUIDs against those entered
@@ -418,14 +422,10 @@ def generate_guids(
     find_mismatch : bool
         Whether to check for mismatches between REDCap
         and generated GUIDs
-    redcap_token : str
-        Personal access token for RedCap
 
     """
     # Trigger build reports class and method, clean intermediate
-    guid_obj = build_reports.GenerateGuids(
-        proj_dir, user_pass, user_name, redcap_token
-    )
+    guid_obj = build_reports.GenerateGuids(proj_dir, user_pass, user_name)
     guid_obj.make_guids()
     os.remove(guid_obj.df_guid_file)
 

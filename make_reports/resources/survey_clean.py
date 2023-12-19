@@ -15,23 +15,23 @@ from string import punctuation
 from make_reports.resources import report_helper
 import importlib.resources as pkg_resources
 from make_reports import reference_files
+from make_reports.resources import sql_database
 
 
 class CleanRedcap:
     """Clean RedCap surveys.
 
-    Intended to be inherited, references child attrs:
-        _proj_dir : str, os.PathLike
-            Location of project directory
-        _pilot_list : list
-            Pilot participant IDs
-        _df_raw : pd.DataFrame
-            Raw RedCap survey dataframe
-
     Clean REDCap surveys and reports. Participants who have
     withdrawn consent are included in the Consent, GUID, and
     demographic dataframes for NIH/Duke reporting purposes but are
     removed from the BDI dataframes.
+
+    Parameters
+    ----------
+    proj_dir : str, os.PathLike
+        Location of project directory
+    pilot_list : list
+        Pilot participant IDs
 
     Attributes
     ----------
@@ -52,6 +52,11 @@ class CleanRedcap:
         Generate clean attrs for GUID report
 
     """
+
+    def __init__(self, proj_dir, pilot_list):
+        """Initialize."""
+        self._proj_dir = proj_dir
+        self._pilot_list = pilot_list
 
     def _dob_convert(self, dob_list):
         """Helper method for _clean_demographics.
@@ -77,6 +82,7 @@ class CleanRedcap:
             When dob response does not match expected formats
 
         """
+
         # Manage nesting nightmare with inner function
         def _num_convert(dob):
             """Interpret numeric dates."""
@@ -148,7 +154,6 @@ class CleanRedcap:
         # Convert education into years
         subj_educate = []
         for _year, _level, _id in zip(edu_year, edu_level, record_id):
-
             # Patch education level issues, deal with self-reports
             if _year in year_str_switch.keys():
                 edu_value = year_str_switch[_year]
@@ -169,9 +174,9 @@ class CleanRedcap:
         """Fix city-of-birth free response.
 
         Account for formats:
-            1. San Jose
-            2. San Jose, California
-            4. San Jose CA
+            - San Jose
+            - San Jose, California
+            - San Jose CA
 
         """
         self._df_raw = self._df_raw.rename(columns={"city": "city-state"})
@@ -230,16 +235,52 @@ class CleanRedcap:
         ]
         self._df_raw = self._df_raw[col_reorder]
 
+    def _clean_middle_name(self):
+        """Clean middle name field.
+
+        Accounts for:
+            - Any single special char
+            - Period after middle initial
+            - space, na, NA, n/a, N/A
+
+        """
+        # Clean middle name responses for NA
+        na_mask = (
+            self._df_raw.middle_name.eq("na")
+            | self._df_raw.middle_name.eq("NA")
+            | self._df_raw.middle_name.eq("n/a")
+            | self._df_raw.middle_name.eq("N/A")
+            | self._df_raw.middle_name.eq(" ")
+        )
+        self._df_raw.loc[na_mask, ["middle_name"]] = np.nan
+
+        # Clean middle name single special chars
+        special_list = [x for x in punctuation]
+        sp_mask = (self._df_raw["middle_name"].str.len() == 1) & self._df_raw[
+            "middle_name"
+        ].astype("str").isin(special_list)
+        self._df_raw.loc[sp_mask, ["middle_name"]] = np.nan
+
+        # Drop period after initials
+        self._df_raw["middle_name"] = self._df_raw["middle_name"].str.replace(
+            ".", "", regex=False
+        )
+
     def _res_idx(self):
         """Reset df_[pilot|study] indices."""
         self.df_study.reset_index(drop=True, inplace=True)
         self.df_pilot.reset_index(drop=True, inplace=True)
 
-    def clean_demographics(self):
+    def clean_demographics(self, df_raw):
         """Cleaning method for RedCap demographics survey.
 
         Convert RedCap report values and participant responses
         to usable dataframe types.
+
+        Parameters
+        ----------
+        df_raw : pd.DataFrame
+            Original REDCap export of demographic survey
 
         Attributes
         ----------
@@ -249,6 +290,8 @@ class CleanRedcap:
             Clean demographic info for pilot participants
 
         """
+        self._df_raw = df_raw
+
         # Reorder columns, drop rows without last name response
         col_names = self._df_raw.columns.tolist()
         col_reorder = col_names[-1:] + col_names[-2:-1] + col_names[:-2]
@@ -261,50 +304,36 @@ class CleanRedcap:
         self._df_raw["dob"] = dob_clean
 
         # Fix years of education
-        # self._df_raw["years_education"] = self._df_raw[
-        #     "years_education"
-        # ].astype("Int64")
-        # self._df_raw["level_education"] = self._df_raw[
-        #     "level_education"
-        # ].astype("Int64")
         self._df_raw["years_education"] = self._get_educ_years()
 
-        # Fix City, State of birth
+        # Fix place of birth, middle name responses
         self._clean_city_state()
-
-        # Clean middle name responses for NA and special characters
-        df_raw = self._df_raw
-        na_mask = (
-            df_raw.middle_name.eq("na")
-            | df_raw.middle_name.eq("NA")
-            | df_raw.middle_name.eq("N/A")
-            | df_raw.middle_name.eq(" ")
-        )
-        df_raw.loc[na_mask, ["middle_name"]] = np.nan
-
-        special_list = [x for x in punctuation]
-        sp_mask = (df_raw["middle_name"].str.len() == 1) & df_raw[
-            "middle_name"
-        ].astype("str").isin(special_list)
-        df_raw.loc[sp_mask, ["middle_name"]] = np.nan
+        self._clean_middle_name()
 
         # Drop participants
-        df_raw = self._drop_subj(df_raw)
+        self._df_raw = self._drop_subj(self._df_raw)
 
         # Separate pilot from study data
         pilot_list = [int(x[-1]) for x in self._pilot_list]
-        idx_pilot = df_raw[df_raw["record_id"].isin(pilot_list)].index.tolist()
-        idx_study = df_raw[
-            ~df_raw["record_id"].isin(pilot_list)
+        idx_pilot = self._df_raw[
+            self._df_raw["record_id"].isin(pilot_list)
         ].index.tolist()
-        self.df_pilot = df_raw.loc[idx_pilot]
-        self.df_study = df_raw.loc[idx_study]
+        idx_study = self._df_raw[
+            ~self._df_raw["record_id"].isin(pilot_list)
+        ].index.tolist()
+        self.df_pilot = self._df_raw.loc[idx_pilot]
+        self.df_study = self._df_raw.loc[idx_study]
         self._res_idx()
 
-    def clean_consent(self):
+    def clean_consent(self, df_raw):
         """Cleaning method for RedCap consent survey.
 
         Only return participants who signed the consent form.
+
+        Parameters
+        ----------
+        df_raw : pd.DataFrame
+            Original REDCap export of consent survey
 
         Attributes
         ----------
@@ -315,11 +344,11 @@ class CleanRedcap:
 
         """
         # Drop rows without signature, account for multiple consent forms
-        col_names = self._df_raw.columns.tolist()
+        col_names = df_raw.columns.tolist()
         col_drop = (
             "signature_v2" if "signature_v2" in col_names else "signature"
         )
-        df_raw = self._df_raw[self._df_raw[col_drop].notna()]
+        df_raw = df_raw[df_raw[col_drop].notna()]
 
         # Drop participants
         df_raw = self._drop_subj(df_raw)
@@ -334,10 +363,15 @@ class CleanRedcap:
         self.df_study = df_raw.loc[idx_study]
         self._res_idx()
 
-    def clean_guid(self):
+    def clean_guid(self, df_raw):
         """Cleaning method for RedCap GUID survey.
 
         Only return participants who have an assigned GUID.
+
+        Parameters
+        ----------
+        df_raw : pd.DataFrame
+            Original REDCap export of GUID survey
 
         Attributes
         ----------
@@ -348,7 +382,7 @@ class CleanRedcap:
 
         """
         # Drop rows without guid
-        df_raw = self._df_raw[self._df_raw["guid"].notna()]
+        df_raw = df_raw[df_raw["guid"].notna()]
 
         # Drop participants
         df_raw = self._drop_subj(df_raw)
@@ -364,8 +398,20 @@ class CleanRedcap:
         self.df_study = df_raw.loc[idx_study]
         self._res_idx()
 
-    def clean_bdi_day23(self):
+        # Update db_emorep.ref_subj for enrolled study subjs
+        db_con = sql_database.DbConnect()
+        up_mysql = sql_database.MysqlUpdate(db_con)
+        df_sql = self.df_study.copy()
+        df_sql = df_sql.rename(columns={"record_id": "subj_id"})
+        up_mysql.update_ref_subj(df_sql)
+
+    def clean_bdi_day23(self, df_raw):
         """Cleaning method for RedCap BDI surveys.
+
+        Parameters
+        ----------
+        df_raw : pd.DataFrame
+            Original REDCap export of BDI survey
 
         Attributes
         ----------
@@ -377,7 +423,7 @@ class CleanRedcap:
         """
         # Rename then remove unneeded columns, reorder
         drop_list = ["guid_timestamp", "redcap_survey_identifier"]
-        df_raw = self._df_raw.drop(drop_list, axis=1)
+        df_raw = df_raw.drop(drop_list, axis=1)
         if "q_1_v2" in df_raw.columns.tolist():
             df_raw.columns = df_raw.columns.str.replace("_v2", "")
         df_raw.columns = df_raw.columns.str.replace("q_", "BDI_")
@@ -409,11 +455,11 @@ class CleanRedcap:
 
         # Drop participants who have withdrawn consent
         part_comp = report_helper.CheckStatus()
-        if not part_comp.all:
-            return
-        withdrew_list = [int(x[2:]) for x in part_comp.all.keys()]
-        df_raw = df_raw[~df_raw["study_id"].isin(withdrew_list)]
-        df_raw = df_raw.reset_index(drop=True)
+        part_comp.status_change("withdrew")
+        if part_comp.all:
+            withdrew_list = [int(x[2:]) for x in part_comp.all.keys()]
+            df_raw = df_raw[~df_raw["study_id"].isin(withdrew_list)]
+            df_raw = df_raw.reset_index(drop=True)
 
         # Separate pilot from study data
         idx_pilot = df_raw[
@@ -437,18 +483,17 @@ class CleanRedcap:
 class CleanQualtrics:
     """Clean Qualtrics surveys.
 
-    Intended to be inherited, references child attrs:
-        _proj_dir : str, os.PathLike
-            Location of project directory
-        _pilot_list : list
-            Pilot participant IDs
-        _df_raw : pd.DataFrame
-            Raw RedCap survey dataframe
-        _withdrew_list : list
-            Participants IDs who withdrew consent
-
     Find downloaded original/raw Qualtrics survey responses, and
     convert values into usable dataframe tyeps and formats.
+
+    Parameters
+    ----------
+    proj_dir : str, os.PathLike
+        Location of project directory
+    pilot_list : list
+        Pilot participant IDs
+    withdrew_list : list
+        Participants IDs who withdrew consent
 
     Attributes
     ----------
@@ -470,11 +515,22 @@ class CleanQualtrics:
 
     """
 
-    def clean_session_1(self):
+    def __init__(self, proj_dir, pilot_list, withdrew_list):
+        """Initialize."""
+        self._proj_dir = proj_dir
+        self._pilot_list = pilot_list
+        self._withdrew_list = withdrew_list
+
+    def clean_session_1(self, df_raw):
         """Cleaning method for visit 1 surveys.
 
         Split session into individual surveys, convert participant
         responses to usable dataframe values and types.
+
+        Parameters
+        ----------
+        df_raw : pd.DataFrame
+            Original Qualtrics session 1 export
 
         Attributes
         ----------
@@ -499,24 +555,22 @@ class CleanQualtrics:
 
         # Setup and identify column names
         subj_cols = ["study_id", "datetime"]
-        self._df_raw.rename(
+        df_raw.rename(
             {"RecipientLastName": subj_cols[0], "StartDate": subj_cols[1]},
             axis=1,
             inplace=True,
         )
-        self._df_raw = report_helper.drop_participant(
-            "ER0080", self._df_raw, "study_id"
-        )
-        col_names = self._df_raw.columns
+        df_raw = report_helper.drop_participant("ER0080", df_raw, "study_id")
+        col_names = df_raw.columns
 
         # Subset session dataframe by survey
         data_study = {}
         data_pilot = {}
         for sur_name in surveys_visit1:
-            print(f"\tCleaning survey data : day1, {sur_name}")
+            print(f"Cleaning survey data : day1, {sur_name}")
             sur_cols = [x for x in col_names if sur_name in x]
             ext_cols = subj_cols + sur_cols
-            df_sur = self._df_raw[ext_cols]
+            df_sur = df_raw[ext_cols]
 
             # Clean subset dataframe
             df_sur = df_sur.dropna()
@@ -557,12 +611,17 @@ class CleanQualtrics:
         self.data_study = {"visit_day1": data_study}
         self.data_pilot = {"visit_day1": data_pilot}
 
-    def clean_session_23(self):
+    def clean_session_23(self, df_raw):
         """Cleaning method for visit 2 & 3 surveys.
 
         Split session into individual surveys, convert participant
         responses to usable dataframe values and types. Keep visit
         day straight.
+
+        Parameters
+        ----------
+        df_raw : pd.DataFrame
+            Original Qualtrics session 2 & 3 export
 
         Attributes
         ----------
@@ -580,7 +639,7 @@ class CleanQualtrics:
 
         # Get dataframe and setup output column names
         subj_cols = ["study_id", "visit", "datetime"]
-        self._df_raw.rename(
+        df_raw.rename(
             {
                 "SubID": subj_cols[0],
                 "Session_Num": subj_cols[1],
@@ -589,10 +648,8 @@ class CleanQualtrics:
             axis=1,
             inplace=True,
         )
-        self._df_raw = report_helper.drop_participant(
-            "ER0080", self._df_raw, "study_id"
-        )
-        col_names = self._df_raw.columns
+        df_raw = report_helper.drop_participant("ER0080", df_raw, "study_id")
+        col_names = df_raw.columns
 
         # Get relevant info from dataframe for each day
         data_study = {}
@@ -601,10 +658,10 @@ class CleanQualtrics:
             data_study[f"visit_{day_str}"] = {}
             data_pilot[f"visit_{day_str}"] = {}
             for sur_key in surveys_visit23:
-                print(f"\tCleaning survey data : {day_str}, {sur_key}")
+                print(f"Cleaning survey data : {day_str}, {sur_key}")
                 sur_cols = [x for x in col_names if sur_key in x]
                 ext_cols = subj_cols + sur_cols
-                df_sub = self._df_raw[ext_cols]
+                df_sub = df_raw[ext_cols]
 
                 # Organize rows and columns, get visit-specific responses
                 df_sub = df_sub.dropna()
@@ -651,7 +708,7 @@ class CleanQualtrics:
         self.data_study = data_study
         self.data_pilot = data_pilot
 
-    def clean_postscan_ratings(self):
+    def clean_postscan_ratings(self, df_raw):
         """Cleaning method for stimuli ratings.
 
         Mine "FINAL - EmoRep Stimulus Ratings - fMRI Study" and generate
@@ -661,6 +718,11 @@ class CleanQualtrics:
         make_reports.reference_files.EmoRep_PostScan_Task_<*>_2022.csv.
         Participants give valence and arousal ratings for each stimulus, and
         supply 1+ emotion endorsements.
+
+        Parameters
+        ----------
+        df_raw : pd.DataFrame
+            Original Qualtrics postscan ratings export
 
         Attributes
         ----------
@@ -672,7 +734,8 @@ class CleanQualtrics:
             {visit: {survey_name: pd.DataFrame}}
 
         """
-        print("\tCleaning survey data : post_scan_ratings ...")
+        self._df_raw = df_raw
+        print("Cleaning survey data : post_scan_ratings ...")
 
         # Remove header rows, test IDs, txtFile NaNs, and restarted
         # sessions (Finished=False).
@@ -744,6 +807,9 @@ class CleanQualtrics:
 
         # Split dataframe by session
         sess_mask = self._df_study["session"] == "day2"
+        self._df_study["type"] = self._df_study["type"].replace(
+            "Videos", "Movies"
+        )
         df_study_day2 = self._df_study[sess_mask]
         df_study_day3 = self._df_study[~sess_mask]
 
@@ -812,7 +878,6 @@ class CleanQualtrics:
         # Add a number lines to df_study for each stimulus
         # nonlocal df_study
         for h_cnt, stim in enumerate(stim_list):
-
             # Determine stimulus number in qualtrics, extract
             # emotion and trial stimulus from reference dict.
             cnt = h_cnt + 1
@@ -820,7 +885,6 @@ class CleanQualtrics:
 
             # Add a line to df_study for each prompt type
             for prompt in ["Arousal", "Valence", "Endorsement"]:
-
                 # Get response value from proper column, manage multiple,
                 # single, or non responses.
                 df_resp = df_sub.loc[
@@ -915,7 +979,6 @@ def clean_rest_ratings(sess, rawdata_path):
 
     # Add each participant's responses to df_sess
     for beh_path in beh_list:
-
         # Get session info
         beh_file = os.path.basename(beh_path)
         subj, sess, _, date_ext = beh_file.split("_")
@@ -928,7 +991,7 @@ def clean_rest_ratings(sess, rawdata_path):
         try:
             task_path = glob.glob(f"{search_path}/*_run-02_events.tsv")[0]
             _, _, task, _, _ = os.path.basename(task_path).split("_")
-        except (IndexError):
+        except IndexError:
             print(
                 f"\n\t\tNo run-02 BIDS event file detected for {subj}, "
                 + f"{sess}. Continuing ..."
@@ -953,7 +1016,7 @@ def clean_rest_ratings(sess, rawdata_path):
     part_comp = report_helper.CheckStatus()
     part_comp.status_change("withdrew")
     if not part_comp.all:
-        return
+        return df_sess
     withdrew_list = [x for x in part_comp.all.keys()]
     df_sess = df_sess[~df_sess.study_id.str.contains("|".join(withdrew_list))]
     df_sess = df_sess.reset_index(drop=True)
