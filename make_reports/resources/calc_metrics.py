@@ -631,8 +631,22 @@ class ParticipantFlow(build_reports.DemoAll, report_helper.CheckStatus):
         """Initialize."""
         print("Initializing ParticipantFlow")
         super().__init__(proj_dir)
+
+    def _get_demo_enroll(self):
+        """Get demographics and enrollment status."""
         self._status_list = ["lost", "excluded", "withdrew"]
-        self._df_demo = self.add_status(self.final_demo, clear_following=True)
+        self._df_demo = self.add_status(
+            self.final_demo,
+            status_list=self._status_list,
+            clear_following=True,
+        )
+
+        # Clean pilot participants
+        pilot_list = report_helper.pilot_list()
+        idx_pilot = self._df_demo.index[
+            self._df_demo["src_subject_id"].isin(pilot_list)
+        ].to_list()
+        self._df_demo = self._df_demo.drop(idx_pilot).reset_index(drop=True)
 
     def draw_prisma(self):
         """Generate PRISMA flowchart of participants in study.
@@ -646,6 +660,9 @@ class ParticipantFlow(build_reports.DemoAll, report_helper.CheckStatus):
             <proj-dir>/analyses_metrics/plot_flow-participant.png
 
         """
+        # Get enrolled status (df_demo)
+        self._get_demo_enroll()
+
         # Recruitment node
         flo = Digraph("participant_flow")
         flo.attr(label="Participant Flow", labelloc="t", fontsize="18")
