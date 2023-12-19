@@ -1,6 +1,9 @@
 """Supporting functions for making reports.
 
 drop_participant : drop participant from dataframe
+check_redcap_pat : check for redcap token
+check_qualtrics_pat : check for qualtrics token
+check_sql_pass : check for mysql db_emorep password
 pull_redcap_data : download survey data from REDCAP
 pull_qualtrics_data : download survey data from Qualtrics
 mine_template : extract values from NDA templates
@@ -16,6 +19,7 @@ ParticipantComplete : deprecated, track participant, data completion status
 AddStatus : deprecated, add participant complete status to dataframe
 
 """
+import os
 import sys
 import io
 import requests
@@ -57,15 +61,41 @@ def drop_participant(subj, df, subj_col):
     return df_drop.reset_index(drop=True)
 
 
-def pull_redcap_data(
-    redcap_token, report_id, content="report", return_format="csv"
-):
+def check_redcap_pat():
+    """Check if PAT_REDCAP_EMOREP exists in env."""
+    try:
+        os.environ["PAT_REDCAP_EMOREP"]
+    except KeyError as e:
+        raise Exception(
+            "No global variable 'PAT_REDCAP_EMOREP' defined in user env"
+        ) from e
+
+
+def check_qualtrics_pat():
+    """Check if PAT_QUALTRICS_EMOREP exists in env."""
+    try:
+        os.environ["PAT_QUALTRICS_EMOREP"]
+    except KeyError as e:
+        raise Exception(
+            "No global variable 'PAT_QUALTRICS_EMOREP' defined in user env"
+        ) from e
+
+
+def check_sql_pass():
+    """Check if SQL_PASS exists in env."""
+    try:
+        os.environ["SQL_PASS"]
+    except KeyError as e:
+        raise Exception(
+            "No global variable 'SQL_PASS' defined in user env"
+        ) from e
+
+
+def pull_redcap_data(report_id, content="report", return_format="csv"):
     """Pull a RedCap report and make a pandas dataframe.
 
     Parameters
     ----------
-    redcap_token : str
-        RedCap API token
     report_id : str, int
         RedCap Report ID
     content : string, optional
@@ -78,8 +108,9 @@ def pull_redcap_data(
     pandas.DataFrame
 
     """
+    check_redcap_pat()
     data = {
-        "token": redcap_token,
+        "token": os.environ["PAT_REDCAP_EMOREP"],
         "content": content,
         "format": return_format,
         "report_id": report_id,
@@ -94,7 +125,7 @@ def pull_redcap_data(
 
 
 def pull_qualtrics_data(
-    survey_name, survey_id, datacenter_id, qualtrics_token, post_labels=False
+    survey_name, survey_id, datacenter_id, post_labels=False
 ):
     """Pull a Qualtrics report and make a pandas dataframe.
 
@@ -109,8 +140,6 @@ def pull_qualtrics_data(
         Qualtrics survey_ID
     data_center_id : str
         Qualtrics datacenter_ID
-    qualtrics_token : str
-        API token for Qualtrics
     post_labels : bool
         Whether to pull labeled [True] or numeric [False] reports
 
@@ -124,6 +153,7 @@ def pull_qualtrics_data(
         If response export progress takes too long
 
     """
+    check_qualtrics_pat()
     print(f"Downloading {survey_name} ...")
 
     # Setting static parameters
@@ -135,7 +165,7 @@ def pull_qualtrics_data(
     )
     headers = {
         "content-type": "application/json",
-        "x-api-token": qualtrics_token,
+        "x-api-token": os.environ["PAT_QUALTRICS_EMOREP"],
     }
 
     # Create data export, submit download request
@@ -253,7 +283,6 @@ def calc_age_mo(subj_dob, subj_dos):
     """
     subj_age_mo = []
     for dob, dos in zip(subj_dob, subj_dos):
-
         # Calculate years, months, and days
         num_years = dos.year - dob.year
         num_months = dos.month - dob.month
@@ -411,9 +440,9 @@ class _RedCapComplete:
 
     """
 
-    def __init__(self, redcap_token: str):
+    def __init__(self):
         """Set df_compl attr from REDCap completion log."""
-        self.df_compl = survey_download.dl_completion_log(redcap_token)
+        self.df_compl = survey_download.dl_completion_log()
         self.df_compl = self.df_compl.loc[
             (self.df_compl["day_1_fully_completed"] == 1.0)
             | (
@@ -535,7 +564,6 @@ class CheckStatus:
     def add_status(
         self,
         df,
-        redcap_token,
         subj_col="src_subject_id",
         status_list=["lost", "withdrew", "excluded"],
         clear_following=True,
@@ -552,8 +580,6 @@ class CheckStatus:
         ----------
         df : pd.DataFrame, build_reports.DemoAll.final_demo
             Input df to be updated
-        redcap_token : str
-            API token for REDCap
         subj_col : str, optional
             Column name of input df holding subject ID strings
         status_list : list, optional
@@ -573,7 +599,7 @@ class CheckStatus:
         v1_dict = chk_stat.visit1
 
         get_demo = build_reports.DemoAll(*args)
-        df_demo_status = chk_stat.add_status(get_demo.final_demo, redcap_token)
+        df_demo_status = chk_stat.add_status(get_demo.final_demo)
 
         """
         # Validate input
@@ -588,7 +614,7 @@ class CheckStatus:
         self._subj_col = subj_col
         self._v_list = [1, 2, 3]
         self._clear = clear_following
-        self._rc_compl = _RedCapComplete(redcap_token)
+        self._rc_compl = _RedCapComplete()
 
         # Start empty columns for visit status and reason of change,
         # then fill rows with "enrolled" for participants who

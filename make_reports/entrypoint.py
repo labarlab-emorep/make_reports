@@ -12,7 +12,7 @@ def main():
     that can be accessed from their respective entrypoints (below).
 
         rep_get     : Download and clean RedCap and Qualtrics surveys,
-                        aggregate rest ratings
+                        aggregate task and rest ratings
         rep_regular : Generate regular reports submitted by lab manager
         rep_ndar    : Generate reports for NDAR submission
         rep_metrics : Generate snapshots of the data to aid acquisition

@@ -23,7 +23,6 @@ def get_metrics(
     prop_motion,
     scan_pace,
     participant_flow,
-    redcap_token,
 ):
     """Generate descriptive metrics about the data.
 
@@ -42,8 +41,6 @@ def get_metrics(
         Plot number of attempted scans by week
     participant_flow : bool
         Draw participant PRISMA flowchart
-    redcap_token : str
-        API token for RedCap project
 
     """
     out_dir = os.path.join(proj_dir, "analyses/metrics_recruit")
@@ -52,12 +49,12 @@ def get_metrics(
 
     # Compare planned versus actual recruitment demographics
     if recruit_demo:
-        _ = calc_metrics.demographics(proj_dir, redcap_token)
+        _ = calc_metrics.demographics(proj_dir)
 
     # Plot number of attempted scans per week
     if scan_pace:
         print("Calculate number of attempted scans per week ...\n")
-        _ = calc_metrics.scan_pace(redcap_token, proj_dir)
+        _ = calc_metrics.scan_pace(proj_dir)
 
     # Plot proportion of volumes censored
     if prop_motion:
@@ -65,7 +62,7 @@ def get_metrics(
 
     # Draw PRSIMA flow
     if participant_flow:
-        part_flo = calc_metrics.ParticipantFlow(proj_dir, redcap_token)
+        part_flo = calc_metrics.ParticipantFlow(proj_dir)
         part_flo.draw_prisma()
 
 

@@ -36,8 +36,6 @@ class _CalcProp(build_reports.DemoAll):
     ----------
     proj_dir : str, os.PathLike
         Project's experiment directory
-    redcap_token : str
-        API token for RedCap project
 
     Attributes
     ----------
@@ -55,10 +53,10 @@ class _CalcProp(build_reports.DemoAll):
 
     """
 
-    def __init__(self, proj_dir, redcap_token):
+    def __init__(self, proj_dir):
         """Initialize."""
         print("\tInitializing _CalcProp")
-        super().__init__(proj_dir, redcap_token)
+        super().__init__(proj_dir)
         self.remove_withdrawn()
         self._total_rec = self.final_demo.shape[0]
         self._planned_demo()
@@ -198,7 +196,7 @@ class _CalcProp(build_reports.DemoAll):
 
 
 # %%
-def demographics(proj_dir, redcap_token, plot_var="Count", ref_num=170):
+def demographics(proj_dir, plot_var="Count", ref_num=170):
     """Check on demographic recruitment.
 
     Currently only supports a subset of total planned demographics.
@@ -213,8 +211,6 @@ def demographics(proj_dir, redcap_token, plot_var="Count", ref_num=170):
     ----------
     proj_dir : path
         Project's experiment directory
-    redcap_token : str
-        API token for RedCap project
     plot_var : str, optional
         [Count | Proportion]
         Whether to plot count or proportion values
@@ -240,7 +236,7 @@ def demographics(proj_dir, redcap_token, plot_var="Count", ref_num=170):
 
     # Make a single factor dataframe
     plot_dict = {}
-    calc_props = _CalcProp(proj_dir, redcap_token)
+    calc_props = _CalcProp(proj_dir)
     for h_col, h_val in plot_plan_all:
         calc_props.get_demo_props([h_col], [h_val])
         plot_dict[h_val] = {
@@ -422,7 +418,7 @@ def demographics(proj_dir, redcap_token, plot_var="Count", ref_num=170):
 
 
 # %%
-def scan_pace(redcap_token, proj_dir):
+def scan_pace(proj_dir):
     """Generate barplot of attempted scans per calender week.
 
     Mine REDCap Visit 2, 3 Logs (MRI) for timestamps, indicating a log was
@@ -434,8 +430,6 @@ def scan_pace(redcap_token, proj_dir):
 
     Parameters
     ----------
-    redcap_token : str
-        API token for RedCap project
     proj_dir : path
         Project's experiment directory
 
@@ -446,7 +440,7 @@ def scan_pace(redcap_token, proj_dir):
 
     """
     # Get data, ready for weekly totals
-    df_log = survey_download.dl_mri_log(redcap_token)
+    df_log = survey_download.dl_mri_log()
     df_log["datetime"] = df_log["datetime"] - pd.to_timedelta(7, unit="d")
     df_log["count"] = 1
 
@@ -620,8 +614,6 @@ class ParticipantFlow(build_reports.DemoAll, report_helper.CheckStatus):
     ----------
     proj_dir : str, os.PathLike
         Project's experiment directory
-    redcap_token : str
-        API token for RedCap project
 
     Methods
     -------
@@ -635,14 +627,12 @@ class ParticipantFlow(build_reports.DemoAll, report_helper.CheckStatus):
 
     """
 
-    def __init__(self, proj_dir, redcap_token):
+    def __init__(self, proj_dir):
         """Initialize."""
         print("Initializing ParticipantFlow")
-        super().__init__(proj_dir, redcap_token)
+        super().__init__(proj_dir)
         self._status_list = ["lost", "excluded", "withdrew"]
-        self._df_demo = self.add_status(
-            self.final_demo, redcap_token, clear_following=True
-        )
+        self._df_demo = self.add_status(self.final_demo, clear_following=True)
 
     def draw_prisma(self):
         """Generate PRISMA flowchart of participants in study.
@@ -730,7 +720,7 @@ class ParticipantFlow(build_reports.DemoAll, report_helper.CheckStatus):
 
     def _get_recruit(self) -> int:
         """Determine number of participants recruited."""
-        df_pre = survey_download.dl_prescreening(self._redcap_token)
+        df_pre = survey_download.dl_prescreening()
         return df_pre.shape[0]
 
     def _v1_subj(self) -> dict:

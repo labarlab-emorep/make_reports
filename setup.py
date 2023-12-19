@@ -29,6 +29,7 @@ setup(
     install_requires=[
         "graphviz>=0.20.1",
         "matplotlib>=3.6.1",
+        "mysql_connector_repackaged>=0.3.1",
         "numpy>=1.23.1",
         "pandas>=1.4.3",
         "pydicom>=2.3.1",

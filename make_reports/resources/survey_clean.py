@@ -15,6 +15,7 @@ from string import punctuation
 from make_reports.resources import report_helper
 import importlib.resources as pkg_resources
 from make_reports import reference_files
+from make_reports.resources import sql_database
 
 
 class CleanRedcap:
@@ -397,6 +398,13 @@ class CleanRedcap:
         self.df_study = df_raw.loc[idx_study]
         self._res_idx()
 
+        # Update db_emorep.ref_subj for enrolled study subjs
+        db_con = sql_database.DbConnect()
+        up_mysql = sql_database.MysqlUpdate(db_con)
+        df_sql = self.df_study.copy()
+        df_sql = df_sql.rename(columns={"record_id": "subj_id"})
+        up_mysql.update_ref_subj(df_sql)
+
     def clean_bdi_day23(self, df_raw):
         """Cleaning method for RedCap BDI surveys.
 
@@ -559,7 +567,7 @@ class CleanQualtrics:
         data_study = {}
         data_pilot = {}
         for sur_name in surveys_visit1:
-            print(f"\tCleaning survey data : day1, {sur_name}")
+            print(f"Cleaning survey data : day1, {sur_name}")
             sur_cols = [x for x in col_names if sur_name in x]
             ext_cols = subj_cols + sur_cols
             df_sur = df_raw[ext_cols]
@@ -650,7 +658,7 @@ class CleanQualtrics:
             data_study[f"visit_{day_str}"] = {}
             data_pilot[f"visit_{day_str}"] = {}
             for sur_key in surveys_visit23:
-                print(f"\tCleaning survey data : {day_str}, {sur_key}")
+                print(f"Cleaning survey data : {day_str}, {sur_key}")
                 sur_cols = [x for x in col_names if sur_key in x]
                 ext_cols = subj_cols + sur_cols
                 df_sub = df_raw[ext_cols]
@@ -727,7 +735,7 @@ class CleanQualtrics:
 
         """
         self._df_raw = df_raw
-        print("\tCleaning survey data : post_scan_ratings ...")
+        print("Cleaning survey data : post_scan_ratings ...")
 
         # Remove header rows, test IDs, txtFile NaNs, and restarted
         # sessions (Finished=False).

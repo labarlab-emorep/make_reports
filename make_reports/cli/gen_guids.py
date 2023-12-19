@@ -7,10 +7,15 @@ GUIDs to those in RedCap survey.
 Generated GUIDs are written to:
     <proj_dir>/data_survey/redcap/output_guid_*.txt
 
+Notes
+-----
+Requires global variable 'PAT_REDCAP_EMOREP' in user env, which
+holds the personal access token to the emorep REDCap database.
+
 Examples
 --------
-gen_guids -n nmuncy -t $PAT_REDCAP_EMOREP
-gen_guids -n nmuncy -t $PAT_REDCAP_EMOREP --find-mismatch
+gen_guids -n nmuncy
+gen_guids -n nmuncy --find-mismatch
 
 """
 import sys
@@ -18,6 +23,7 @@ import textwrap
 from getpass import getpass
 from argparse import ArgumentParser, RawTextHelpFormatter
 from make_reports.workflows import required_reports
+from make_reports.resources import report_helper
 
 
 def _get_args():
@@ -52,13 +58,6 @@ def _get_args():
     required_args.add_argument(
         "-n", "--user-name", type=str, required=True, help="NDA user name"
     )
-    required_args.add_argument(
-        "-t",
-        "--redcap-token",
-        type=str,
-        default=None,
-        help="API token for RedCap project",
-    )
 
     if len(sys.argv) <= 1:
         parser.print_help(sys.stderr)
@@ -73,9 +72,9 @@ def main():
     proj_dir = args.proj_dir
     user_name = args.user_name
     find_mismatch = args.find_mismatch
-    redcap_token = args.redcap_token
 
     # Get, check for password
+    report_helper.check_redcap_pat()
     user_pass = getpass(
         """
         Please provide NDA password used with the GUID tool
@@ -92,7 +91,7 @@ def main():
     # Start workflows
     print("\nStarting workflow ...")
     required_reports.generate_guids(
-        proj_dir, user_name, user_pass, find_mismatch, redcap_token
+        proj_dir, user_name, user_pass, find_mismatch
     )
 
 
