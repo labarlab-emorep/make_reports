@@ -15,7 +15,6 @@ EmorepTask : generate stats, plots emorep task
 """
 # %%
 import os
-import glob
 from typing import Tuple
 import pandas as pd
 from pandas.api.types import is_numeric_dtype, is_string_dtype
@@ -1089,85 +1088,18 @@ class EmorepTask(_DescStat):
         self._draw_plot = draw_plot
         self.out_dir = os.path.join(proj_dir, "analyses/metrics_surveys")
 
-        # Find all events files, make and initialize dataframe
-        print("\tFinding all events.tsv files ...")
-        mri_rawdata = os.path.join(proj_dir, "data_scanner_BIDS", "rawdata")
-        events_all = sorted(
-            glob.glob(f"{mri_rawdata}/sub-*/ses-*/func/*_events.tsv")
-        )
-        if not events_all:
-            raise ValueError(
-                f"Expected to find BIDS events files in : {mri_rawdata}"
-            )
-        self.df = self._get_data(events_all)
+        # Get and organize cleaned data
+        gt = manage_data.GetTask(proj_dir)
+        gt.get_task()
+        df_day2 = gt.clean_task["study"]["visit_day2"]["in_scan_task"]
+        df_day3 = gt.clean_task["study"]["visit_day3"]["in_scan_task"]
+        self.df = pd.concat([df_day2, df_day3], axis=0, ignore_index=True)
+        self.df["task"] = self.df["task"].str.title()
+        self.df["block"] = self.df["block"].str.title()
+        self.df["resp_emotion"] = self.df["resp_emotion"].str.title()
+
+        # Initialize stat helper
         super().__init__(self.df)
-
-    def _get_data(self, events_all: list) -> pd.DataFrame:
-        """Combine all events files into dataframe."""
-        print("\tBuilding dataframe of all participant events.tsv")
-        df_all = pd.DataFrame(
-            columns=[
-                "onset",
-                "duration",
-                "trial_type",
-                "stim_info",
-                "response",
-                "response_time",
-                "accuracy",
-                "emotion",
-                "subj",
-                "sess",
-                "task",
-                "run",
-            ]
-        )
-        for event_path in events_all:
-            subj, sess, task, run, _ = os.path.basename(event_path).split("_")
-            df = pd.read_csv(event_path, sep="\t")
-            df["subj"] = subj.split("-")[-1]
-            df["sess"] = sess.split("-")[-1]
-            df["task"] = task.split("-")[-1]
-            df["run"] = int(run[-1])
-            df_all = pd.concat([df_all, df], ignore_index=True)
-            del df
-
-        # Extract participant response rows
-        df_resp = df_all.loc[
-            df_all["trial_type"].isin(
-                ["movie", "scenario", "emotion", "intensity"]
-            )
-        ].reset_index(drop=True)
-        del df_all
-
-        # Organize dataframe
-        df_resp["emotion"] = df_resp["emotion"].fillna(method="ffill")
-        df_resp = df_resp.loc[
-            ~df_resp["trial_type"].isin(["movie", "scenario"])
-        ].reset_index(drop=True)
-        df_resp = df_resp.drop(
-            ["onset", "duration", "accuracy", "stim_info"], axis=1
-        )
-
-        # Clean up column values and types
-        df_resp["emotion"] = df_resp["emotion"].str.title()
-        df_resp["task"] = df_resp["task"].str.title()
-        # df_resp["task"] = df_resp["task"].replace("Movies", "Videos")
-        df_resp["run"] = df_resp["run"].astype("Int64")
-
-        # Clean up dataframe for writing
-        df_task = df_resp.copy()
-        df_task = df_task.drop("response_time", axis=1)
-        df_task = df_task.rename(columns={"emotion": "block"})
-        df_task["block"] = df_task.block.str.lower()
-        df_task["task"] = df_task.task.str.lower()
-        df_task["response"] = df_task.response.str.lower()
-        df_task = df_task[
-            ["subj", "sess", "task", "run", "block", "trial_type", "response"]
-        ]
-        out_path = os.path.join(self.out_dir, "df_in_scan_ratings.csv")
-        print(f"\tWriting : {out_path}")
-        df_task.to_csv(out_path, index=False)
-        return df_resp
 
     def select_intensity(self):
         """Generate descriptive stats and plots for intensity selection.
@@ -1183,23 +1115,16 @@ class EmorepTask(_DescStat):
         """
         # Subset dataframe for intensity selection
         df_all = self.df.copy()
-        df_int = df_all.loc[df_all["trial_type"] == "intensity"].copy()
-        df_int["response"] = df_int["response"].replace("NONE", np.nan)
-        df_int = df_int.reset_index(drop=True)
-        df_int = df_int.drop(
-            ["response_time", "run", "trial_type", "sess"], axis=1
-        )
+        df_int = df_all.drop(["visit", "run", "resp_emotion"], axis=1)
 
         # Organize dataframe for _DescStat.calc_long_stats
-        df_int["task"] = df_int["task"].str.title()
-        df_int["response"] = df_int["response"].astype("Int64")
-        for str_col in ["emotion", "task"]:
+        for str_col in ["task", "block"]:
             df_int[str_col] = df_int[str_col].astype(pd.StringDtype())
-        df_int = df_int.sort_values(by=["subj", "emotion", "task"])
+        df_int = df_int.sort_values(by=["study_id", "block", "task"])
 
         # Calculate and write stats
         self.df = df_int
-        df_stats = self.calc_long_stats("task", "emotion")
+        df_stats = self.calc_long_stats("task", "block")
         out_csv = os.path.join(self.out_dir, "table_task-intensity.csv")
         df_stats.to_csv(out_csv)
         print(f"\tWrote csv : {out_csv}")
@@ -1211,9 +1136,9 @@ class EmorepTask(_DescStat):
                 "plot_task-intensity_boxplot-long.png",
             )
             self.draw_long_boxplot(
-                x_col="emotion",
+                x_col="block",
                 x_lab="Emotion",
-                y_col="response",
+                y_col="resp_intensity",
                 y_lab="Intensity",
                 hue_order=["Scenarios", "Movies"],
                 hue_col="task",
@@ -1252,19 +1177,18 @@ class EmorepTask(_DescStat):
 
         # Subset dataframe for emotion selection
         df_all = self.df.copy()
-        df_emo = df_all.loc[
-            (df_all["trial_type"] == "emotion") & (df_all["task"] == task)
-        ].copy()
-        df_emo["response"] = df_emo["response"].str.title()
-        df_emo = df_emo.reset_index(drop=True)
+        df_emo = df_all.loc[df_all["task"] == task].copy()
+        df_emo = df_emo.drop(["resp_intensity", "visit"], axis=1)
 
         # Determine emotions
-        emo_all = df_emo["emotion"].unique().tolist()
+        emo_all = df_emo["block"].unique().tolist()
         emo_all.sort()
 
         # Calculate confusion matrix, write out
         self.df = df_emo
-        df_prop, df_count = self.confusion_matrix(emo_all, "subj", 2)
+        df_prop, df_count = self.confusion_matrix(
+            emo_all, "study_id", 2, emo_col="block", resp_col="resp_emotion"
+        )
         out_prop = os.path.join(
             self.out_dir,
             f"table_task-emotion_endorsement-prop_{task.lower()}.csv",
