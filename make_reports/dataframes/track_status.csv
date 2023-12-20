@@ -28,6 +28,7 @@ ER0736,,,lost,Unknown,
 ER0744,,lost,lost,Time Conflict,
 ER0800,,,lost,Unknown,
 ER0909,,,lost,EAE,day3 Adverse event
+ER0911,,,lost,Time Conflict,
 ER0962,,,lost,EAE,day3 Adverse Event
 ER1014,,,lost,Unknown,
 ER1024,lost,lost,lost,Time Conflict,visit1 marked lost bc didn't do Emotion surveys
