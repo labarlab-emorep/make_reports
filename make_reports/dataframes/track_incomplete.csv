@@ -13,7 +13,7 @@ ER0208,,JG,,incomplete,,,,,,,,,,day2 qualtrics prescan survey missing
 ER0211,,,,,,,,JG,,incomplete,,,,day3 qualtrics prescan survey missing
 ER0229,incomplete,YD,,,,bad_run,,JG,,incomplete,incomplete,not_collected,not_collected,day1 missing qualtrics survey; day2 run1 behav responses; day3  EAE
 ER0274,,YD,,incomplete,,,,,,,,,,day2 qualtrics postscan surveys missing
-ER0325,,,,,,,,YD,,incomplete,,not_collected,not_collected,day3 missing physio & behav (assumed not moved from CAMRD) & missing day3 qualtrics post-scan survey
+ER0325,,,,,,,,YD,,incomplete,,,not_collected,day3 missing physio & missing day3 qualtrics post-scan survey
 ER0489,,,,,,,,JG,,,bad_run,bad_run,bad_run,day3 run6 missing behav file; day3 run6 short mri & physio files
 ER0611,,,,,,,,AS,,,bad_run,,incomplete,day3 run5 sync box not started & missing day3 run4 physio due to crash
 ER0631,incomplete,,not_collected,not_collected,not_collected,not_collected,not_collected,,not_collected,not_collected,not_collected,not_collected,not_collected,day1 survey incomplete; day2 & day3 not run
@@ -24,7 +24,8 @@ ER0693,,SS,,,bad_run,,bad_run,,,,,,,day2 run1 short mri & physio files
 ER0697,,SS,,,incomplete,incomplete,incomplete,,,,,,,day2 missing rest & rest ratings; day2 empty run-01 physio file
 ER0730,,,,,,,,SS,,,,,bad_run,day3 missing run2 physio files
 ER0736,incomplete,,,,,,,,not_collected,not_collected,not_collected,not_collected,not_collected,day1 survey incomplete; day3 lost
-ER0909,,JG,,,bad_run,bad_run,bad_run,YD,,incomplete,incomplete,not_collected,not_collected,"day2 run6 missing mri, behav, physio files; day3 EAE at run2"
+ER0909,,JG,,,bad_run,bad_run,bad_run,YD,,incomplete,incomplete,incomplete,incomplete,"day2 run6 missing mri, behav, physio files; day3 EAE at run2"
+ER0962,,SS,,,incomplete,incomplete,incomplete,,not_collected,not_collected,not_collected,not_collected,not_collected,"day2 run6 EAE, missing run6-8 and rest run for mri, behav and physio; day3 EAE"
 ER1002,,,,,,,,YD,,,,incomplete,,day3 missing rest ratings behav file
 ER1006,,,,,,,,YD,,,bad_run,,,day3 run6 missing end of mri file
 ER1132,,AS,,,,bad_run,,,,,,,,day2 run1 behav file missing
