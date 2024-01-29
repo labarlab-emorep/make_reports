@@ -203,11 +203,11 @@ class _CheckEmorep(_ChkRsc):
                 "*defaced.nii.gz",
                 1,
             ),
-            "fmriprep": (
-                os.path.join(self._deriv_dir, "pre_processing/fmriprep"),
-                "func/*desc-preproc_bold.nii.gz",
-                9,
-            ),
+            # "fmriprep": (
+            #     os.path.join(self._deriv_dir, "pre_processing/fmriprep"),
+            #     "func/*desc-preproc_bold.nii.gz",
+            #     9,
+            # ),
             "fsl-preproc": (
                 os.path.join(self._deriv_dir, "pre_processing/fsl_denoise"),
                 "func/*desc-scaled_bold.nii.gz",
@@ -239,17 +239,17 @@ class _CheckEmorep(_ChkRsc):
                 + "cope1.feat/stats/cope*.nii.gz",
                 30,
             ),
-            "fsl-tog-first": (
-                os.path.join(self._deriv_dir, "model_fsl"),
-                "func/*level-first_name-tog.feat/stats/cope*.nii.gz",
-                30,
-            ),
-            "fsl-tog-second": (
-                os.path.join(self._deriv_dir, "model_fsl"),
-                "func/level-second_name-tog.gfeat/"
-                + "cope1.feat/stats/cope*.nii.gz",
-                15,
-            ),
+            # "fsl-tog-first": (
+            #     os.path.join(self._deriv_dir, "model_fsl"),
+            #     "func/*level-first_name-tog.feat/stats/cope*.nii.gz",
+            #     30,
+            # ),
+            # "fsl-tog-second": (
+            #     os.path.join(self._deriv_dir, "model_fsl"),
+            #     "func/level-second_name-tog.gfeat/"
+            #     + "cope1.feat/stats/cope*.nii.gz",
+            #     15,
+            # ),
             "fsl-lss": (
                 os.path.join(self._deriv_dir, "model_fsl-lss"),
                 "func/*level-first_name-lss*.feat/stats/cope1.nii.gz",
