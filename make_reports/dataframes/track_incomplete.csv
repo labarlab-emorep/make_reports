@@ -32,4 +32,4 @@ ER1006,,,,,,,,YD,,,bad_run,,,day3 run6 missing end of mri file
 ER1132,,AS,,,,bad_run,,,,,,,,day2 run1 behav file missing
 ER1136,,JG,,,,,bad_run,SS,,,not_collected,,,day2: sync box not started - bad resting-state physio data; day3 all MRI data corrupted per reconstruction failed
 ER1137,,AS,,,,incomplete,,,not_collected,not_collected,not_collected,not_collected,not_collected,day2 post-rest ratings behav file missing; day3: lost
-ER1152,not_collected,JG,,,incomplete,incomplete,incomplete,,,,,,,day1 not rcvd; day2 rest & post-rest not run
+ER1152,,JG,,,incomplete,incomplete,incomplete,,,,,,,day2 rest & post-rest not run
