@@ -351,7 +351,7 @@ class ManagerRegular(DemoAll):
         ----------
         report : str
             {"nih4", "nih12", "duke3", "duke12"}
-            Desired report name
+            Desired report name, "duke3" deprecated
 
         """
         # Trigger appropriate method

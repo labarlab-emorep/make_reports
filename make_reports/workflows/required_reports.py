@@ -20,7 +20,7 @@ def make_regular_reports(regular_reports, query_date, proj_dir):
     """Make reports for the lab manager.
 
     Coordinate the use of build_reports.ManagerRegular to generate
-    desired nih12, nih4, or duke3 report.
+    desired nih12, nih4, duke3, or duke12 report.
 
     Reports are written to:
         <proj_dir>/documents/regular_reports

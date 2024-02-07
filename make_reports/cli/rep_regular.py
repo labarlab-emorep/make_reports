@@ -3,15 +3,12 @@ r"""Generate regular reports.
 Mine RedCap demographic information to construct reports regularly
 submitted to the NIH or Duke.
 
-Reports are written to:
-    <proj_dir>/documents/regular_reports
-
-Previous submissions can also be generated via --query-date.
-
 Notes
 -----
-Requires global variable 'PAT_REDCAP_EMOREP' in user env, which
-holds the personal access token to the emorep REDCap database.
+- Requires global variable 'PAT_REDCAP_EMOREP' in user env, which
+    holds the personal access token to the emorep REDCap database.
+- Previous submissions can also be generated via --query-date.
+- Reports are written to <proj_dir>/documents/regular_reports
 
 Examples
 --------
