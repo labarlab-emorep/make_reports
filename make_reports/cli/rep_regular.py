@@ -15,10 +15,11 @@ holds the personal access token to the emorep REDCap database.
 
 Examples
 --------
-rep_regular --names nih4 nih12 duke3
+rep_regular --names nih4 nih12 duke12
 rep_regular --names nih4 --query-date 2022-06-29
 
 """
+
 import sys
 import textwrap
 from datetime import date
@@ -65,16 +66,8 @@ def _get_args():
         nargs="+",
         required=True,
         type=str,
-        help=textwrap.dedent(
-            """\
-            [nih4 | nih12 | duke3]
-            List of reguilar reports to generate. Acceptable
-            args are "nih4", "nih12", and "duke3" for the reports
-            submitted to the NIH every 4 months, NIH every 12 months,
-            and Duke every 3 months, respectively.
-            e.g. --manager-reports nih4 duke3
-            """
-        ),
+        choices=["nih4", "nih12", "duke3", "duke12"],
+        help="List of desired reports to generate",
     )
 
     if len(sys.argv) <= 1:

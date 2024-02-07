@@ -5,6 +5,7 @@ ManagerRegular : generate reports regularly submitted
 GenerateGuids : generate, check GUIDs
 
 """
+
 import os
 import glob
 import subprocess
@@ -318,10 +319,13 @@ class ManagerRegular(DemoAll):
 
     Methods
     -------
-    make_report(report)
-        Entrypoint, trigger appropriate report method
+    make_report()
+        Entrypoint, triggers appropriate report method
     make_duke3()
+        Deprecated.
         Generate report submitted to Duke every 3 months
+    make_duke12()
+        Generate report submitted to Duke every 12 months
     make_nih4()
         Generate report submitted to NIH every 4 months
     make_nih12()
@@ -346,12 +350,12 @@ class ManagerRegular(DemoAll):
         Parameters
         ----------
         report : str
-            [nih4 | nih12 | duke3]
-            Select desired report
+            {"nih4", "nih12", "duke3", "duke12"}
+            Desired report name
 
         """
         # Trigger appropriate method
-        if report not in ["nih12", "nih4", "duke3"]:
+        if report not in ["nih12", "nih4", "duke3", "duke12"]:
             raise ValueError(f"Inappropriate report requested : {report}")
         report_method = getattr(self, f"make_{report}")
         report_method()
@@ -562,7 +566,43 @@ class ManagerRegular(DemoAll):
             )
             self.df_report = None
             return
+        self._make_duke()
 
+    def make_duke12(self):
+        """Create report submitted to Duke every 12 months.
+
+        Determine the number of participants that belong to
+        gender * ethnicity * race group combinations which have
+        been recruited in the current period.
+
+        Attributes
+        ----------
+        df_report : pd.DataFrame, None
+            Relevant info, format for requested report
+
+        """
+        # Set start, end dates for report periods
+        duke_12mo_ranges = [
+            ("2020-07-01", "2021-06-30"),
+            ("2021-07-01", "2022-06-30"),
+            ("2022-07-01", "2023-06-30"),
+            ("2023-07-01", "2024-06-30"),
+            ("2024-07-01", "2025-06-30"),
+        ]
+
+        # Find data within range, check for data
+        self._get_data_range(duke_12mo_ranges)
+        if self._df_range.empty:
+            print(
+                "\t\tNo data collected for query range : "
+                + f"{self.range_start} - {self.range_end}, skipping ..."
+            )
+            self.df_report = None
+            return
+        self._make_duke()
+
+    def _make_duke(self):
+        """Generate metrics for duke reports."""
         # Get gender, ethnicity, race responses
         df_hold = self._df_range[
             ["src_subject_id", "sex", "ethnicity", "race"]
@@ -770,9 +810,9 @@ class GenerateGuids(manage_data.GetRedcap):
         # have a middle name.
         df_guid["SEX"] = df_guid["SEX"].map({1.0: "M", 2.0: "F"})
         df_guid["SUBJECTHASMIDDLENAME"] = "Yes"
-        df_guid.loc[
-            df_guid["MIDDLENAME"].isnull(), "SUBJECTHASMIDDLENAME"
-        ] = "No"
+        df_guid.loc[df_guid["MIDDLENAME"].isnull(), "SUBJECTHASMIDDLENAME"] = (
+            "No"
+        )
 
         # Write out intermediate dataframe
         self.df_guid_file = os.path.join(
