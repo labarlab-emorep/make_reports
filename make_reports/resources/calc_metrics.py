@@ -6,6 +6,7 @@ censored_volumes : plot proportion of volumes exceeding FD threshold
 ParticipantFlow : generate PRISMA flowchart of participants in experiment
 
 """
+
 # %%
 import os
 import json
@@ -680,7 +681,8 @@ class ParticipantFlow(build_reports.DemoAll, report_helper.CheckStatus):
                 "1",
                 "Visit1: Enrollment\n"
                 + f"n={len(v1_dict['start'])} {self._get_female(v1_dict['start'])}\l"  # noqa: W605 E501
-                + f"{self._get_age(v1_dict['start'])}\l",  # noqa: W605
+                + f"{self._get_age(v1_dict['start'])}\l"  # noqa: W605 E501
+                + f"(in progress: {len(v1_dict['prog'])})\l",  # noqa: W605
                 shape="box",
             )
             c.node(
@@ -695,13 +697,24 @@ class ParticipantFlow(build_reports.DemoAll, report_helper.CheckStatus):
         count = 3
         for day in [2, 3]:
             v_dict = self._v23_subj(day)
+
+            # Add in progress for day2, not day3
+            if day == 2:
+                prog_str = (
+                    f"{self._get_age(v_dict['start'])}\l"  # noqa: W605 E501
+                    + f"(in progress: {len(v_dict['prog'])})\l"  # noqa: W605 E501
+                )
+            else:
+                prog_str = (
+                    f"{self._get_age(v_dict['start'])}\l"  # noqa: W605 E501
+                )
             with flo.subgraph() as c:
                 c.attr(rank="same")
                 c.node(
                     str(count),
                     f"Visit{day}: Survey & MRI\n"
                     + f"n={len(v_dict['start'])} {self._get_female(v_dict['start'])}\l"  # noqa: W605 E501
-                    + f"{self._get_age(v_dict['start'])}\l",  # noqa: W605
+                    + prog_str,
                     shape="box",
                 )
                 count += 1
@@ -748,9 +761,10 @@ class ParticipantFlow(build_reports.DemoAll, report_helper.CheckStatus):
             self._df_demo["visit1_status"].notna(), "src_subject_id"
         ].to_list()
 
-        # Participants with status change
+        # Participants with status change, in progress
         for stat in self._status_list:
             out_dict[stat] = self._stat_change("visit1", stat)
+        out_dict["prog"] = self._in_prog("visit1", "visit2")
         return out_dict
 
     def _stat_change(self, visit: str, status: str) -> list:
@@ -759,6 +773,14 @@ class ParticipantFlow(build_reports.DemoAll, report_helper.CheckStatus):
             self._df_demo[f"{visit}_status"] == status
         ].to_list()
         return self._df_demo.loc[idx_subj, "src_subject_id"].to_list()
+
+    def _in_prog(self, visit_a: str, visit_b: str) -> list:
+        """Return participants who started visit_a and waiting for visit_b."""
+        idx_prog = self._df_demo.index[
+            (self._df_demo[f"{visit_a}_status"] == "enrolled")
+            & (self._df_demo[f"{visit_b}_status"].isna())
+        ].to_list()
+        return self._df_demo.loc[idx_prog, "src_subject_id"].to_list()
 
     def _v23_subj(self, day: int) -> dict:
         """Return visit 2,3 status info."""
@@ -771,6 +793,8 @@ class ParticipantFlow(build_reports.DemoAll, report_helper.CheckStatus):
         # Participants with status change
         for stat in self._status_list:
             out_dict[stat] = self._stat_change(f"visit{day}", stat)
+        if day == 2:
+            out_dict["prog"] = self._in_prog("visit2", "visit3")
         return out_dict
 
     def _final_subj(self) -> dict:
