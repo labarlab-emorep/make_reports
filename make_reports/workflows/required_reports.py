@@ -6,6 +6,7 @@ MakeNdarReports : Generate reports, data submitted to NIH Data
 gen_guids : generate or check GUIDs
 
 """
+
 # %%
 import os
 from datetime import datetime
@@ -19,7 +20,7 @@ def make_regular_reports(regular_reports, query_date, proj_dir):
     """Make reports for the lab manager.
 
     Coordinate the use of build_reports.ManagerRegular to generate
-    desired nih12, nih4, or duke3 report.
+    desired nih12, nih4, duke3, or duke12 report.
 
     Reports are written to:
         <proj_dir>/documents/regular_reports
@@ -41,7 +42,7 @@ def make_regular_reports(regular_reports, query_date, proj_dir):
 
     """
     # Validate regular_reports arguments
-    valid_mr_args = ["nih12", "nih4", "duke3"]
+    valid_mr_args = ["nih12", "nih4", "duke3", "duke12"]
     for report in regular_reports:
         if report not in valid_mr_args:
             raise ValueError(
