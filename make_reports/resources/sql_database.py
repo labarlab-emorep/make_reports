@@ -4,6 +4,7 @@ DbConnect : connect to and interact with mysql server
 MysqlUpdate : update db_emorep tables
 
 """
+
 # %%
 import os
 import pandas as pd
@@ -239,6 +240,20 @@ class _DbUpdateRecipes:
             + "(subj_id, sess_id, task_id, run, block_id, "
             + "resp_emo_id, resp_intensity) "
             + "values (%s, %s, %s, %s, %s, %s, %s)",
+            tbl_input,
+        )
+
+    def update_ref_sess_task(self, df: pd.DataFrame):
+        """Update mysql db_emorep.ref_sess_task."""
+        tbl_input = list(
+            df[["subj_id", "sess_id", "task_id"]].itertuples(
+                index=False, name=None
+            )
+        )
+        self._db_con.exec_many(
+            "insert ignore into ref_sess_task "
+            + "(subj_id, sess_id, task_id)"
+            + "values (%s, %s, %s)",
             tbl_input,
         )
 
@@ -528,7 +543,12 @@ class MysqlUpdate(_DbUpdateRecipes, _DfManip, _TaskMaps):
         df["resp_emo_id"] = df["resp_emo_id"].replace(np.nan, "")
         df["resp_intensity"] = df["resp_intensity"].astype(str)
         df["resp_intensity"] = df["resp_intensity"].replace("<NA>", "")
+
+        # Update reference and task tables
         self.update_in_scan_ratings(df, self._sur_low)
+        self.update_ref_sess_task(
+            df.drop_duplicates(subset=["subj_id", "sess_id", "task_id"]),
+        )
 
 
 # %%
