@@ -15,6 +15,7 @@ import numpy as np
 from datetime import datetime
 from make_reports.resources import manage_data
 from make_reports.resources import report_helper
+from make_reports.resources import sql_database
 
 
 class DemoAll(manage_data.GetRedcap):
@@ -122,7 +123,7 @@ class DemoAll(manage_data.GetRedcap):
 
         """
         # Get attribute for readibility, testing
-        df_merge = self._df_merge
+        df_merge = self._df_merge.copy()
 
         # Get race response - deal with "More than one" (6) and
         # "Other" (8) separately.
@@ -209,6 +210,22 @@ class DemoAll(manage_data.GetRedcap):
         self._subj_ethnic = subj_ethnic
         self._subj_minor = subj_minor
 
+    def _get_hand(self) -> list:
+        """Determine handedness."""
+        hand_clean = []
+        for hand in self._df_merge["handedness"]:
+            if "ight" in hand or "R" in hand:
+                hand_clean.append(2)
+            elif "eft" in hand or "L" in hand:
+                hand_clean.append(1)
+            elif "na" in hand:
+                hand_clean.append(0)
+            else:
+                hand_clean.append(int(hand))
+
+        hand_switch = {0: np.nan, 1: "left", 2: "right", 3: "ambi"}
+        return [hand_switch[x] for x in hand_clean]
+
     def make_complete(self):
         """Make a demographic dataframe.
 
@@ -231,11 +248,12 @@ class DemoAll(manage_data.GetRedcap):
         self._df_merge["datetime"] = self._df_merge["datetime"].dt.date
         subj_consent_date = self._df_merge["datetime"].tolist()
 
-        # Get age, sex
+        # Get age, sex, handedness
         subj_age = self._df_merge["age"].tolist()
         h_sex = self._df_merge["gender"].tolist()
         sex_switch = {1.0: "Male", 2.0: "Female", 3.0: "Neither"}
         subj_sex = [sex_switch[x] for x in h_sex]
+        subj_hand = self._get_hand()
 
         # Get DOB, age in months, education
         subj_dob = self._df_merge["dob"]
@@ -246,7 +264,7 @@ class DemoAll(manage_data.GetRedcap):
         self._get_race()
         self._get_ethnic_minority()
 
-        # Write dataframe
+        # Build dataframe
         out_dict = {
             "subjectkey": subj_guid,
             "src_subject_id": subj_study,
@@ -259,8 +277,21 @@ class DemoAll(manage_data.GetRedcap):
             "race": self._race_resp,
             "is_minority": self._subj_minor,
             "years_education": subj_educate,
+            "handedness": subj_hand,
         }
         self.final_demo = pd.DataFrame(out_dict, columns=out_dict.keys())
+
+        # Update db_emorep
+        db_con = sql_database.DbConnect()
+        up_mysql = sql_database.MysqlUpdate(db_con)
+        up_mysql.update_db(
+            self.final_demo.copy(),
+            "demographics",
+            1,
+            "demographics",
+            subj_col="src_subject_id",
+        )
+        db_con.close_con()
 
     def remove_withdrawn(self):
         """Remove participants from final_demo who have withdrawn consent."""

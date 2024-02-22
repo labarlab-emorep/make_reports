@@ -13,6 +13,7 @@ GetRest : aggregate, clean, and write rest rating responses (rest_ratings)
 GetTask : aggregate and write emorep task responses (in_scan_ratings)
 
 """
+
 # %%
 import os
 import glob
@@ -81,8 +82,8 @@ class GetRedcap(survey_clean.CleanRedcap):
         super().__init__(self._proj_dir, pilot_list)
 
         # Start mysql connection
-        db_con = sql_database.DbConnect()
-        self._up_mysql = sql_database.MysqlUpdate(db_con)
+        self._db_con = sql_database.DbConnect()
+        self._up_mysql = sql_database.MysqlUpdate(self._db_con)
 
     def _download_redcap(self, survey_list: list) -> dict:
         """Get, write, and return RedCap survey info.
@@ -121,9 +122,15 @@ class GetRedcap(survey_clean.CleanRedcap):
         Parameters
         ----------
         survey_list : list, optional
-            If None, pull all reports. Available report names:
-            demographics, consent_pilot, consent_v1.22, guid,
-            bdi_day2, bdi_day3
+            {
+                "demographics",
+                "consent_pilot",
+                "consent_v1.22",
+                "guid",
+                "bdi_day2",
+                "bdi_day3"
+            }
+            If None, pull all reports.
 
         Attributes
         ----------
@@ -184,6 +191,7 @@ class GetRedcap(survey_clean.CleanRedcap):
                 self._up_mysql.update_db(
                     self.df_study.copy(), key_name, int(visit[-1]), "redcap"
                 )
+        self._db_con.close_con()
 
     def _write_redcap(
         self, df: pd.DataFrame, sur_name: str, dir_name: str, is_pilot: bool
@@ -285,8 +293,12 @@ class GetQualtrics(survey_clean.CleanQualtrics):
         Parameters
         ----------
         survey_list : list, optional
-            Qualtrics report names, available names = EmoRep_Session_1,
-            Session 2 & 3 Survey, FINAL - EmoRep Stimulus Ratings - fMRI Study
+            {
+                "EmoRep_Session_1",
+                "Session 2 & 3 Survey",
+                "FINAL - EmoRep Stimulus Ratings - fMRI Study"
+            }
+            Qualtrics report names
 
         Attributes
         ----------

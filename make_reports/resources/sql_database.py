@@ -21,6 +21,10 @@ class DbConnect:
 
     Methods
     -------
+    close_con()
+        Close database connection
+    connect()
+        Yield cursor
     exec_many()
         Update mysql db_emorep.tbl_* with multiple values
 
@@ -37,6 +41,7 @@ class DbConnect:
     )
     tbl_input = [(9, "ER0009"), (16, "ER0016")]
     db_con.exec_many(sql_cmd, tbl_input)
+    db_con.close_con()
 
     """
 
@@ -64,6 +69,10 @@ class DbConnect:
         with self.connect() as con:
             con.executemany(sql_cmd, value_list)
             self.db_con.commit()
+
+    def close_con(self):
+        """Close database connection."""
+        self.db_con.close()
 
 
 # %%
@@ -171,6 +180,33 @@ class _DbUpdateRecipes:
     def _print_tbl_out(self, sur_low: str):
         """Print table update."""
         print(f"\tUpdating db_emorep.tbl_{sur_low} ...")
+
+    def update_demographics(self, df: pd.DataFrame):
+        """Update db_emorep.tbl_demographics."""
+        self._print_tbl_out("demographics")
+        tbl_input = list(
+            df[
+                [
+                    "subj_id",
+                    "sess_id",
+                    "age",
+                    "interview_age",
+                    "years_education",
+                    "sex",
+                    "handedness",
+                    "race",
+                    "is_hispanic",
+                    "is_minority",
+                ]
+            ].itertuples(index=False, name=None)
+        )
+        self._db_con.exec_many(
+            "insert ignore into tbl_demographics "
+            + "(subj_id, sess_id, age_yrs, age_mos, edu_yrs, "
+            + "sex, hand, race, is_hispanic, is_minority) "
+            + "values (%s, %s, %s, %s, %s, %s, %s, %s, %s, %s)",
+            tbl_input,
+        )
 
     def update_psr(self, df: pd.DataFrame, sur_low: str):
         """Update mysql db_emorep.tbl_post_scan_ratings."""
@@ -419,7 +455,13 @@ class MysqlUpdate(_DbUpdateRecipes, _DfManip, _TaskMaps):
         sess_id : int
             Session ID
         data_source : str
-            {"qualtrics", "redcap", "rest_ratings", "in_scan_ratings"}
+            {
+                "qualtrics",
+                "redcap",
+                "rest_ratings",
+                "in_scan_ratings",
+                "demographics"
+            }
             Survey or task source of data
         subj_col : str, optional
             Name of column holding subject identifiers
@@ -433,6 +475,7 @@ class MysqlUpdate(_DbUpdateRecipes, _DfManip, _TaskMaps):
             "redcap",
             "rest_ratings",
             "in_scan_ratings",
+            "demographics",
         ]:
             raise ValueError("Unexpected data_source parameter")
         if subj_col not in df.columns:
@@ -477,6 +520,31 @@ class MysqlUpdate(_DbUpdateRecipes, _DfManip, _TaskMaps):
             self._df, self._sur_name, item_type=str
         )
         self.update_basic_tbl(df_long, self._sur_low)
+
+    def _update_demographics(self):
+        """Update db_emorep.tbl_demographics."""
+        # Manage casing, type, nan
+        self._df["age"] = self._df["age"].astype(int)
+        self._df["sex"] = self._df["sex"].str.lower()
+        self._df["handedness"] = self._df["handedness"].replace(np.nan, "")
+
+        # Manage is hispanic
+        idx_hisp = self._df.index[
+            self._df["ethnicity"] == "Hispanic or Latino"
+        ].to_list()
+        self._df["is_hispanic"] = "no"
+        self._df.loc[idx_hisp, "is_hispanic"] = "yes"
+
+        # Manage is minority
+        self._df = self._df.rename(
+            {"is_minority": "minority_status"}, axis="columns"
+        )
+        idx_minor = self._df.index[
+            self._df["minority_status"] == "Minority"
+        ].to_list()
+        self._df["is_minority"] = "no"
+        self._df.loc[idx_minor, "is_minority"] = "yes"
+        self.update_demographics(self._df)
 
     def _update_rest_ratings(self):
         """Update db_emorep.tbl_rest_ratings and tbl_survey_date."""
