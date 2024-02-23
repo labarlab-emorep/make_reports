@@ -7,6 +7,7 @@ dl_redcap : download REDCap surveys
 download qualtrics : download Qualtrics surveys
 
 """
+
 import json
 import pandas as pd
 import importlib.resources as pkg_resources
@@ -97,7 +98,10 @@ def dl_prescreening():
     ) as jf:
         report_keys = json.load(jf)
     df_pre = report_helper.pull_redcap_data(report_keys["prescreen"])
-    df_pre = df_pre[df_pre["permission"] == 1].reset_index(drop=True)
+    df_pre = df_pre[
+        (df_pre["permission"] == 1)
+        & (df_pre["prescreening_survey_complete"] == 2)
+    ].reset_index(drop=True)
     df_out = df_pre[
         ["record_id", "permission", "prescreening_survey_complete"]
     ].copy()
