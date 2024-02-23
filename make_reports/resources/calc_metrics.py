@@ -6,6 +6,7 @@ censored_volumes : plot proportion of volumes exceeding FD threshold
 ParticipantFlow : generate PRISMA flowchart of participants in experiment
 
 """
+
 # %%
 import os
 import json
@@ -36,8 +37,6 @@ class _CalcProp(build_reports.DemoAll):
     ----------
     proj_dir : str, os.PathLike
         Project's experiment directory
-    redcap_token : str
-        API token for RedCap project
 
     Attributes
     ----------
@@ -55,10 +54,10 @@ class _CalcProp(build_reports.DemoAll):
 
     """
 
-    def __init__(self, proj_dir, redcap_token):
+    def __init__(self, proj_dir):
         """Initialize."""
         print("\tInitializing _CalcProp")
-        super().__init__(proj_dir, redcap_token)
+        super().__init__(proj_dir)
         self.remove_withdrawn()
         self._total_rec = self.final_demo.shape[0]
         self._planned_demo()
@@ -198,7 +197,7 @@ class _CalcProp(build_reports.DemoAll):
 
 
 # %%
-def demographics(proj_dir, redcap_token, plot_var="Count", ref_num=170):
+def demographics(proj_dir, plot_var="Count", ref_num=170):
     """Check on demographic recruitment.
 
     Currently only supports a subset of total planned demographics.
@@ -213,8 +212,6 @@ def demographics(proj_dir, redcap_token, plot_var="Count", ref_num=170):
     ----------
     proj_dir : path
         Project's experiment directory
-    redcap_token : str
-        API token for RedCap project
     plot_var : str, optional
         [Count | Proportion]
         Whether to plot count or proportion values
@@ -240,7 +237,7 @@ def demographics(proj_dir, redcap_token, plot_var="Count", ref_num=170):
 
     # Make a single factor dataframe
     plot_dict = {}
-    calc_props = _CalcProp(proj_dir, redcap_token)
+    calc_props = _CalcProp(proj_dir)
     for h_col, h_val in plot_plan_all:
         calc_props.get_demo_props([h_col], [h_val])
         plot_dict[h_val] = {
@@ -422,7 +419,7 @@ def demographics(proj_dir, redcap_token, plot_var="Count", ref_num=170):
 
 
 # %%
-def scan_pace(redcap_token, proj_dir):
+def scan_pace(proj_dir):
     """Generate barplot of attempted scans per calender week.
 
     Mine REDCap Visit 2, 3 Logs (MRI) for timestamps, indicating a log was
@@ -434,8 +431,6 @@ def scan_pace(redcap_token, proj_dir):
 
     Parameters
     ----------
-    redcap_token : str
-        API token for RedCap project
     proj_dir : path
         Project's experiment directory
 
@@ -446,7 +441,7 @@ def scan_pace(redcap_token, proj_dir):
 
     """
     # Get data, ready for weekly totals
-    df_log = survey_download.dl_mri_log(redcap_token)
+    df_log = survey_download.dl_mri_log()
     df_log["datetime"] = df_log["datetime"] - pd.to_timedelta(7, unit="d")
     df_log["count"] = 1
 
@@ -620,8 +615,6 @@ class ParticipantFlow(build_reports.DemoAll, report_helper.CheckStatus):
     ----------
     proj_dir : str, os.PathLike
         Project's experiment directory
-    redcap_token : str
-        API token for RedCap project
 
     Methods
     -------
@@ -635,14 +628,26 @@ class ParticipantFlow(build_reports.DemoAll, report_helper.CheckStatus):
 
     """
 
-    def __init__(self, proj_dir, redcap_token):
+    def __init__(self, proj_dir):
         """Initialize."""
         print("Initializing ParticipantFlow")
-        super().__init__(proj_dir, redcap_token)
+        super().__init__(proj_dir)
+
+    def _get_demo_enroll(self):
+        """Get demographics and enrollment status."""
         self._status_list = ["lost", "excluded", "withdrew"]
         self._df_demo = self.add_status(
-            self.final_demo, redcap_token, clear_following=True
+            self.final_demo,
+            status_list=self._status_list,
+            clear_following=True,
         )
+
+        # Clean pilot participants
+        pilot_list = report_helper.pilot_list()
+        idx_pilot = self._df_demo.index[
+            self._df_demo["src_subject_id"].isin(pilot_list)
+        ].to_list()
+        self._df_demo = self._df_demo.drop(idx_pilot).reset_index(drop=True)
 
     def draw_prisma(self):
         """Generate PRISMA flowchart of participants in study.
@@ -656,6 +661,9 @@ class ParticipantFlow(build_reports.DemoAll, report_helper.CheckStatus):
             <proj-dir>/analyses_metrics/plot_flow-participant.png
 
         """
+        # Get enrolled status (df_demo)
+        self._get_demo_enroll()
+
         # Recruitment node
         flo = Digraph("participant_flow")
         flo.attr(label="Participant Flow", labelloc="t", fontsize="18")
@@ -673,7 +681,8 @@ class ParticipantFlow(build_reports.DemoAll, report_helper.CheckStatus):
                 "1",
                 "Visit1: Enrollment\n"
                 + f"n={len(v1_dict['start'])} {self._get_female(v1_dict['start'])}\l"  # noqa: W605 E501
-                + f"{self._get_age(v1_dict['start'])}\l",  # noqa: W605
+                + f"{self._get_age(v1_dict['start'])}\l"  # noqa: W605 E501
+                + f"(in progress: {len(v1_dict['prog'])})\l",  # noqa: W605
                 shape="box",
             )
             c.node(
@@ -688,13 +697,24 @@ class ParticipantFlow(build_reports.DemoAll, report_helper.CheckStatus):
         count = 3
         for day in [2, 3]:
             v_dict = self._v23_subj(day)
+
+            # Add in progress for day2, not day3
+            if day == 2:
+                prog_str = (
+                    f"{self._get_age(v_dict['start'])}\l"  # noqa: W605 E501
+                    + f"(in progress: {len(v_dict['prog'])})\l"  # noqa: W605 E501
+                )
+            else:
+                prog_str = (
+                    f"{self._get_age(v_dict['start'])}\l"  # noqa: W605 E501
+                )
             with flo.subgraph() as c:
                 c.attr(rank="same")
                 c.node(
                     str(count),
                     f"Visit{day}: Survey & MRI\n"
                     + f"n={len(v_dict['start'])} {self._get_female(v_dict['start'])}\l"  # noqa: W605 E501
-                    + f"{self._get_age(v_dict['start'])}\l",  # noqa: W605
+                    + prog_str,
                     shape="box",
                 )
                 count += 1
@@ -730,7 +750,7 @@ class ParticipantFlow(build_reports.DemoAll, report_helper.CheckStatus):
 
     def _get_recruit(self) -> int:
         """Determine number of participants recruited."""
-        df_pre = survey_download.dl_prescreening(self._redcap_token)
+        df_pre = survey_download.dl_prescreening()
         return df_pre.shape[0]
 
     def _v1_subj(self) -> dict:
@@ -741,9 +761,10 @@ class ParticipantFlow(build_reports.DemoAll, report_helper.CheckStatus):
             self._df_demo["visit1_status"].notna(), "src_subject_id"
         ].to_list()
 
-        # Participants with status change
+        # Participants with status change, in progress
         for stat in self._status_list:
             out_dict[stat] = self._stat_change("visit1", stat)
+        out_dict["prog"] = self._in_prog("visit1", "visit2")
         return out_dict
 
     def _stat_change(self, visit: str, status: str) -> list:
@@ -752,6 +773,14 @@ class ParticipantFlow(build_reports.DemoAll, report_helper.CheckStatus):
             self._df_demo[f"{visit}_status"] == status
         ].to_list()
         return self._df_demo.loc[idx_subj, "src_subject_id"].to_list()
+
+    def _in_prog(self, visit_a: str, visit_b: str) -> list:
+        """Return participants who started visit_a and waiting for visit_b."""
+        idx_prog = self._df_demo.index[
+            (self._df_demo[f"{visit_a}_status"] == "enrolled")
+            & (self._df_demo[f"{visit_b}_status"].isna())
+        ].to_list()
+        return self._df_demo.loc[idx_prog, "src_subject_id"].to_list()
 
     def _v23_subj(self, day: int) -> dict:
         """Return visit 2,3 status info."""
@@ -764,6 +793,8 @@ class ParticipantFlow(build_reports.DemoAll, report_helper.CheckStatus):
         # Participants with status change
         for stat in self._status_list:
             out_dict[stat] = self._stat_change(f"visit{day}", stat)
+        if day == 2:
+            out_dict["prog"] = self._in_prog("visit2", "visit3")
         return out_dict
 
     def _final_subj(self) -> dict:

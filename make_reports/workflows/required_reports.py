@@ -6,6 +6,7 @@ MakeNdarReports : Generate reports, data submitted to NIH Data
 gen_guids : generate or check GUIDs
 
 """
+
 # %%
 import os
 from datetime import datetime
@@ -15,11 +16,11 @@ from make_reports.resources import manage_data
 
 
 # %%
-def make_regular_reports(regular_reports, query_date, proj_dir, redcap_token):
+def make_regular_reports(regular_reports, query_date, proj_dir):
     """Make reports for the lab manager.
 
     Coordinate the use of build_reports.ManagerRegular to generate
-    desired nih12, nih4, or duke3 report.
+    desired nih12, nih4, duke3, or duke12 report.
 
     Reports are written to:
         <proj_dir>/documents/regular_reports
@@ -32,8 +33,6 @@ def make_regular_reports(regular_reports, query_date, proj_dir, redcap_token):
         Date for finding report range
     proj_dir : str, os.PathLike
         Project's experiment directory
-    redcap_token : str
-        Personal access token for RedCap
 
     Raises
     ------
@@ -43,7 +42,7 @@ def make_regular_reports(regular_reports, query_date, proj_dir, redcap_token):
 
     """
     # Validate regular_reports arguments
-    valid_mr_args = ["nih12", "nih4", "duke3"]
+    valid_mr_args = ["nih12", "nih4", "duke3", "duke12"]
     for report in regular_reports:
         if report not in valid_mr_args:
             raise ValueError(
@@ -63,7 +62,7 @@ def make_regular_reports(regular_reports, query_date, proj_dir, redcap_token):
         os.makedirs(manager_dir)
 
     # Generate reports
-    make_rep = build_reports.ManagerRegular(query_date, proj_dir, redcap_token)
+    make_rep = build_reports.ManagerRegular(query_date, proj_dir)
     for report in regular_reports:
         make_rep.make_report(report)
 
@@ -88,10 +87,6 @@ class _GetData:
     ----------
     proj_dir : str, os.PathLike
         Location of project directory
-    redcap_token : str
-        Personal access token for RedCap
-    qualtrics_token : str
-        Personal access token for Qualtrics
 
     Attributes
     ----------
@@ -109,11 +104,9 @@ class _GetData:
 
     """
 
-    def __init__(self, proj_dir, redcap_token, qualtrics_token):
+    def __init__(self, proj_dir):
         """Initialize."""
         self._proj_dir = proj_dir
-        self._redcap_token = redcap_token
-        self._qualtrics_token = qualtrics_token
 
     def get_data(self, report_names: list, close_date: datetime.date):
         """Build df_demo and data_dict attrs."""
@@ -121,7 +114,7 @@ class _GetData:
 
         # Get redcap demographic data, use only consented data in
         # submission cycle.
-        redcap_demo = build_reports.DemoAll(self._proj_dir, self._redcap_token)
+        redcap_demo = build_reports.DemoAll(self._proj_dir)
         redcap_demo.remove_withdrawn()
         redcap_demo.submission_cycle(close_date)
         self.df_demo = redcap_demo.final_demo
@@ -136,7 +129,7 @@ class _GetData:
 
     def _get_red(self):
         """Add RedCap BDI to data_dict."""
-        redcap_data = manage_data.GetRedcap(self._proj_dir, self._redcap_token)
+        redcap_data = manage_data.GetRedcap(self._proj_dir)
         redcap_data.get_redcap(survey_list=["bdi_day2", "bdi_day3"])
         self._merge_dict(redcap_data.clean_redcap)
 
@@ -163,9 +156,7 @@ class _GetData:
 
         # Initialize getting qualtrics
         if get_qs1 or get_qs23 or get_qs123 or get_qsf:
-            qc_data = manage_data.GetQualtrics(
-                self._proj_dir, self._qualtrics_token
-            )
+            qc_data = manage_data.GetQualtrics(self._proj_dir)
 
         # Get appropriate data
         if get_qsf:
@@ -242,18 +233,18 @@ class _BuildArgs:
 
     def _v1_pilot_study(self) -> list:
         """Return visit_day1 dataframes."""
-        df_pilot = self.data_dict["pilot"]["visit_day1"][self._df_name]
-        df_study = self.data_dict["study"]["visit_day1"][self._df_name]
+        df_pilot = self._data_dict["pilot"]["visit_day1"][self._df_name]
+        df_study = self._data_dict["study"]["visit_day1"][self._df_name]
 
         # RRS does not have pilot data in qualtrics
         return [df_pilot, df_study] if self._df_name != "RRS" else [df_study]
 
     def _v23_pilot_study(self) -> list:
         """Return visit_day2 and visit_day3 dataframes."""
-        df_pilot_2 = self.data_dict["pilot"]["visit_day2"][self._df_name]
-        df_study_2 = self.data_dict["study"]["visit_day2"][self._df_name]
-        df_pilot_3 = self.data_dict["pilot"]["visit_day3"][self._df_name]
-        df_study_3 = self.data_dict["study"]["visit_day3"][self._df_name]
+        df_pilot_2 = self._data_dict["pilot"]["visit_day2"][self._df_name]
+        df_study_2 = self._data_dict["study"]["visit_day2"][self._df_name]
+        df_pilot_3 = self._data_dict["pilot"]["visit_day3"][self._df_name]
+        df_study_3 = self._data_dict["study"]["visit_day3"][self._df_name]
 
         # PANAS and post_scan_ratings do not have pilot data in qualtrics
         if self._df_name in ["PANAS", "post_scan_ratings"]:
@@ -263,12 +254,12 @@ class _BuildArgs:
 
     def _v123_pilot_study(self) -> list:
         """Return STAI dataframes."""
-        df_pilot_1 = self.data_dict["pilot"]["visit_day1"]["STAI_Trait"]
-        df_study_1 = self.data_dict["study"]["visit_day1"]["STAI_Trait"]
-        df_pilot_2 = self.data_dict["pilot"]["visit_day2"]["STAI_State"]
-        df_study_2 = self.data_dict["study"]["visit_day2"]["STAI_State"]
-        df_pilot_3 = self.data_dict["pilot"]["visit_day3"]["STAI_State"]
-        df_study_3 = self.data_dict["study"]["visit_day3"]["STAI_State"]
+        df_pilot_1 = self._data_dict["pilot"]["visit_day1"]["STAI_Trait"]
+        df_study_1 = self._data_dict["study"]["visit_day1"]["STAI_Trait"]
+        df_pilot_2 = self._data_dict["pilot"]["visit_day2"]["STAI_State"]
+        df_study_2 = self._data_dict["study"]["visit_day2"]["STAI_State"]
+        df_pilot_3 = self._data_dict["pilot"]["visit_day3"]["STAI_State"]
+        df_study_3 = self._data_dict["study"]["visit_day3"]["STAI_State"]
         return [
             df_pilot_1,
             df_study_1,
@@ -293,10 +284,6 @@ class MakeNdarReports(_BuildArgs):
         Project's experiment directory
     close_date : datetime.date
         Submission cycle close date
-    redcap_token : str
-        Personal access token for RedCap
-    qualtrics_token : str
-        Personal access token for Qualtrics
 
     Methods
     -------
@@ -315,12 +302,10 @@ class MakeNdarReports(_BuildArgs):
 
     """
 
-    def __init__(self, proj_dir, close_date, redcap_token, qualtrics_token):
+    def __init__(self, proj_dir, close_date):
         """Initialize."""
         self._proj_dir = proj_dir
         self._close_date = close_date
-        self._redcap_token = redcap_token
-        self._qualtrics_token = qualtrics_token
         super().__init__()
 
     @property
@@ -358,9 +343,7 @@ class MakeNdarReports(_BuildArgs):
                 raise ValueError(f"Unexpected ndar_report value : {report}")
 
         # Download and clean data for requested reports
-        gd = _GetData(
-            self._proj_dir, self._redcap_token, self._qualtrics_token
-        )
+        gd = _GetData(self._proj_dir)
         gd.get_data(report_names, self._close_date)
         self.df_demo = gd.df_demo
         self.data_dict = gd.data_dict
@@ -420,9 +403,7 @@ class MakeNdarReports(_BuildArgs):
 
 
 # %%
-def generate_guids(
-    proj_dir, user_name, user_pass, find_mismatch, redcap_token
-):
+def generate_guids(proj_dir, user_name, user_pass, find_mismatch):
     """Compile needed demographic info and make GUIDs.
 
     Also supports checking newly generated GUIDs against those entered
@@ -442,14 +423,10 @@ def generate_guids(
     find_mismatch : bool
         Whether to check for mismatches between REDCap
         and generated GUIDs
-    redcap_token : str
-        Personal access token for RedCap
 
     """
     # Trigger build reports class and method, clean intermediate
-    guid_obj = build_reports.GenerateGuids(
-        proj_dir, user_pass, user_name, redcap_token
-    )
+    guid_obj = build_reports.GenerateGuids(proj_dir, user_pass, user_name)
     guid_obj.make_guids()
     os.remove(guid_obj.df_guid_file)
 

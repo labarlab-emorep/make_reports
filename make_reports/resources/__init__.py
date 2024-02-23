@@ -3,6 +3,7 @@ from . import calc_metrics, calc_surveys
 from . import report_helper
 from . import survey_clean, survey_download
 from . import manage_data, check_data
+from . import sql_database
 
 __all__ = [
     "build_ndar",
@@ -14,4 +15,5 @@ __all__ = [
     "survey_download",
     "manage_data",
     "check_data",
+    "sql_database",
 ]

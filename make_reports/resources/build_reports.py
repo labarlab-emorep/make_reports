@@ -5,6 +5,7 @@ ManagerRegular : generate reports regularly submitted
 GenerateGuids : generate, check GUIDs
 
 """
+
 import os
 import glob
 import subprocess
@@ -14,6 +15,7 @@ import numpy as np
 from datetime import datetime
 from make_reports.resources import manage_data
 from make_reports.resources import report_helper
+from make_reports.resources import sql_database
 
 
 class DemoAll(manage_data.GetRedcap):
@@ -29,8 +31,6 @@ class DemoAll(manage_data.GetRedcap):
     ----------
     proj_dir : str, os.PathLike
         Project's parent directory
-    redcap_token : str
-        Personal access token for RedCap
 
     Attributes
     ----------
@@ -49,7 +49,7 @@ class DemoAll(manage_data.GetRedcap):
 
     Example
     -------
-    get_demo = DemoAll("/path/to/proj", "token")
+    get_demo = DemoAll("/path/to/proj")
     df_demo_all = get_demo.final_demo
 
     get_demo.remove_withdrawn()
@@ -58,10 +58,10 @@ class DemoAll(manage_data.GetRedcap):
 
     """
 
-    def __init__(self, proj_dir, redcap_token):
+    def __init__(self, proj_dir):
         """Initialize, build final_demo."""
         print("Initializing DemoAll")
-        super().__init__(proj_dir, redcap_token)
+        super().__init__(proj_dir)
         self._get_demo()
 
         # Generate final_demo
@@ -123,7 +123,7 @@ class DemoAll(manage_data.GetRedcap):
 
         """
         # Get attribute for readibility, testing
-        df_merge = self._df_merge
+        df_merge = self._df_merge.copy()
 
         # Get race response - deal with "More than one" (6) and
         # "Other" (8) separately.
@@ -210,6 +210,22 @@ class DemoAll(manage_data.GetRedcap):
         self._subj_ethnic = subj_ethnic
         self._subj_minor = subj_minor
 
+    def _get_hand(self) -> list:
+        """Determine handedness."""
+        hand_clean = []
+        for hand in self._df_merge["handedness"]:
+            if "ight" in hand or "R" in hand:
+                hand_clean.append(2)
+            elif "eft" in hand or "L" in hand:
+                hand_clean.append(1)
+            elif "na" in hand:
+                hand_clean.append(0)
+            else:
+                hand_clean.append(int(hand))
+
+        hand_switch = {0: np.nan, 1: "left", 2: "right", 3: "ambi"}
+        return [hand_switch[x] for x in hand_clean]
+
     def make_complete(self):
         """Make a demographic dataframe.
 
@@ -232,11 +248,12 @@ class DemoAll(manage_data.GetRedcap):
         self._df_merge["datetime"] = self._df_merge["datetime"].dt.date
         subj_consent_date = self._df_merge["datetime"].tolist()
 
-        # Get age, sex
+        # Get age, sex, handedness
         subj_age = self._df_merge["age"].tolist()
         h_sex = self._df_merge["gender"].tolist()
         sex_switch = {1.0: "Male", 2.0: "Female", 3.0: "Neither"}
         subj_sex = [sex_switch[x] for x in h_sex]
+        subj_hand = self._get_hand()
 
         # Get DOB, age in months, education
         subj_dob = self._df_merge["dob"]
@@ -247,7 +264,7 @@ class DemoAll(manage_data.GetRedcap):
         self._get_race()
         self._get_ethnic_minority()
 
-        # Write dataframe
+        # Build dataframe
         out_dict = {
             "subjectkey": subj_guid,
             "src_subject_id": subj_study,
@@ -260,8 +277,20 @@ class DemoAll(manage_data.GetRedcap):
             "race": self._race_resp,
             "is_minority": self._subj_minor,
             "years_education": subj_educate,
+            "handedness": subj_hand,
         }
         self.final_demo = pd.DataFrame(out_dict, columns=out_dict.keys())
+
+        # Update db_emorep
+        up_db_emorep = sql_database.DbUpdate()
+        up_db_emorep.update_db(
+            self.final_demo.copy(),
+            "demographics",
+            1,
+            "demographics",
+            subj_col="src_subject_id",
+        )
+        up_db_emorep.close_db()
 
     def remove_withdrawn(self):
         """Remove participants from final_demo who have withdrawn consent."""
@@ -308,8 +337,6 @@ class ManagerRegular(DemoAll):
         Date for finding report range
     proj_dir : str, os.PathLike
         Project's experiment directory
-    redcap_token : str
-        Personal access token for RedCap
 
     Attributes
     ----------
@@ -322,10 +349,13 @@ class ManagerRegular(DemoAll):
 
     Methods
     -------
-    make_report(report)
-        Entrypoint, trigger appropriate report method
+    make_report()
+        Entrypoint, triggers appropriate report method
     make_duke3()
+        Deprecated.
         Generate report submitted to Duke every 3 months
+    make_duke12()
+        Generate report submitted to Duke every 12 months
     make_nih4()
         Generate report submitted to NIH every 4 months
     make_nih12()
@@ -339,9 +369,9 @@ class ManagerRegular(DemoAll):
 
     """
 
-    def __init__(self, query_date, proj_dir, redcap_token):
+    def __init__(self, query_date, proj_dir):
         """Generate requested report."""
-        super().__init__(proj_dir, redcap_token)
+        super().__init__(proj_dir)
         self._query_date = query_date
 
     def make_report(self, report):
@@ -350,12 +380,12 @@ class ManagerRegular(DemoAll):
         Parameters
         ----------
         report : str
-            [nih4 | nih12 | duke3]
-            Select desired report
+            {"nih4", "nih12", "duke3", "duke12"}
+            Desired report name, "duke3" deprecated
 
         """
         # Trigger appropriate method
-        if report not in ["nih12", "nih4", "duke3"]:
+        if report not in ["nih12", "nih4", "duke3", "duke12"]:
             raise ValueError(f"Inappropriate report requested : {report}")
         report_method = getattr(self, f"make_{report}")
         report_method()
@@ -566,7 +596,43 @@ class ManagerRegular(DemoAll):
             )
             self.df_report = None
             return
+        self._make_duke()
 
+    def make_duke12(self):
+        """Create report submitted to Duke every 12 months.
+
+        Determine the number of participants that belong to
+        gender * ethnicity * race group combinations which have
+        been recruited in the current period.
+
+        Attributes
+        ----------
+        df_report : pd.DataFrame, None
+            Relevant info, format for requested report
+
+        """
+        # Set start, end dates for report periods
+        duke_12mo_ranges = [
+            ("2020-07-01", "2021-06-30"),
+            ("2021-07-01", "2022-06-30"),
+            ("2022-07-01", "2023-06-30"),
+            ("2023-07-01", "2024-06-30"),
+            ("2024-07-01", "2025-06-30"),
+        ]
+
+        # Find data within range, check for data
+        self._get_data_range(duke_12mo_ranges)
+        if self._df_range.empty:
+            print(
+                "\t\tNo data collected for query range : "
+                + f"{self.range_start} - {self.range_end}, skipping ..."
+            )
+            self.df_report = None
+            return
+        self._make_duke()
+
+    def _make_duke(self):
+        """Generate metrics for duke reports."""
         # Get gender, ethnicity, race responses
         df_hold = self._df_range[
             ["src_subject_id", "sex", "ethnicity", "race"]
@@ -693,8 +759,6 @@ class GenerateGuids(manage_data.GetRedcap):
         NDA user name
     user_pass : str
         NDA user password
-    redcap_token : str
-        Personal access token for RedCap
 
     Attributes
     ----------
@@ -713,9 +777,9 @@ class GenerateGuids(manage_data.GetRedcap):
 
     """
 
-    def __init__(self, proj_dir, user_pass, user_name, redcap_token):
+    def __init__(self, proj_dir, user_pass, user_name):
         """Setup instance and compile demographic information."""
-        super().__init__(proj_dir, redcap_token)
+        super().__init__(proj_dir)
         self._user_name = user_name
         self._user_pass = user_pass
         self._get_demo()
@@ -776,9 +840,9 @@ class GenerateGuids(manage_data.GetRedcap):
         # have a middle name.
         df_guid["SEX"] = df_guid["SEX"].map({1.0: "M", 2.0: "F"})
         df_guid["SUBJECTHASMIDDLENAME"] = "Yes"
-        df_guid.loc[
-            df_guid["MIDDLENAME"].isnull(), "SUBJECTHASMIDDLENAME"
-        ] = "No"
+        df_guid.loc[df_guid["MIDDLENAME"].isnull(), "SUBJECTHASMIDDLENAME"] = (
+            "No"
+        )
 
         # Write out intermediate dataframe
         self.df_guid_file = os.path.join(

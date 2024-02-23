@@ -3,28 +3,26 @@ r"""Generate regular reports.
 Mine RedCap demographic information to construct reports regularly
 submitted to the NIH or Duke.
 
-Reports are written to:
-    <proj_dir>/documents/regular_reports
-
-Previous submissions can also be generated via --query-date.
+Notes
+-----
+- Requires global variable 'PAT_REDCAP_EMOREP' in user env, which
+    holds the personal access token to the emorep REDCap database.
+- Previous submissions can also be generated via --query-date.
+- Reports are written to <proj_dir>/documents/regular_reports
 
 Examples
 --------
-rep_regular \
-    -t $PAT_REDCAP_EMOREP \
-    --names nih4 nih12 duke3
-
-rep_regular \
-    -t $PAT_REDCAP_EMOREP \
-    --names nih4 \
-    --query-date 2022-06-29
+rep_regular --names nih4 nih12 duke12
+rep_regular --names nih4 --query-date 2022-06-29
 
 """
+
 import sys
 import textwrap
 from datetime import date
 from argparse import ArgumentParser, RawTextHelpFormatter
 from make_reports.workflows import required_reports
+from make_reports.resources import report_helper
 
 
 def _get_args():
@@ -65,23 +63,8 @@ def _get_args():
         nargs="+",
         required=True,
         type=str,
-        help=textwrap.dedent(
-            """\
-            [nih4 | nih12 | duke3]
-            List of reguilar reports to generate. Acceptable
-            args are "nih4", "nih12", and "duke3" for the reports
-            submitted to the NIH every 4 months, NIH every 12 months,
-            and Duke every 3 months, respectively.
-            e.g. --manager-reports nih4 duke3
-            """
-        ),
-    )
-    required_args.add_argument(
-        "-t",
-        "--redcap-token",
-        type=str,
-        default=None,
-        help="API token for RedCap project",
+        choices=["nih4", "nih12", "duke3", "duke12"],
+        help="List of desired reports to generate",
     )
 
     if len(sys.argv) <= 1:
@@ -97,10 +80,10 @@ def main():
     regular_reports = args.names
     proj_dir = args.proj_dir
     query_date = args.query_date
-    redcap_token = args.redcap_token
 
+    report_helper.check_redcap_pat()
     required_reports.make_regular_reports(
-        regular_reports, query_date, proj_dir, redcap_token
+        regular_reports, query_date, proj_dir
     )
 
 

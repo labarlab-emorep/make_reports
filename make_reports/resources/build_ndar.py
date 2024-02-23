@@ -597,7 +597,6 @@ class NdarBrd01(_CleanDemo):
         sub_list = df_brd["src_subject_id"].unique().tolist()
         sub_demo = self._df_demo["src_subject_id"].tolist()
         for sub in sub_list:
-
             # Skip participants not in df_demo (cycle date or withdrawn)
             if sub not in sub_demo:
                 continue
@@ -1291,31 +1290,34 @@ class NdarImage03(_CleanDemo):
         print(f"\t\tWorking on {self._subj} {self._sess} : anat ...")
 
         # Get JSON info
-        json_file = sorted(glob.glob(f"{self._subj_sess}/anat/*.json"))[0]
-        if not os.path.exists(json_file):
-            raise FileNotFoundError(
-                f"""
-                Expected to find a JSON sidecar file at :
-                    {self._subj_ses}/anat
-                """
+        json_list = sorted(glob.glob(f"{self._subj_sess}/anat/*.json"))
+        if not json_list:
+            print(
+                f"No files found at {self._subj_sess}/anat, continuing ..."
             )
+            return
+        json_file = json_list[0]
         with open(json_file, "r") as jf:
             nii_json = json.load(jf)
 
         # Get DICOM info
         day = self._sess.split("-")[1]
-        dicom_file = glob.glob(
+        dicom_dir = (
             f"{self._source_dir}/{self._subj_nda}/{day}*/"
-            + "DICOM/EmoRep_anat/*.dcm"
-        )[0]
-        if not os.path.exists(dicom_file):
-            raise FileNotFoundError(
-                f"""
-                Expected to find a DICOM file at :
-                    {self._source_dir}/{self._subj_nda}/{day}*/DICOM/EmoRep_anat
-                """
-            )
-        dicom_hdr = pydicom.read_file(dicom_file)
+            + "DICOM/EmoRep_anat"
+        )
+        dicom_list = glob.glob(f"{dicom_dir}/*.dcm")
+        if not dicom_list:
+            # Account for reconstruction issues showing in dir names
+            dicom_dir = dicom_dir + "*"
+            dicom_list = glob.glob(f"{dicom_dir}/*.dcm")
+            if not dicom_list:
+                raise FileNotFoundError(
+                    f"""
+                    Expected to find a DICOM file at : {dicom_dir}
+                    """
+                )
+        dicom_hdr = pydicom.read_file(dicom_list[0])
 
         # Get demographic info
         scan_date = datetime.strptime(dicom_hdr[0x08, 0x20].value, "%Y%m%d")
@@ -1402,14 +1404,12 @@ class NdarImage03(_CleanDemo):
         # Find nii, json files
         nii_list = sorted(glob.glob(f"{self._subj_sess}/fmap/*.nii.gz"))
         json_list = sorted(glob.glob(f"{self._subj_sess}/fmap/*.json"))
-        if not nii_list:
-            raise FileNotFoundError(
-                f"Expected to find : {self._subj_sess}/fmap/*.nii.gz"
+        if not nii_list or not json_list:
+            print(
+                f"No files found at {self._subj_sess}/fmap, continuing ..."
             )
-        if not json_list:
-            raise FileNotFoundError(
-                f"Expected to find : {self._subj_sess}/fmap/*.json"
-            )
+            return
+
         if len(nii_list) != len(json_list):
             raise ValueError(
                 "Detected uneven number of NIfTI and JSON files "
@@ -1440,9 +1440,13 @@ class NdarImage03(_CleanDemo):
             # Find dcms, get header
             dicom_list = sorted(glob.glob(f"{dicom_dir}/*.dcm"))
             if not dicom_list:
-                raise FileNotFoundError(
-                    f"Expected to find DICOMs in : {dicom_dir}"
-                )
+                # Account for reconstruction issues showing in dir names
+                dicom_dir = dicom_dir + "*"
+                dicom_list = sorted(glob.glob(f"{dicom_dir}/*.dcm"))
+                if not dicom_list:
+                    raise FileNotFoundError(
+                        f"Expected to find DICOMs in : {dicom_dir}"
+                    )
             dicom_hdr = pydicom.read_file(dicom_list[0])
 
             # Get demographic info
@@ -1525,13 +1529,13 @@ class NdarImage03(_CleanDemo):
         # Find all func niftis
         nii_list = sorted(glob.glob(f"{self._subj_sess}/func/*.nii.gz"))
         if not nii_list:
-            raise FileNotFoundError(
-                f"Expected NIfTIs at : {self._subj_sess}/func/"
+            print(
+                f"No NIfTIs found for {self._subj_sess}/func, continuing ..."
             )
+            return
 
         # Write line for each func nifti
         for nii_path in nii_list:
-
             # Get JSON for func run
             json_path = re.sub(".nii.gz$", ".json", nii_path)
             if not os.path.exists(json_path):
@@ -1556,9 +1560,14 @@ class NdarImage03(_CleanDemo):
             )
             dicom_list = glob.glob(f"{task_source}/*.dcm")
             if not dicom_list:
-                raise FileNotFoundError(
-                    f"Expected to find DICOMs at : {task_source}"
-                )
+                # Account for reconstruction issues showing in dir names
+                task_source = task_source + "*"
+                dicom_list = glob.glob(f"{task_source}/*.dcm")
+                if not dicom_list:
+                    raise FileNotFoundError(
+                        f"Expected to find DICOMs at : {task_source}"
+                    )
+
             dicom_file = dicom_list[0]
             dicom_hdr = pydicom.read_file(dicom_file)
 
@@ -1684,7 +1693,6 @@ class NdarImage03(_CleanDemo):
         phys_path = os.path.join(self._subj_sess, "phys", phys_file)
         phys_exists = os.path.exists(phys_path)
         if phys_exists:
-
             # Host physio file
             task_name = "rest" if task == "task-rest" else "emostim"
             host_phys = (
@@ -2120,7 +2128,6 @@ class NdarPhysio:
         # Start empty dataframe, fill with physio data
         df_report = pd.DataFrame(columns=self._nda_cols)
         for phys_path in self._physio_all:
-
             # Determine session info
             phys_file = os.path.basename(phys_path)
             print(f"\tMining data for {phys_file}")

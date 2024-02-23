@@ -5,18 +5,26 @@ resting task data from the scanner. Split omnibus dataframes into
 survey-specific dataframes, clean, and organize according
 to the EmoRep scheme.
 
-GetRedcap : download, clean, write, and return RedCap report data
-GetQualtrics : download, clean, write, and return Qualtrics survey data
-GetRest : aggregate, clean, write, and return rest rating responses
+Mysql database db_emorep is also updated with participant responses.
+
+GetRedcap : download, clean, and write RedCap report data
+GetQualtrics : download, clean, and write Qualtrics survey data
+GetRest : aggregate, clean, and write rest rating responses (rest_ratings)
+GetTask : aggregate and write emorep task responses (in_scan_ratings)
 
 """
+
 # %%
 import os
+import glob
 from typing import Union, Tuple
 import pandas as pd
+import numpy as np
+from multiprocessing import Pool
 from make_reports.resources import survey_download
 from make_reports.resources import survey_clean
 from make_reports.resources import report_helper
+from make_reports.resources import sql_database
 
 
 # %%
@@ -36,13 +44,12 @@ class GetRedcap(survey_clean.CleanRedcap):
 
     Download RedCap data and coordinate cleaning methods. Write both
     raw and cleaned dataframes to disk, except for reports containing PHI.
+    Update mysql db_emorep.
 
     Parameters
     ----------
     proj_dir : str, os.PathLike
         Location of project parent directory
-    redcap_token : str
-        API token for RedCap
 
     Attributes
     ----------
@@ -63,16 +70,15 @@ class GetRedcap(survey_clean.CleanRedcap):
     gr.get_redcap()
     rc_dict = gr.clean_redcap
 
-    gr.get_redcap(["bdi_day2", "bdi_day3"])
+    gr.get_redcap(survey_list=["bdi_day2", "bdi_day3"])
     rc_bdi_dict = gr.clean_redcap
 
     """
 
-    def __init__(self, proj_dir, redcap_token):
+    def __init__(self, proj_dir):
         """Initialize."""
         self._proj_dir = proj_dir
         pilot_list = report_helper.pilot_list()
-        self._redcap_token = redcap_token
         super().__init__(self._proj_dir, pilot_list)
 
     def _download_redcap(self, survey_list: list) -> dict:
@@ -86,9 +92,7 @@ class GetRedcap(survey_clean.CleanRedcap):
             {"demographics": (False, pd.DataFrame)}
 
         """
-        raw_redcap = survey_download.dl_redcap(
-            self._proj_dir, self._redcap_token, survey_list
-        )
+        raw_redcap = survey_download.dl_redcap(self._proj_dir, survey_list)
 
         # Write rawdata to csv, skip writing PHI
         for sur_name in raw_redcap:
@@ -109,13 +113,20 @@ class GetRedcap(survey_clean.CleanRedcap):
 
         Coordinate RedCap survey download, then match survey to cleaning
         method. Write certain raw and cleaned dataframes to disk.
+        Update mysql db_emorep.
 
         Parameters
         ----------
         survey_list : list, optional
-            If None, pull all reports. Available report names:
-            demographics, consent_pilot, consent_v1.22, guid,
-            bdi_day2, bdi_day3
+            {
+                "demographics",
+                "consent_pilot",
+                "consent_v1.22",
+                "guid",
+                "bdi_day2",
+                "bdi_day3"
+            }
+            If None, pull all reports.
 
         Attributes
         ----------
@@ -145,6 +156,7 @@ class GetRedcap(survey_clean.CleanRedcap):
         raw_redcap = self._download_redcap(survey_list)
 
         # Clean each survey and build clean_redcap attr
+        up_db_emorep = sql_database.DbUpdate()
         self.clean_redcap = {"pilot": {}, "study": {}}
         for sur_name in raw_redcap:
             visit = clean_map[sur_name][1]
@@ -171,6 +183,13 @@ class GetRedcap(survey_clean.CleanRedcap):
                 self._write_redcap(self.df_study, sur_name, dir_name, False)
                 self._write_redcap(self.df_pilot, sur_name, dir_name, True)
 
+            # Update mysql db_emorep.tbl_bdi
+            if key_name == "BDI":
+                up_db_emorep.update_db(
+                    self.df_study.copy(), key_name, int(visit[-1]), "redcap"
+                )
+        up_db_emorep.close_db()
+
     def _write_redcap(
         self, df: pd.DataFrame, sur_name: str, dir_name: str, is_pilot: bool
     ):
@@ -192,14 +211,12 @@ class GetQualtrics(survey_clean.CleanQualtrics):
     Inherits survey_clean.CleanQualtrics.
 
     Download Qualtrics data and coordinate cleaning methods. Write both
-    raw and cleaned dataframes to disk.
+    raw and cleaned dataframes to disk. Update mysql db_emorep.
 
     Parameters
     ----------
     proj_dir : str, os.PathLike
         Location of project parent directory
-    qualtrics_token : str
-        API token for Qualtrics
 
     Attributes
     ----------
@@ -220,20 +237,22 @@ class GetQualtrics(survey_clean.CleanQualtrics):
     gq.get_qualtrics()
     q_dict = gq.clean_qualtrics
 
-    gq.get_qualtrics(["EmoRep_Session_1"])
+    gq.get_qualtrics(survey_list=["EmoRep_Session_1"])
     q_s1_dict = gq.clean_qualtrics
 
     """
 
-    def __init__(self, proj_dir, qualtrics_token):
+    def __init__(self, proj_dir):
         """Initialize."""
         self._proj_dir = proj_dir
         pilot_list = report_helper.pilot_list()
-        self._qualtrics_token = qualtrics_token
         part_comp = report_helper.CheckStatus()
         part_comp.status_change("withdrew")
         withdrew_list = [x for x in part_comp.all.keys()]
         super().__init__(self._proj_dir, pilot_list, withdrew_list)
+
+        # Start mysql server connection
+        self._up_mysql = sql_database.DbUpdate()
 
     def _download_qualtrics(self, survey_list: list) -> dict:
         """Get, write, and return Qualtrics survey info.
@@ -246,7 +265,7 @@ class GetQualtrics(survey_clean.CleanQualtrics):
 
         """
         raw_qualtrics = survey_download.dl_qualtrics(
-            self._proj_dir, self._qualtrics_token, survey_list
+            self._proj_dir, survey_list
         )
 
         # Coordinate writing to disk -- write session2&3 surveys to
@@ -264,13 +283,18 @@ class GetQualtrics(survey_clean.CleanQualtrics):
         """Get and clean Qualtrics survey info.
 
         Coordinate Qualtrics survey download, then match survey to cleaning
-        method. Write raw and cleaned dataframes to disk.
+        method. Write raw and cleaned dataframes to disk. Update mysql
+        db_emorep.
 
         Parameters
         ----------
         survey_list : list, optional
-            RedCap report names, available names = EmoRep_Session_1,
-            Session 2 & 3 Survey, FINAL - EmoRep Stimulus Ratings - fMRI Study
+            {
+                "EmoRep_Session_1",
+                "Session 2 & 3 Survey",
+                "FINAL - EmoRep Stimulus Ratings - fMRI Study"
+            }
+            Qualtrics report names
 
         Attributes
         ----------
@@ -306,19 +330,31 @@ class GetQualtrics(survey_clean.CleanQualtrics):
             clean_method = getattr(self, clean_map[omni_name])
             clean_method(df_raw)
             self._unpack_qualtrics()
+        self._up_mysql.close_db()
 
     def _unpack_qualtrics(self):
         """Organize cleaned qualtrics data, trigger writing."""
         for data_type in self.clean_qualtrics.keys():
+            # Get attr data_study|pilot
             is_pilot = True if data_type == "pilot" else False
             data_dict = getattr(self, f"data_{data_type}")
+
+            # Unpack data_dict
             for visit, sur_dict in data_dict.items():
                 for sur_name, df in sur_dict.items():
+                    # Build attr clean_qualtrics, write
                     if visit not in self.clean_qualtrics[data_type].keys():
                         self.clean_qualtrics[data_type][visit] = {sur_name: df}
                     else:
                         self.clean_qualtrics[data_type][visit][sur_name] = df
                     self._write_qualtrics(df, sur_name, visit, is_pilot)
+
+                    # Update mysql db_emorep with study (not pilot) data
+                    if is_pilot:
+                        continue
+                    self._up_mysql.update_db(
+                        df.copy(), sur_name, int(visit[-1]), "qualtrics"
+                    )
 
     def _write_qualtrics(
         self, df: pd.DataFrame, sur_name: str, visit: str, is_pilot: bool
@@ -336,6 +372,8 @@ class GetQualtrics(survey_clean.CleanQualtrics):
 
 class GetRest:
     """Aggregate rest-rating survey responses.
+
+    Writes cleaned dataframe to disk. Updates mysql db_emorep.
 
     Parameters
     ----------
@@ -380,6 +418,7 @@ class GetRest:
         print("Cleaning survey : rest ratings")
 
         # Aggregate rest ratings, for each session day
+        up_db_emorep = sql_database.DbUpdate()
         self.clean_rest = {"pilot": {}, "study": {}}
         for data_type in self.clean_rest.keys():
             raw_dir, out_dir = self._rest_paths(data_type)
@@ -396,6 +435,17 @@ class GetRest:
                 )
                 _write_dfs(df_sess, out_file)
 
+                # Update mysql db_emorep.tbl_rest_ratings with study data
+                if data_type == "pilot":
+                    continue
+                up_db_emorep.update_db(
+                    df_sess.copy(),
+                    "rest_ratings",
+                    int(day[-1]),
+                    "rest_ratings",
+                )
+        up_db_emorep.close_db()
+
     def _rest_paths(self, data_type: str) -> Tuple:
         """Return paths to rawdata, output directory."""
         if data_type == "pilot":
@@ -407,3 +457,168 @@ class GetRest:
             raw_dir = os.path.join(self._proj_dir, "data_scanner_BIDS/rawdata")
             out_dir = os.path.join(self._proj_dir, "data_survey")
         return (raw_dir, out_dir)
+
+
+# %%
+class GetTask:
+    """Aggregate in-scanner task responses from BIDS events files.
+
+    Writes cleaned dataframe to disk. Updates mysql db_emorep.
+
+    Parameters
+    ----------
+    proj_dir : str, os.PathLike
+        Location of project parent directory
+
+    Attributes
+    ----------
+    clean_task : dict
+        All cleaned task responses
+        {study: visit: {"in_scan_task": pd.DataFrame}}
+
+    Methods
+    -------
+    get_task()
+        Get and clean in-scanner task responses
+
+    Example
+    -------
+    gt = GetTask(*args)
+    gt.get_task()
+    task_dict = gt.clean_task
+
+    """
+
+    def __init__(self, proj_dir):
+        """Initialize."""
+        self._proj_dir = proj_dir
+
+    def get_task(self):
+        """Coordinate finding and cleaning task responses.
+
+        Data are written to disk, used to update mysql db_emorep,
+        and available on clean_task attr.
+
+        Attributes
+        ----------
+        clean_task : dict
+            {study: visit: {"in_scan_task": pd.DataFrame}}
+
+        """
+        # Start DbConnect here to avoid pickle issue
+        up_db_emorep = sql_database.DbUpdate()
+
+        # Aggregate data
+        print("Aggregating in-scanner task responses ...")
+        self.clean_task = {"study": {}}
+        self._build_df()
+
+        # Build clean_task attr
+        for sess in ["day2", "day3"]:
+            df_sess = self._df_all[self._df_all["visit"] == sess]
+            self.clean_task["study"][f"visit_{sess}"] = {
+                "in_scan_task": df_sess
+            }
+
+            # Write out and update database
+            out_path = os.path.join(
+                self._proj_dir,
+                f"data_survey/visit_{sess}",
+                "df_in_scan_ratings.csv",
+            )
+            _write_dfs(df_sess, out_path)
+            up_db_emorep.update_db(
+                df_sess.copy(),
+                "in_scan_ratings",
+                int(sess[-1]),
+                "in_scan_ratings",
+            )
+        up_db_emorep.close_db()
+
+    def _build_df(self):
+        """Build attr df_all from rawdata events files."""
+        # Find all events files
+        mri_rawdata = os.path.join(
+            self._proj_dir, "data_scanner_BIDS", "rawdata"
+        )
+        events_all = sorted(
+            glob.glob(f"{mri_rawdata}/sub-*/ses-*/func/*_events.tsv")
+        )
+        if not events_all:
+            raise ValueError(
+                f"Expected to find BIDS events files in : {mri_rawdata}"
+            )
+
+        # Load (in parallel) all dfs, build df_all, trigger cleaning
+        events_dfs = Pool().starmap(
+            self._load_event, [(event_path,) for event_path in events_all]
+        )
+        self._df_all = pd.concat(events_dfs, axis=0, ignore_index=True)
+        self._clean_df()
+
+    def _load_event(self, event_path: Union[str, os.PathLike]) -> pd.DataFrame:
+        """Return organized pd.DataFrame of events file."""
+        print(f"\tLoading {os.path.basename(event_path)} ...")
+        subj, sess, task, run, _ = os.path.basename(event_path).split("_")
+        df = pd.read_csv(event_path, sep="\t")
+
+        # Add columns for keeping subj, sess straight
+        df["subj"] = subj.split("-")[-1]
+        df["sess"] = sess.split("-")[-1]
+        df["task"] = task.split("-")[-1]
+        df["run"] = int(run[-1])
+        return df
+
+    def _clean_df(self):
+        """Tidy-format attr df_all."""
+        print("\tCleaning dataframe ...")
+        # Get participant responses
+        self._df_all = self._df_all.loc[
+            self._df_all["trial_type"].isin(
+                ["movie", "scenario", "emotion", "intensity"]
+            )
+        ].reset_index(drop=True)
+
+        # Organize dataframe
+        self._df_all["emotion"] = self._df_all["emotion"].fillna(
+            method="ffill"
+        )
+        self._df_all = self._df_all.loc[
+            ~self._df_all["trial_type"].isin(["movie", "scenario"])
+        ].reset_index(drop=True)
+        self._df_all = self._df_all.drop(
+            ["onset", "duration", "accuracy", "stim_info"], axis=1
+        )
+        self._df_all = self._df_all.drop("response_time", axis=1)
+
+        # Tidy format with resp_emotion, resp_intensity cols
+        self._df_all = self._df_all.rename(columns={"emotion": "block"})
+        self._df_all = self._df_all.pivot(
+            index=[
+                "subj",
+                "sess",
+                "task",
+                "run",
+                "block",
+            ],
+            columns=["trial_type"],
+            values="response",
+        ).reset_index()
+        self._df_all = self._df_all.rename(
+            columns={
+                "emotion": "resp_emotion",
+                "intensity": "resp_intensity",
+            }
+        )
+
+        # Update column names, types
+        self._df_all = self._df_all.rename(
+            columns={"subj": "study_id", "sess": "visit"}
+        )
+        self._df_all["resp_emotion"] = self._df_all["resp_emotion"].str.lower()
+        self._df_all["resp_intensity"] = self._df_all[
+            "resp_intensity"
+        ].replace("NONE", np.nan)
+        self._df_all["resp_intensity"] = self._df_all["resp_intensity"].astype(
+            "Int64"
+        )
