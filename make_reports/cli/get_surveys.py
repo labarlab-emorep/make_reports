@@ -1,8 +1,10 @@
 r"""Download and clean survey data.
 
 Download RedCap and Qualtrics data, and aggregate all rest-rating
-responses. Clean dataframes, and write raw and clean dataframes to
-<proj-dir>/data_survey according to visit.
+and task responses. Clean dataframes, and write raw and clean dataframes
+to <proj-dir>/data_survey according to visit. Also update relevant
+tables in db_emorep.
+
 
 Notes
 -----
@@ -20,13 +22,16 @@ rep_get \
     --get-redcap \
     --get-qualtrics \
     --get-rest \
-    --get-task
+    --get-task \
+    --get-demographics
 
 """
+
 import sys
 import textwrap
 from argparse import ArgumentParser, RawTextHelpFormatter
 from make_reports.resources import manage_data
+from make_reports.resources import build_reports
 from make_reports.resources import report_helper
 
 
@@ -34,6 +39,11 @@ def _get_args():
     """Get and parse arguments."""
     parser = ArgumentParser(
         description=__doc__, formatter_class=RawTextHelpFormatter
+    )
+    parser.add_argument(
+        "--get-demographics",
+        action="store_true",
+        help="Download and clean demographic info",
     )
     parser.add_argument(
         "--get-redcap",
@@ -83,6 +93,7 @@ def main():
     manage_qualtrics = args.get_qualtrics
     manage_rest = args.get_rest
     manage_task = args.get_task
+    manage_demo = args.get_demographics
 
     # Check for required tokens
     report_helper.check_sql_pass()
@@ -106,6 +117,9 @@ def main():
     if manage_task:
         dl_clean_task = manage_data.GetTask(proj_dir)
         dl_clean_task.get_task()
+
+    if manage_demo:
+        build_reports.DemoAll(proj_dir)
 
 
 if __name__ == "__main__":

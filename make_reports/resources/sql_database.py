@@ -1,9 +1,10 @@
 """Methods for interacting with mysql db_emorep.
 
 DbConnect : connect to and interact with mysql server
-MysqlUpdate : update db_emorep tables
+DbUpdate : update db_emorep tables
 
 """
+
 # %%
 import os
 import pandas as pd
@@ -18,8 +19,17 @@ from make_reports.resources import report_helper
 class DbConnect:
     """Connect to mysql server and update db_emorep.
 
+    Attributes
+    ----------
+    con : mysql.connector.connection_cext.CMySQLConnection
+        Connection object to database
+
     Methods
     -------
+    close_con()
+        Close database connection
+    connect()
+        Yield cursor
     exec_many()
         Update mysql db_emorep.tbl_* with multiple values
 
@@ -36,13 +46,14 @@ class DbConnect:
     )
     tbl_input = [(9, "ER0009"), (16, "ER0016")]
     db_con.exec_many(sql_cmd, tbl_input)
+    db_con.close_con()
 
     """
 
     def __init__(self):
         """Set db_con attr as mysql connection."""
         report_helper.check_sql_pass()
-        self.db_con = mysql.connector.connect(
+        self.con = mysql.connector.connect(
             host="localhost",
             user=os.environ["USER"],
             password=os.environ["SQL_PASS"],
@@ -50,9 +61,9 @@ class DbConnect:
         )
 
     @contextmanager
-    def connect(self):
+    def _con_cursor(self):
         """Yield cursor."""
-        db_cursor = self.db_con.cursor()
+        db_cursor = self.con.cursor()
         try:
             yield db_cursor
         finally:
@@ -60,9 +71,20 @@ class DbConnect:
 
     def exec_many(self, sql_cmd: str, value_list: list):
         """Update db_emorep via executemany."""
-        with self.connect() as con:
+        with self._con_cursor() as con:
             con.executemany(sql_cmd, value_list)
-            self.db_con.commit()
+            self.con.commit()
+
+    def fetch_rows(self, sql_cmd: str) -> list:
+        """Return rows from query output."""
+        with self._con_cursor() as cur:
+            cur.execute(sql_cmd)
+            rows = cur.fetchall()
+        return rows
+
+    def close_con(self):
+        """Close database connection."""
+        self.con.close()
 
 
 # %%
@@ -94,7 +116,7 @@ class _DfManip:
         return df_long
 
 
-class _DbUpdateRecipes:
+class _Recipes:
     """SQL recipes for updating db_emorep tables.
 
     Insert commands hardcoded for each type of table.
@@ -105,7 +127,7 @@ class _DbUpdateRecipes:
         """Initialize."""
         self._db_con = db_con
 
-    def update_ref_subj(
+    def insert_ref_subj(
         self,
         df: pd.DataFrame,
         subj_col: str = "study_id",
@@ -125,7 +147,7 @@ class _DbUpdateRecipes:
             tbl_input,
         )
 
-    def update_survey_date(
+    def insert_survey_date(
         self,
         df: pd.DataFrame,
         sur_low: str,
@@ -152,7 +174,7 @@ class _DbUpdateRecipes:
             tbl_input,
         )
 
-    def update_basic_tbl(self, df: pd.DataFrame, sur_low: str):
+    def insert_basic_tbl(self, df: pd.DataFrame, sur_low: str):
         """Update mysql db_emorep for common (REDCap, Qualtrics) tables."""
         print(f"\tUpdating db_emorep.tbl_{sur_low} ...")
         tbl_input = list(
@@ -171,7 +193,34 @@ class _DbUpdateRecipes:
         """Print table update."""
         print(f"\tUpdating db_emorep.tbl_{sur_low} ...")
 
-    def update_psr(self, df: pd.DataFrame, sur_low: str):
+    def insert_demographics(self, df: pd.DataFrame):
+        """Update db_emorep.tbl_demographics."""
+        self._print_tbl_out("demographics")
+        tbl_input = list(
+            df[
+                [
+                    "subj_id",
+                    "sess_id",
+                    "age",
+                    "interview_age",
+                    "years_education",
+                    "sex",
+                    "handedness",
+                    "race",
+                    "is_hispanic",
+                    "is_minority",
+                ]
+            ].itertuples(index=False, name=None)
+        )
+        self._db_con.exec_many(
+            "insert ignore into tbl_demographics "
+            + "(subj_id, sess_id, age_yrs, age_mos, edu_yrs, "
+            + "sex, hand, race, is_hispanic, is_minority) "
+            + "values (%s, %s, %s, %s, %s, %s, %s, %s, %s, %s)",
+            tbl_input,
+        )
+
+    def insert_psr(self, df: pd.DataFrame, sur_low: str):
         """Update mysql db_emorep.tbl_post_scan_ratings."""
         self._print_tbl_out(sur_low)
         tbl_input = list(
@@ -196,7 +245,7 @@ class _DbUpdateRecipes:
             tbl_input,
         )
 
-    def update_rest_ratings(self, df: pd.DataFrame, sur_low: str):
+    def insert_rest_ratings(self, df: pd.DataFrame, sur_low: str):
         """Update mysql db_emorep.tbl_rest_ratings."""
         self._print_tbl_out(sur_low)
         tbl_input = list(
@@ -218,7 +267,7 @@ class _DbUpdateRecipes:
             tbl_input,
         )
 
-    def update_in_scan_ratings(self, df: pd.DataFrame, sur_low: str):
+    def insert_in_scan_ratings(self, df: pd.DataFrame, sur_low: str):
         """Update mysql db_emorep.tbl_in_scan_ratings."""
         self._print_tbl_out(sur_low)
         tbl_input = list(
@@ -242,47 +291,50 @@ class _DbUpdateRecipes:
             tbl_input,
         )
 
+    def insert_ref_sess_task(self, df: pd.DataFrame):
+        """Update mysql db_emorep.ref_sess_task."""
+        tbl_input = list(
+            df[["subj_id", "sess_id", "task_id"]].itertuples(
+                index=False, name=None
+            )
+        )
+        self._db_con.exec_many(
+            "insert ignore into ref_sess_task "
+            + "(subj_id, sess_id, task_id)"
+            + "values (%s, %s, %s)",
+            tbl_input,
+        )
+
 
 # %%
 class _TaskMaps:
     """Supply mappings to SQL reference table values."""
 
-    @property
-    def emo_map(self):
-        return {
-            "amusement": 1,
-            "anger": 2,
-            "anxiety": 3,
-            "awe": 4,
-            "calmness": 5,
-            "craving": 6,
-            "disgust": 7,
-            "excitement": 8,
-            "fear": 9,
-            "horror": 10,
-            "joy": 11,
-            "neutral": 12,
-            "romance": 13,
-            "sadness": 14,
-            "surprise": 15,
-        }
+    def __init__(self, db_con: Type[DbConnect]):
+        """Initialize."""
+        self._db_con = db_con
+        self._load_refs()
 
-    @property
-    def task_map(self):
-        return {
-            "movies": 1,
-            "scenarios": 2,
+    def _load_refs(self):
+        """Supply mappings in format {name: id}."""
+        self._ref_task = {
+            x[1]: x[0]
+            for x in self._db_con.fetch_rows("select * from ref_task")
+        }
+        self._ref_emo = {
+            x[1]: x[0]
+            for x in self._db_con.fetch_rows("select * from ref_emo")
         }
 
     def task_label(self, row, row_name) -> int:
         """Return task ID given task name."""
-        for task_name, task_id in self.task_map.items():
+        for task_name, task_id in self._ref_task.items():
             if row[row_name] == task_name:
                 return task_id
 
     def emo_label(self, row, row_name) -> int:
         """Return emotion ID given emotion name."""
-        for emo_name, emo_id in self.emo_map.items():
+        for emo_name, emo_id in self._ref_emo.items():
             if row[row_name] == emo_name:
                 return emo_id
 
@@ -291,12 +343,17 @@ class _PrepPsr(_TaskMaps):
     """Make df_tidy, df_date for post_scan_ratings."""
 
     def __init__(
-        self, df: pd.DataFrame, sess_id: int, subj_col: str = "study_id"
+        self,
+        df: pd.DataFrame,
+        sess_id: int,
+        db_con: Type[DbConnect],
+        subj_col: str = "study_id",
     ):
         """Initialize."""
         self._df = df
         self._sess_id = sess_id
         self._subj_col = subj_col
+        super().__init__(db_con)
 
     def prep_dfs(self):
         """Make attrs df_tidy, df_date."""
@@ -365,34 +422,40 @@ class _PrepPsr(_TaskMaps):
 
 
 # %%
-class MysqlUpdate(_DbUpdateRecipes, _DfManip, _TaskMaps):
+class DbUpdate(_Recipes, _DfManip, _TaskMaps):
     """Update mysql db_emorep tables.
 
-    Inherits _DbUpdateRecipes, _DfManip, _TaskMaps.
+    Format dataframes to match db_emorep tables and then coordinate inserts.
+
+    Inherits _Recipes, _DfManip, _TaskMaps.
 
     Methods
     -------
     update_db(*args)
         Update appropriate table given args
+    close_db()
+        Close connection with mysql server
 
     Example
     -------
-    db_con = sql_database.DbConnect()
-    up_mysql = sql_database.MysqlUpdate(db_con)
-    up_mysql.update_db(*args)
+    up_db_emorep = sql_database.DbUpdate()
+    up_db_emorep.update_db(*args)
+    up_db_emorep.close_db()
 
     """
 
-    def __init__(self, db_con: Type[DbConnect]):
+    def __init__(self):
         """Initialize."""
-        super().__init__(db_con)
+        self._db_con = DbConnect()
+        _Recipes.__init__(self, self._db_con)
+        _TaskMaps.__init__(self, self._db_con)
 
     def update_db(
         self, df, sur_name, sess_id, data_source, subj_col="study_id"
     ):
         """Identify and update appropriate mysql db_emorep table.
 
-        Coordinates internal methods to wrap _DbUpdateRecipes with
+        Coordinates internal methods to wrap _Recipes with
         appropriate input.
 
         Parameters
@@ -404,7 +467,13 @@ class MysqlUpdate(_DbUpdateRecipes, _DfManip, _TaskMaps):
         sess_id : int
             Session ID
         data_source : str
-            {"qualtrics", "redcap", "rest_ratings", "in_scan_ratings"}
+            {
+                "qualtrics",
+                "redcap",
+                "rest_ratings",
+                "in_scan_ratings",
+                "demographics"
+            }
             Survey or task source of data
         subj_col : str, optional
             Name of column holding subject identifiers
@@ -418,6 +487,7 @@ class MysqlUpdate(_DbUpdateRecipes, _DfManip, _TaskMaps):
             "redcap",
             "rest_ratings",
             "in_scan_ratings",
+            "demographics",
         ]:
             raise ValueError("Unexpected data_source parameter")
         if subj_col not in df.columns:
@@ -435,6 +505,10 @@ class MysqlUpdate(_DbUpdateRecipes, _DfManip, _TaskMaps):
         up_meth = getattr(self, f"_update_{data_source}")
         up_meth()
 
+    def close_db(self):
+        """Close database connection."""
+        self._db_con.close_con()
+
     def _basic_prep(self):
         """Add subj_id and sess_id to df."""
         self._df["sess_id"] = self._sess_id
@@ -444,30 +518,55 @@ class MysqlUpdate(_DbUpdateRecipes, _DfManip, _TaskMaps):
         """Update db_emorep tables with qualtrics data."""
         # Treat post_scan_ratings specifically
         if self._sur_name == "post_scan_ratings":
-            prep_psr = _PrepPsr(self._df.copy(), self._sess_id)
+            prep_psr = _PrepPsr(self._df.copy(), self._sess_id, self._db_con)
             prep_psr.prep_dfs()
-            self.update_psr(prep_psr.df_tidy, self._sur_low)
-            self.update_survey_date(prep_psr.df_date, self._sur_low)
+            self.insert_psr(prep_psr.df_tidy, self._sur_low)
+            self.insert_survey_date(prep_psr.df_date, self._sur_low)
             return
 
         # Update db_emorep.tbl_survey_date and other table
-        self.update_survey_date(self._df, self._sur_low)
+        self.insert_survey_date(self._df, self._sur_low)
         df_long = self.convert_wide_long(self._df, self._sur_name)
-        self.update_basic_tbl(df_long, self._sur_low)
+        self.insert_basic_tbl(df_long, self._sur_low)
 
     def _update_redcap(self):
         """Update db_emorep tables with redcap data."""
-        self.update_survey_date(self._df, self._sur_low)
+        self.insert_survey_date(self._df, self._sur_low)
         df_long = self.convert_wide_long(
             self._df, self._sur_name, item_type=str
         )
-        self.update_basic_tbl(df_long, self._sur_low)
+        self.insert_basic_tbl(df_long, self._sur_low)
+
+    def _update_demographics(self):
+        """Update db_emorep.tbl_demographics."""
+        # Manage casing, type, nan
+        self._df["age"] = self._df["age"].astype(int)
+        self._df["sex"] = self._df["sex"].str.lower()
+        self._df["handedness"] = self._df["handedness"].replace(np.nan, "")
+
+        # Manage is hispanic
+        idx_hisp = self._df.index[
+            self._df["ethnicity"] == "Hispanic or Latino"
+        ].to_list()
+        self._df["is_hispanic"] = "no"
+        self._df.loc[idx_hisp, "is_hispanic"] = "yes"
+
+        # Manage is minority
+        self._df = self._df.rename(
+            {"is_minority": "minority_status"}, axis="columns"
+        )
+        idx_minor = self._df.index[
+            self._df["minority_status"] == "Minority"
+        ].to_list()
+        self._df["is_minority"] = "no"
+        self._df.loc[idx_minor, "is_minority"] = "yes"
+        self.insert_demographics(self._df)
 
     def _update_rest_ratings(self):
         """Update db_emorep.tbl_rest_ratings and tbl_survey_date."""
         # Update db_emorep.tbl_survey_date
         df_date = self._df.loc[self._df["resp_type"] == "resp_int"]
-        self.update_survey_date(df_date, self._sur_low)
+        self.insert_survey_date(df_date, self._sur_low)
         del df_date
 
         # Prep certain cols for tbl_rest_ratings
@@ -478,7 +577,7 @@ class MysqlUpdate(_DbUpdateRecipes, _DfManip, _TaskMaps):
             [self._subj_col, "visit", "datetime", "task"], axis=1
         )
         for col_name in df.columns:
-            if col_name.lower() in self.emo_map.keys():
+            if col_name.lower() in self._ref_emo.keys():
                 df = df.rename(columns={col_name: f"rsp_{col_name.lower()}"})
 
         # Format into tidy format
@@ -507,7 +606,7 @@ class MysqlUpdate(_DbUpdateRecipes, _DfManip, _TaskMaps):
         for col_name in int_list:
             df_tidy[col_name] = df_tidy[col_name].astype(int)
         df_tidy["resp_alpha"] = df_tidy["resp_alpha"].astype(str)
-        self.update_rest_ratings(df_tidy, self._sur_low)
+        self.insert_rest_ratings(df_tidy, self._sur_low)
 
     def _update_in_scan_ratings(self):
         """Update db_emorep.tbl_in_scan_ratings.
@@ -528,7 +627,12 @@ class MysqlUpdate(_DbUpdateRecipes, _DfManip, _TaskMaps):
         df["resp_emo_id"] = df["resp_emo_id"].replace(np.nan, "")
         df["resp_intensity"] = df["resp_intensity"].astype(str)
         df["resp_intensity"] = df["resp_intensity"].replace("<NA>", "")
-        self.update_in_scan_ratings(df, self._sur_low)
+
+        # Update reference and task tables
+        self.insert_in_scan_ratings(df, self._sur_low)
+        self.insert_ref_sess_task(
+            df.drop_duplicates(subset=["subj_id", "sess_id", "task_id"]),
+        )
 
 
 # %%

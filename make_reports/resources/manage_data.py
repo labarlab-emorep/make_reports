@@ -13,6 +13,7 @@ GetRest : aggregate, clean, and write rest rating responses (rest_ratings)
 GetTask : aggregate and write emorep task responses (in_scan_ratings)
 
 """
+
 # %%
 import os
 import glob
@@ -80,10 +81,6 @@ class GetRedcap(survey_clean.CleanRedcap):
         pilot_list = report_helper.pilot_list()
         super().__init__(self._proj_dir, pilot_list)
 
-        # Start mysql connection
-        db_con = sql_database.DbConnect()
-        self._up_mysql = sql_database.MysqlUpdate(db_con)
-
     def _download_redcap(self, survey_list: list) -> dict:
         """Get, write, and return RedCap survey info.
 
@@ -121,9 +118,15 @@ class GetRedcap(survey_clean.CleanRedcap):
         Parameters
         ----------
         survey_list : list, optional
-            If None, pull all reports. Available report names:
-            demographics, consent_pilot, consent_v1.22, guid,
-            bdi_day2, bdi_day3
+            {
+                "demographics",
+                "consent_pilot",
+                "consent_v1.22",
+                "guid",
+                "bdi_day2",
+                "bdi_day3"
+            }
+            If None, pull all reports.
 
         Attributes
         ----------
@@ -153,6 +156,7 @@ class GetRedcap(survey_clean.CleanRedcap):
         raw_redcap = self._download_redcap(survey_list)
 
         # Clean each survey and build clean_redcap attr
+        up_db_emorep = sql_database.DbUpdate()
         self.clean_redcap = {"pilot": {}, "study": {}}
         for sur_name in raw_redcap:
             visit = clean_map[sur_name][1]
@@ -181,9 +185,10 @@ class GetRedcap(survey_clean.CleanRedcap):
 
             # Update mysql db_emorep.tbl_bdi
             if key_name == "BDI":
-                self._up_mysql.update_db(
+                up_db_emorep.update_db(
                     self.df_study.copy(), key_name, int(visit[-1]), "redcap"
                 )
+        up_db_emorep.close_db()
 
     def _write_redcap(
         self, df: pd.DataFrame, sur_name: str, dir_name: str, is_pilot: bool
@@ -247,8 +252,7 @@ class GetQualtrics(survey_clean.CleanQualtrics):
         super().__init__(self._proj_dir, pilot_list, withdrew_list)
 
         # Start mysql server connection
-        db_con = sql_database.DbConnect()
-        self._up_mysql = sql_database.MysqlUpdate(db_con)
+        self._up_mysql = sql_database.DbUpdate()
 
     def _download_qualtrics(self, survey_list: list) -> dict:
         """Get, write, and return Qualtrics survey info.
@@ -285,8 +289,12 @@ class GetQualtrics(survey_clean.CleanQualtrics):
         Parameters
         ----------
         survey_list : list, optional
-            Qualtrics report names, available names = EmoRep_Session_1,
-            Session 2 & 3 Survey, FINAL - EmoRep Stimulus Ratings - fMRI Study
+            {
+                "EmoRep_Session_1",
+                "Session 2 & 3 Survey",
+                "FINAL - EmoRep Stimulus Ratings - fMRI Study"
+            }
+            Qualtrics report names
 
         Attributes
         ----------
@@ -322,6 +330,7 @@ class GetQualtrics(survey_clean.CleanQualtrics):
             clean_method = getattr(self, clean_map[omni_name])
             clean_method(df_raw)
             self._unpack_qualtrics()
+        self._up_mysql.close_db()
 
     def _unpack_qualtrics(self):
         """Organize cleaned qualtrics data, trigger writing."""
@@ -393,8 +402,6 @@ class GetRest:
     def __init__(self, proj_dir):
         """Initialize."""
         self._proj_dir = proj_dir
-        db_con = sql_database.DbConnect()
-        self._up_mysql = sql_database.MysqlUpdate(db_con)
 
     def get_rest(self):
         """Coordinate cleaning of rest ratings survey.
@@ -411,6 +418,7 @@ class GetRest:
         print("Cleaning survey : rest ratings")
 
         # Aggregate rest ratings, for each session day
+        up_db_emorep = sql_database.DbUpdate()
         self.clean_rest = {"pilot": {}, "study": {}}
         for data_type in self.clean_rest.keys():
             raw_dir, out_dir = self._rest_paths(data_type)
@@ -430,12 +438,13 @@ class GetRest:
                 # Update mysql db_emorep.tbl_rest_ratings with study data
                 if data_type == "pilot":
                     continue
-                self._up_mysql.update_db(
+                up_db_emorep.update_db(
                     df_sess.copy(),
                     "rest_ratings",
                     int(day[-1]),
                     "rest_ratings",
                 )
+        up_db_emorep.close_db()
 
     def _rest_paths(self, data_type: str) -> Tuple:
         """Return paths to rawdata, output directory."""
@@ -497,8 +506,7 @@ class GetTask:
 
         """
         # Start DbConnect here to avoid pickle issue
-        db_con = sql_database.DbConnect()
-        up_mysql = sql_database.MysqlUpdate(db_con)
+        up_db_emorep = sql_database.DbUpdate()
 
         # Aggregate data
         print("Aggregating in-scanner task responses ...")
@@ -519,12 +527,13 @@ class GetTask:
                 "df_in_scan_ratings.csv",
             )
             _write_dfs(df_sess, out_path)
-            up_mysql.update_db(
+            up_db_emorep.update_db(
                 df_sess.copy(),
                 "in_scan_ratings",
                 int(sess[-1]),
                 "in_scan_ratings",
             )
+        up_db_emorep.close_db()
 
     def _build_df(self):
         """Build attr df_all from rawdata events files."""
