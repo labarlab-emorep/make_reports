@@ -507,7 +507,7 @@ class CheckStatus:
         Parameters
         ----------
         status_name : str
-            ["lost", "excluded", "withdrew"]
+            {"lost", "excluded", "withdrew"}
             Status change of interest
 
         Attributes

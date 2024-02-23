@@ -1,26 +1,35 @@
-subj,visit1_qualtrics,visit2_redcap,visit2_qualtrics,visit2_mri,visit2_task,visit2_physio,visit3_redcap,visit3_qualtrics,visit3_mri,visit3_task,visit3_physio
-ER0009,,,,incl,incl,,,,,,
-ER0052,,,,,,,,,incl,,
-ER0057,incl,,,,,,,incl,incl,incl,incl
-ER0071,,,,,,,,incl,,,
-ER0075,,,,,incl,,,,,,
-ER0087,,,,incl,incl,incl,,,,,
-ER0093,,,,,incl,,,,,incl,
-ER0110,,,,,,,,incl,,,
-ER0135,,,,,incl,incl,,,,,
-ER0181,,,,,,,,,,incl,
-ER0211,,,,,,,,incl,,,
-ER0229,incl,,,,incl,,,incl,incl,incl,incl
-ER0246,incl,,,,,,,,,,
-ER0274,,,incl,,,,,,,,
-ER0489,,,,,,,,,,incl,
-ER0611,,,,,,,,,incl,,incl
-ER0637,,,,incl,incl,incl,,,,,
-ER0643,,,,,,,,,incl,,incl
-ER0647,,,,,incl,,,,,,
-ER0697,,,,incl,incl,incl,,,,,
-ER0909,,,,incl,incl,incl,,incl,incl,incl,incl
-ER1002,,,,,,,,,,incl,
-ER1006,,,,incl,,,,,,,
-ER1136,,,,,,,,,incl,,
-ER1137,,,,,,,,incl,,,
+subj,visit1_qualtrics,visit2_RA,visit2_redcap,visit2_qualtrics,visit2_mri,visit2_task,visit2_physio,visit3_RA,visit3_redcap,visit3_qualtrics,visit3_mri,visit3_task,visit3_physio,notes
+ER0009,,MB_YD,,,,incomplete,incomplete,,,,,,,"day2 runs 1-8: ""event code corrupted"""
+ER0052,,,,,,,,YD,,,bad_run,,,day3 run5: missing mri volumes
+ER0057,incomplete,YD_JG,,,,bad_run,,MB_YD,,incomplete,incomplete,incomplete,incomplete,day1 survey incomplete; day2 run1 mri & task fell asleep
+ER0060,,YD_JG,,,,,bad_run,,,,,,,"day2 run5: ""there was a biopac hardware connection issue near the end of recording"" - lost last 1/4 of run5 physio"
+ER0071,,,,,,,,YD,,incomplete,,,,day3 qualtrics prescan survey missing
+ER0075,,YD,,,,incomplete,,,,,,,,day2 missing rest ratings
+ER0087,,JG,,,incomplete,incomplete,incomplete,,not_collected,not_collected,not_collected,not_collected,not_collected,day2 missing rest ; day3 participation lost
+ER0093,,YD,,,bad_run,incomplete,bad_run,YD,,,,incomplete,,"day2 run6: ""Failed to present the task"" ""Missing day2 run-6 task file."" - day2 run6 mri & physio & behav bad; day3: ""Missing rest ratings (2023-03-31 NM), forgot to run."""
+ER0135,,YD,,,bad_run,incomplete,bad_run,,,,,,,day2 run8 - sync box not started: behav files missing & mri/physio bad
+ER0181,,,,,,,,YD,,,bad_run,incomplete,bad_run,day3 run 4 - sync box not started: behav files missing & mri/physio bad
+ER0208,,JG,,incomplete,,,,,,,,,,day2 qualtrics prescan survey missing
+ER0211,,,,,,,,JG,,incomplete,,,,day3 qualtrics prescan survey missing
+ER0216,,,,,,,,AS,,incomplete,incomplete,incomplete,incomplete,day3 EAE at run 3
+ER0229,incomplete,YD,,,,bad_run,,JG,,incomplete,incomplete,not_collected,not_collected,day1 missing qualtrics survey; day2 run1 behav responses; day3  EAE
+ER0274,,YD,,incomplete,,,,,,,,,,day2 qualtrics postscan surveys missing
+ER0325,,,,,,,,YD,,incomplete,,,not_collected,day3 missing physio & missing day3 qualtrics post-scan survey
+ER0489,,,,,,,,JG,,,bad_run,bad_run,bad_run,day3 run6 missing behav file; day3 run6 short mri & physio files
+ER0611,,,,,,,,AS,,,bad_run,,incomplete,day3 run5 sync box not started & missing day3 run4 physio due to crash
+ER0631,incomplete,,not_collected,not_collected,not_collected,not_collected,not_collected,,not_collected,not_collected,not_collected,not_collected,not_collected,day1 survey incomplete; day2 & day3 not run
+ER0637,,SC,,,incomplete,incomplete,incomplete,,,,,,,"day2 missing rest files for mri, behav, physio; day2 empty run-04 physio file"
+ER0643,,,,,,,,SS,,,bad_run,,bad_run,day3 run1 missing mri & physio files
+ER0647,,YD,,,,incomplete,,,,,,,,day2 missing post-rest behav ratings
+ER0693,,SS,,,bad_run,,bad_run,,,,,,,day2 run1 short mri & physio files
+ER0697,,SS,,,incomplete,incomplete,incomplete,,,,,,,day2 missing rest & rest ratings; day2 empty run-01 physio file
+ER0730,,,,,,,,SS,,,,,bad_run,day3 missing run2 physio files
+ER0736,incomplete,,,,,,,,not_collected,not_collected,not_collected,not_collected,not_collected,day1 survey incomplete; day3 lost
+ER0909,,JG,,,bad_run,bad_run,bad_run,YD,,incomplete,incomplete,incomplete,incomplete,"day2 run6 missing mri, behav, physio files; day3 EAE at run2"
+ER0962,,SS,,,incomplete,incomplete,incomplete,,not_collected,not_collected,not_collected,not_collected,not_collected,"day2 run6 EAE, missing run6-8 and rest run for mri, behav and physio; day3 EAE"
+ER1002,,,,,,,,YD,,,,incomplete,,day3 missing rest ratings behav file
+ER1006,,,,,,,,YD,,,bad_run,,,day3 run6 missing end of mri file
+ER1132,,AS,,,,bad_run,,,,,,,,day2 run1 behav file missing
+ER1136,,JG,,,,,bad_run,SS,,,not_collected,,,day2: sync box not started - bad resting-state physio data; day3 all MRI data corrupted per reconstruction failed
+ER1137,,AS,,,,incomplete,,,not_collected,not_collected,not_collected,not_collected,not_collected,day2 post-rest ratings behav file missing; day3: lost
+ER1152,,JG,,,incomplete,incomplete,incomplete,,,,,,,day2 rest & post-rest not run
