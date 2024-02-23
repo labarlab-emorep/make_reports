@@ -5,6 +5,7 @@ CleanQualtrics : organize, clean Qualtrics survey responses
 clean_rest_ratings : aggregate post-rest responses into dataframe
 
 """
+
 import os
 import string
 import glob
@@ -399,11 +400,11 @@ class CleanRedcap:
         self._res_idx()
 
         # Update db_emorep.ref_subj for enrolled study subjs
-        db_con = sql_database.DbConnect()
-        up_mysql = sql_database.MysqlUpdate(db_con)
+        up_db_emorep = sql_database.DbUpdate()
         df_sql = self.df_study.copy()
         df_sql = df_sql.rename(columns={"record_id": "subj_id"})
-        up_mysql.update_ref_subj(df_sql)
+        up_db_emorep.insert_ref_subj(df_sql)
+        up_db_emorep.close_db()
 
     def clean_bdi_day23(self, df_raw):
         """Cleaning method for RedCap BDI surveys.

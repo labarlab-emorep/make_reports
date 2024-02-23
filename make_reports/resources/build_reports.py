@@ -282,16 +282,15 @@ class DemoAll(manage_data.GetRedcap):
         self.final_demo = pd.DataFrame(out_dict, columns=out_dict.keys())
 
         # Update db_emorep
-        db_con = sql_database.DbConnect()
-        up_mysql = sql_database.MysqlUpdate(db_con)
-        up_mysql.update_db(
+        up_db_emorep = sql_database.DbUpdate()
+        up_db_emorep.update_db(
             self.final_demo.copy(),
             "demographics",
             1,
             "demographics",
             subj_col="src_subject_id",
         )
-        db_con.close_con()
+        up_db_emorep.close_db()
 
     def remove_withdrawn(self):
         """Remove participants from final_demo who have withdrawn consent."""
