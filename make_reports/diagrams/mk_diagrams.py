@@ -115,7 +115,7 @@ graph_attr = {
 
 
 # %%
-with Diagram("chk_data process", graph_attr=graph_attr, show=False):
+with Diagram("process chk_data", graph_attr=graph_attr, show=False):
     with Cluster("cli"):
         cli_chk_data = CommandLineInterface("chk_data")
 
@@ -149,6 +149,41 @@ with Diagram("chk_data process", graph_attr=graph_attr, show=False):
         >> rsc_multiproc
     )
     wf_run_check >> wf_write_csv
+
+
+# %%
+with Diagram("process gen_guids", graph_attr=graph_attr):
+    with Cluster("cli"):
+        cli_gen_guids = CommandLineInterface("gen_guids")
+
+    with Cluster("workflows.required_reports"):
+        wf_gen_guids = Compute("generate_guids")
+
+    with Cluster("resources.build_reports"):
+        with Cluster("GenerateGuids"):
+            rsc_mk_guids = Compute("make_guids")
+            rsc_chk_guids = Compute("check_guids")
+
+    with Cluster("resources.manage_data"):
+        with Cluster("GetRedcap.get_redcap"):
+            rsc_get_demo = Compute("demographics")
+            rsc_get_guid = Compute("guid")
+
+    with Cluster("subshell"):
+        sys_guid_tool = Bash("guid-tool")
+        sys_write_txt = Storage("write TXT")
+
+    cli_gen_guids >> wf_gen_guids
+    wf_gen_guids >> rsc_mk_guids
+    rsc_mk_guids << rsc_get_demo
+    rsc_mk_guids >> sys_guid_tool
+    sys_guid_tool >> sys_write_txt
+
+    wf_gen_guids >> rsc_chk_guids
+    rsc_chk_guids << rsc_get_guid
+    rsc_chk_guids >> rsc_mk_guids
+    rsc_chk_guids << sys_write_txt
+
 
 
 # %%
