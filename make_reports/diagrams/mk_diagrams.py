@@ -1,10 +1,16 @@
 # %%
-from diagrams import Cluster, Diagram
+from diagrams import Cluster, Diagram, Edge
+from diagrams.aws.analytics import DataPipeline
+from diagrams.aws.compute import Compute
+from diagrams.aws.compute import Batch
+from diagrams.aws.database import Database
+from diagrams.aws.devtools import CommandLineInterface
 from diagrams.aws.general import General
+from diagrams.programming.language import Bash
+from diagrams.aws.storage import Storage
 
 # %%
-# , show=False
-with Diagram("imports", direction="TB"):
+with Diagram("imports", direction="TB", , show=False):
 
     with Cluster("cli"):
         cli_chk_data = General("chk_data")
@@ -99,6 +105,50 @@ with Diagram("imports", direction="TB"):
 
     rsc_sur_download << rsc_rep_helper
     rsc_sur_download << ref_files
+
+
+# %%
+graph_attr = {
+    "layout": "dot",
+    "compound": "true",
+}
+
+
+# %%
+with Diagram("chk_data process", graph_attr=graph_attr, show=False):
+    with Cluster("cli"):
+        cli_chk_data = CommandLineInterface("chk_data")
+
+    with Cluster("workflows.data_metrics"):
+        with Cluster("CheckProjectMri"):
+            wf_run_check = Compute("run_check")
+            wf_write_csv = Storage("write CSV")
+
+    with Cluster("resources.check_data"):
+        with Cluster("CheckMri"):
+            with Cluster("check_emorep"):
+                rsc_chk_dcm = Compute("check_dcmnii")
+                rsc_chk_bids = Compute("check_bids")
+                rsc_chk_mriqc = Compute("check_mriqc")
+            with Cluster("check_archival"):
+                rsc_chk_arch = Compute()
+
+            rsc_multiproc = Batch("multi_chk")
+
+    (
+        cli_chk_data
+        >> Edge(lhead="cluster_workflows.data_metrics")
+        >> wf_run_check
+    )
+    wf_run_check >> Edge(lhead="cluster_check_emorep") >> rsc_chk_dcm
+    rsc_chk_dcm >> rsc_chk_bids >> rsc_chk_mriqc >> rsc_multiproc
+    (
+        wf_run_check
+        >> Edge(lhead="cluster_check_archival")
+        >> rsc_chk_arch
+        >> rsc_multiproc
+    )
+    wf_run_check >> wf_write_csv
 
 
 # %%
