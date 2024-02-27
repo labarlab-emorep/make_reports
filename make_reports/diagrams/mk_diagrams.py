@@ -10,7 +10,7 @@ from diagrams.programming.language import Bash
 from diagrams.aws.storage import Storage
 
 # %%
-with Diagram("imports", direction="TB", , show=False):
+with Diagram("imports", direction="TB", show=False):
 
     with Cluster("cli"):
         cli_chk_data = General("chk_data")
@@ -152,7 +152,7 @@ with Diagram("process chk_data", graph_attr=graph_attr, show=False):
 
 
 # %%
-with Diagram("process gen_guids", graph_attr=graph_attr):
+with Diagram("process gen_guids", graph_attr=graph_attr, show=False):
     with Cluster("cli"):
         cli_gen_guids = CommandLineInterface("gen_guids")
 
@@ -185,5 +185,55 @@ with Diagram("process gen_guids", graph_attr=graph_attr):
     rsc_chk_guids << sys_write_txt
 
 
+# %%
+with Diagram("process get_surveys", graph_attr=graph_attr):
+    with Cluster("cli"):
+        cli_get_surveys = CommandLineInterface("get_surveys")
+
+    with Cluster("resources.manage_data"):
+        with Cluster("GetRest"):
+            rsc_get_rest = Compute("get_rest")
+        with Cluster("GetRedcap"):
+            rsc_get_redcap = Compute("get_redcap")
+
+    with Cluster("resources.survey_download"):
+        rsc_sur_dl_rc = Compute("dl_redcap")
+
+    with Cluster("resources.survey_clean"):
+        rsc_sur_cl_rr = Compute("clean_rest_ratings")
+        with Cluster("CleanRedcap"):
+            rsc_sur_cl_rc = Compute("clean surveys")
+
+    with Cluster("resources.report_helper"):
+        with Cluster("CheckStatus"):
+            rsc_stat_change = Compute("status_change")
+        rsc_pull_rc = Compute("pull_redcap_data")
+
+    with Cluster("dataframes"):
+        ref_dfs = Storage("track_status.csv")
+
+    with Cluster("reference_files"):
+        ref_file = Storage("report_keys")
+
+    with Cluster("resources.sql_database"):
+        rsc_db_connect = Compute("DbConnect")
+        with Cluster("DbUpdate"):
+            rsc_db_update = Database("update_db")
+
+    # GetRest
+    (
+        cli_get_surveys
+        >> rsc_get_rest
+        << rsc_sur_cl_rr
+        << rsc_stat_change
+        << ref_dfs
+    )
+    rsc_get_rest >> rsc_db_update << rsc_db_connect
+
+    # GetRedcap
+    cli_get_surveys >> rsc_get_redcap >> rsc_sur_dl_rc << ref_file
+    rsc_sur_dl_rc >> rsc_pull_rc >> rsc_sur_dl_rc >> rsc_get_redcap
+    rsc_get_redcap >> rsc_sur_cl_rc >> rsc_get_redcap
+    rsc_get_redcap >> rsc_db_update
 
 # %%
