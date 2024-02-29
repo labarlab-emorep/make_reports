@@ -190,46 +190,52 @@ with Diagram("process get_surveys", graph_attr=graph_attr, show=False):
     with Cluster("cli"):
         cli_get_surveys = CommandLineInterface("get_surveys")
 
-    with Cluster("resources.manage_data"):
-        with Cluster("GetRest"):
-            rsc_get_rest = DataPipeline("get_rest")
-        with Cluster("GetRedcap"):
-            rsc_get_redcap = DataPipeline("get_redcap")
-        with Cluster("GetQualtrics"):
-            rsc_get_qual = DataPipeline("get_qualtrics")
-        with Cluster("GetTask"):
-            rsc_get_task = DataPipeline("get_task")
-
     with Cluster("Keoki"):
         bids_files = Storage("BIDS files")
 
-    with Cluster("resources.survey_download"):
-        rsc_sur_dl_rc = Compute("dl_redcap")
-        rsc_sur_dl_qual = Compute("dl_qualtrics")
+    with Cluster("resources"):
+        with Cluster("manage_data"):
+            with Cluster("GetRest"):
+                rsc_get_rest = DataPipeline("get_rest")
+            with Cluster("GetRedcap"):
+                rsc_get_redcap = DataPipeline("get_redcap")
+            with Cluster("GetQualtrics"):
+                rsc_get_qual = DataPipeline("get_qualtrics")
+            with Cluster("GetTask"):
+                rsc_get_task = DataPipeline("get_task")
 
-    with Cluster("resources.survey_clean"):
-        rsc_sur_cl_rr = Compute("clean_rest_ratings")
-        with Cluster("CleanRedcap"):
-            rsc_sur_cl_rc = Compute("clean surveys")
-        with Cluster("CleanQualtrics"):
-            rsc_sur_cl_qual = Compute("clean surveys")
+        with Cluster("survey_download"):
+            rsc_sur_dl_rc = Compute("dl_redcap")
+            rsc_sur_dl_qual = Compute("dl_qualtrics")
 
-    with Cluster("resources.report_helper"):
-        with Cluster("CheckStatus"):
-            rsc_stat_change = Compute("status_change")
-        rsc_pull_rc = Compute("pull_redcap_data")
-        rsc_pull_qual = Compute("pull_qualtrics_data")
+        with Cluster("survey_clean"):
+            rsc_sur_cl_rr = Compute("clean_rest_ratings")
+            with Cluster("CleanRedcap"):
+                rsc_sur_cl_rc = Compute("clean surveys")
+            with Cluster("CleanQualtrics"):
+                rsc_sur_cl_qual = Compute("clean surveys")
 
-    with Cluster("dataframes"):
-        ref_dfs = Storage("track_status.csv")
+        with Cluster("report_helper"):
+            with Cluster("CheckStatus"):
+                rsc_stat_change = Compute("status_change")
+            rsc_pull_rc = Compute("pull_redcap_data")
+            rsc_pull_qual = Compute("pull_qualtrics_data")
 
-    with Cluster("reference_files"):
-        ref_file = Storage("report_keys")
+        with Cluster("sql_database"):
+            rsc_db_connect = Compute("DbConnect")
+            with Cluster("DbUpdate"):
+                rsc_db_update = Compute("update_db")
 
-    with Cluster("resources.sql_database"):
-        rsc_db_connect = Compute("DbConnect")
-        with Cluster("DbUpdate"):
-            rsc_db_update = Compute("update_db")
+        with Cluster("build_reports"):
+            with Cluster("DemoAll"):
+                rsc_mk_compl = DataPipeline("make_complete")
+
+    with Cluster("Helper Files"):
+        with Cluster("dataframes"):
+            ref_dfs = Storage("track_status.csv")
+
+        with Cluster("reference_files"):
+            ref_file = Storage("report_keys")
 
     with Cluster("LaBarLab Databases"):
         rsc_db_emorep = Database("db_emorep")
@@ -237,10 +243,6 @@ with Diagram("process get_surveys", graph_attr=graph_attr, show=False):
     with Cluster("Survey Databases"):
         db_redcap = Database("REDCap")
         db_qualtrics = Database("Qualtrics")
-
-    with Cluster("resources.build_reports"):
-        with Cluster("DemoAll"):
-            rsc_mk_compl = DataPipeline("make_complete")
 
     # GetRest
     (
@@ -284,6 +286,5 @@ with Diagram("process get_surveys", graph_attr=graph_attr, show=False):
 
     # GetDemo
     cli_get_surveys >> rsc_mk_compl >> Edge(color="") << rsc_get_redcap
+    rsc_mk_compl << rsc_stat_change
     rsc_mk_compl >> rsc_db_update
-
-# %%
