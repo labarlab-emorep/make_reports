@@ -190,10 +190,12 @@ with Diagram("process get_surveys", graph_attr=graph_attr, show=False):
     with Cluster("cli"):
         cli_get_surveys = CommandLineInterface("get_surveys")
 
-    with Cluster("Keoki"):
-        bids_files = Storage("BIDS files")
-
     with Cluster("resources"):
+
+        with Cluster("build_reports"):
+            with Cluster("DemoAll"):
+                rsc_mk_compl = DataPipeline("make_complete")
+
         with Cluster("manage_data"):
             with Cluster("GetRest"):
                 rsc_get_rest = DataPipeline("get_rest")
@@ -203,17 +205,6 @@ with Diagram("process get_surveys", graph_attr=graph_attr, show=False):
                 rsc_get_qual = DataPipeline("get_qualtrics")
             with Cluster("GetTask"):
                 rsc_get_task = DataPipeline("get_task")
-
-        with Cluster("survey_download"):
-            rsc_sur_dl_rc = Compute("dl_redcap")
-            rsc_sur_dl_qual = Compute("dl_qualtrics")
-
-        with Cluster("survey_clean"):
-            rsc_sur_cl_rr = Compute("clean_rest_ratings")
-            with Cluster("CleanRedcap"):
-                rsc_sur_cl_rc = Compute("clean surveys")
-            with Cluster("CleanQualtrics"):
-                rsc_sur_cl_qual = Compute("clean surveys")
 
         with Cluster("report_helper"):
             with Cluster("CheckStatus"):
@@ -226,9 +217,19 @@ with Diagram("process get_surveys", graph_attr=graph_attr, show=False):
             with Cluster("DbUpdate"):
                 rsc_db_update = Compute("update_db")
 
-        with Cluster("build_reports"):
-            with Cluster("DemoAll"):
-                rsc_mk_compl = DataPipeline("make_complete")
+        with Cluster("survey_clean"):
+            rsc_sur_cl_rr = Compute("clean_rest_ratings")
+            with Cluster("CleanRedcap"):
+                rsc_sur_cl_rc = Compute("clean surveys")
+            with Cluster("CleanQualtrics"):
+                rsc_sur_cl_qual = Compute("clean surveys")
+
+        with Cluster("survey_download"):
+            rsc_sur_dl_rc = Compute("dl_redcap")
+            rsc_sur_dl_qual = Compute("dl_qualtrics")
+
+    with Cluster("Keoki"):
+        bids_files = Storage("BIDS files")
 
     with Cluster("Helper Files"):
         with Cluster("dataframes"):
@@ -299,6 +300,12 @@ with Diagram("process rep_metrics", graph_attr=graph_attr, show=False):
             wf_get_metrics = Compute("get_metrics")
 
     with Cluster("resources"):
+
+        with Cluster("build_reports"):
+            with Cluster("DemoAll"):
+                rsc_mk_compl = DataPipeline("make_complete")
+                rsc_rm_with = Compute("remove_withdrawn")
+
         with Cluster("calc_metrics"):
             rsc_demographics = Compute("demographics")
             rsc_scan_pace = Compute("scan_pace")
@@ -306,10 +313,9 @@ with Diagram("process rep_metrics", graph_attr=graph_attr, show=False):
             with Cluster("ParticipantFlow"):
                 rsc_draw_prisma = DataPipeline("draw_prisma")
 
-        with Cluster("build_reports"):
-            with Cluster("DemoAll"):
-                rsc_mk_compl = DataPipeline("make_complete")
-                rsc_rm_with = Compute("remove_withdrawn")
+        with Cluster("manage_data"):
+            with Cluster("GetRedcap"):
+                rsc_get_redcap = DataPipeline("get_redcap")
 
         with Cluster("report_helper"):
             with Cluster("CheckStatus"):
@@ -317,9 +323,10 @@ with Diagram("process rep_metrics", graph_attr=graph_attr, show=False):
                 rsc_stat_add = Compute("add_status")
             rsc_pull_rc = Compute("pull_redcap_data")
 
-        with Cluster("manage_data"):
-            with Cluster("GetRedcap"):
-                rsc_get_redcap = DataPipeline("get_redcap")
+        with Cluster("sql_database"):
+            rsc_db_connect = Compute("DbConnect")
+            with Cluster("DbUpdate"):
+                rsc_db_update = Compute("update_db")
 
         with Cluster("survey_clean"):
             with Cluster("CleanRedcap"):
@@ -338,6 +345,9 @@ with Diagram("process rep_metrics", graph_attr=graph_attr, show=False):
 
     with Cluster("Survey Databases"):
         db_redcap = Database("REDCap")
+
+    with Cluster("LaBarLab Databases"):
+        rsc_db_emorep = Database("db_emorep")
 
     with Cluster("Keoki"):
         bids_files = Storage("BIDS files")
@@ -369,6 +379,8 @@ with Diagram("process rep_metrics", graph_attr=graph_attr, show=False):
         << db_redcap
     )
     rsc_sur_dl_rc << ref_file
+    rsc_get_redcap >> rsc_db_update >> rsc_db_connect >> rsc_db_emorep
+    rsc_mk_compl >> rsc_db_update
 
     #
     rsc_scan_pace << rsc_sur_dl_rc
@@ -377,5 +389,135 @@ with Diagram("process rep_metrics", graph_attr=graph_attr, show=False):
     rsc_draw_prisma >> Edge(color="") << rsc_mk_compl
     rsc_draw_prisma << rsc_sur_dl_prescr >> Edge(color="") << rsc_pull_rc
 
+
+# %%
+with Diagram("process rep_ndar", graph_attr=graph_attr, show=False):
+    with Cluster("cli"):
+        cli_rep_ndar = CommandLineInterface("rep_ndar")
+
+    with Cluster("workflows"):
+        with Cluster("required_reports"):
+            with Cluster("MakeNdarReports"):
+                wf_mk_report = Compute("make_report")
+
+    with Cluster("Keoki"):
+        bids_files = Storage("BIDS files")
+
+    with Cluster("resources"):
+
+        with Cluster("build_ndar"):
+            with Cluster("NdarFoo"):
+                rsc_mk_ndar = Compute("make_foo")
+
+        with Cluster("build_reports"):
+            with Cluster("DemoAll"):
+                rsc_mk_compl = DataPipeline("make_complete")
+                rsc_rm_with = Compute("remove_withdrawn")
+                rsc_sub_cycle = Compute("submission_cycle")
+
+        with Cluster("manage_data"):
+            with Cluster("GetRest"):
+                rsc_get_rest = DataPipeline("get_rest")
+            with Cluster("GetRedcap"):
+                rsc_get_redcap = DataPipeline("get_redcap")
+            with Cluster("GetQualtrics"):
+                rsc_get_qual = DataPipeline("get_qualtrics")
+
+        with Cluster("report_helper"):
+            with Cluster("CheckStatus"):
+                rsc_stat_change = Compute("status_change")
+            rsc_pull_rc = Compute("pull_redcap_data")
+            rsc_pull_qual = Compute("pull_qualtrics_data")
+            rsc_get_sury_age = Compute("get_survey_age")
+            rsc_mine_tpl = Compute("mine_template")
+            rsc_calc_age_mo = Compute("calc_age_mo")
+
+        with Cluster("sql_database"):
+            rsc_db_connect = Compute("DbConnect")
+            with Cluster("DbUpdate"):
+                rsc_db_update = Compute("update_db")
+
+        with Cluster("survey_clean"):
+            rsc_sur_cl_rr = Compute("clean_rest_ratings")
+            with Cluster("CleanRedcap"):
+                rsc_sur_cl_rc = Compute("clean surveys")
+            with Cluster("CleanQualtrics"):
+                rsc_sur_cl_qual = Compute("clean surveys")
+
+        with Cluster("survey_download"):
+            rsc_sur_dl_rc = Compute("dl_redcap")
+            rsc_sur_dl_qual = Compute("dl_qualtrics")
+
+    with Cluster("Helper Files"):
+        with Cluster("dataframes"):
+            ref_dfs = Storage("track_status.csv")
+        with Cluster("reference_files"):
+            ref_file = Storage("report_keys")
+        with Cluster("templates"):
+            ref_tpl = Storage("NDAR template")
+
+    with Cluster("LaBarLab Databases"):
+        rsc_db_emorep = Database("db_emorep")
+
+    with Cluster("Survey Databases"):
+        db_redcap = Database("REDCap")
+        db_qualtrics = Database("Qualtrics")
+
+    #
+    cli_rep_ndar >> wf_mk_report
+
+    #
+    (
+        wf_mk_report
+        >> Edge(color="")
+        << rsc_mk_compl
+        >> Edge(color="")
+        << rsc_get_redcap
+        >> rsc_sur_cl_rc
+    )
+    rsc_mk_compl >> rsc_rm_with << rsc_stat_change << ref_dfs
+    rsc_mk_compl >> rsc_sub_cycle
+    (
+        rsc_get_redcap
+        >> Edge(color="")
+        << rsc_sur_dl_rc
+        >> Edge(color="")
+        << rsc_pull_rc
+        << db_redcap
+    )
+    rsc_sur_dl_rc << ref_file
+    rsc_get_redcap >> rsc_db_update >> rsc_db_connect >> rsc_db_emorep
+    rsc_mk_compl >> rsc_db_update
+
+    # GetRest
+    (
+        wf_mk_report
+        >> Edge(color="")
+        << rsc_get_rest
+        >> Edge(color="")
+        << rsc_sur_cl_rr
+        << rsc_stat_change
+        << ref_dfs
+    )
+    rsc_sur_cl_rr << bids_files
+    rsc_get_rest >> rsc_db_update >> rsc_db_connect >> rsc_db_emorep
+
+    # GetQualtrics
+    (
+        cli_get_surveys
+        >> rsc_get_qual
+        >> Edge(color="")
+        << rsc_sur_dl_qual
+        << ref_file
+    )
+    rsc_sur_dl_qual >> Edge(color="") << rsc_pull_qual << db_qualtrics
+    rsc_get_qual >> Edge(color="") << rsc_sur_cl_qual << rsc_stat_change
+    rsc_get_qual >> rsc_db_update
+
+    #
+    wf_mk_report >> rsc_mk_ndar << bids_files
+    rsc_mk_ndar << rsc_get_sury_age
+    rsc_mk_ndar << rsc_calc_age_mo
+    rsc_mk_ndar << rsc_mine_tpl << ref_tpl
 
 # %%
