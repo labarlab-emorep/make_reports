@@ -288,3 +288,94 @@ with Diagram("process get_surveys", graph_attr=graph_attr, show=False):
     cli_get_surveys >> rsc_mk_compl >> Edge(color="") << rsc_get_redcap
     rsc_mk_compl << rsc_stat_change
     rsc_mk_compl >> rsc_db_update
+
+# %%
+with Diagram("process rep_metrics", graph_attr=graph_attr, show=False):
+    with Cluster("cli"):
+        cli_get_surveys = CommandLineInterface("rep_metrics")
+
+    with Cluster("workflows"):
+        with Cluster("data_metrics"):
+            wf_get_metrics = Compute("get_metrics")
+
+    with Cluster("resources"):
+        with Cluster("calc_metrics"):
+            rsc_demographics = Compute("demographics")
+            rsc_scan_pace = Compute("scan_pace")
+            rsc_cens_vols = Compute("censored_volumes")
+            with Cluster("ParticipantFlow"):
+                rsc_draw_prisma = DataPipeline("draw_prisma")
+
+        with Cluster("build_reports"):
+            with Cluster("DemoAll"):
+                rsc_mk_compl = DataPipeline("make_complete")
+                rsc_rm_with = Compute("remove_withdrawn")
+
+        with Cluster("report_helper"):
+            with Cluster("CheckStatus"):
+                rsc_stat_change = Compute("status_change")
+                rsc_stat_add = Compute("add_status")
+            rsc_pull_rc = Compute("pull_redcap_data")
+
+        with Cluster("manage_data"):
+            with Cluster("GetRedcap"):
+                rsc_get_redcap = DataPipeline("get_redcap")
+
+        with Cluster("survey_clean"):
+            with Cluster("CleanRedcap"):
+                rsc_sur_cl_rc = Compute("clean surveys")
+
+        with Cluster("survey_download"):
+            rsc_sur_dl_rc = Compute("dl_redcap")
+            rsc_sur_dl_prescr = Compute("dl_prescreening")
+
+    with Cluster("Helper Files"):
+        with Cluster("dataframes"):
+            ref_dfs = Storage("track_status.csv")
+
+        with Cluster("reference_files"):
+            ref_file = Storage("report_keys")
+
+    with Cluster("Survey Databases"):
+        db_redcap = Database("REDCap")
+
+    with Cluster("Keoki"):
+        bids_files = Storage("BIDS files")
+
+    #
+    cli_get_surveys >> wf_get_metrics
+    wf_get_metrics >> rsc_demographics
+    wf_get_metrics >> rsc_scan_pace
+    wf_get_metrics >> rsc_cens_vols << bids_files
+    wf_get_metrics >> rsc_draw_prisma
+
+    #
+    (
+        rsc_demographics
+        >> Edge(color="")
+        << rsc_mk_compl
+        >> Edge(color="")
+        << rsc_get_redcap
+        >> rsc_sur_cl_rc
+    )
+    rsc_mk_compl >> rsc_rm_with << rsc_stat_change << ref_dfs
+    rsc_mk_compl >> rsc_stat_add
+    (
+        rsc_get_redcap
+        >> Edge(color="")
+        << rsc_sur_dl_rc
+        >> Edge(color="")
+        << rsc_pull_rc
+        << db_redcap
+    )
+    rsc_sur_dl_rc << ref_file
+
+    #
+    rsc_scan_pace << rsc_sur_dl_rc
+
+    #
+    rsc_draw_prisma >> Edge(color="") << rsc_mk_compl
+    rsc_draw_prisma << rsc_sur_dl_prescr >> Edge(color="") << rsc_pull_rc
+
+
+# %%
