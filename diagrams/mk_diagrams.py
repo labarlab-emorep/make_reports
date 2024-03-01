@@ -501,11 +501,13 @@ with Diagram("process rep_ndar", graph_attr=graph_attr, show=False):
     )
     rsc_sur_cl_rr << bids_files
     rsc_get_rest >> rsc_db_update >> rsc_db_connect >> rsc_db_emorep
+    rsc_get_rest >> rsc_db_update
 
     # GetQualtrics
     (
-        cli_get_surveys
-        >> rsc_get_qual
+        wf_mk_report
+        >> Edge(color="")
+        << rsc_get_qual
         >> Edge(color="")
         << rsc_sur_dl_qual
         << ref_file
