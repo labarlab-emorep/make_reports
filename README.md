@@ -149,6 +149,61 @@ Schematic mapping the `rep_get` workflow to specific modules and methods of `mak
 
 
 ## rep_regular
+This workflow generates reportes required regularly by the NIH and Duke. Individual reports are requested by specifying the name of the institution + the frequency in months, e.g. a report submitted to the NIH every 12 months is requested via `--names nih12`.
+
+Generated reports are written to `/mnt/keoki/experiments2/EmoRep/Exp2_Compute_Emotion/documents/regular_reports`.
+
+
+### Setup
+- Generate and store API tokens for REDCap in user environment (see [above](#general-requirements)).
+- Store MySQL password for `db_emorep` in user environment.
+
+
+### Usage
+Trigger sub-package help and usage via `$rep_regular`:
+
+```
+(emorep)[nmm51-vm: ~]$rep_regular
+usage: rep_regular [-h] [--proj-dir PROJ_DIR] [--query-date QUERY_DATE] --names {nih4,nih12,duke3,duke12}
+                   [{nih4,nih12,duke3,duke12} ...]
+
+Generate regular reports.
+
+Mine RedCap demographic information to construct reports regularly
+submitted to the NIH or Duke.
+
+Notes
+-----
+- Requires global variable 'PAT_REDCAP_EMOREP' in user env, which
+    holds the personal access token to the emorep REDCap database.
+- Previous submissions can also be generated via --query-date.
+- Reports are written to <proj_dir>/documents/regular_reports
+
+Examples
+--------
+rep_regular --names nih4 nih12 duke12
+rep_regular --names nih4 --query-date 2022-06-29
+
+optional arguments:
+  -h, --help            show this help message and exit
+  --proj-dir PROJ_DIR   Path to project's experiment directory
+                        (default : /mnt/keoki/experiments2/EmoRep/Exp2_Compute_Emotion)
+  --query-date QUERY_DATE
+                        YYYY-MM-DD format, after 2022-04-01.
+                        Used to find a submission window e.g. 2022-06-06
+                        would find all data between 2022-01-01 and 2022-12-31
+                        when doing an annual report.
+                        (default : today's date (2024-03-08))
+
+Required Arguments:
+  --names {nih4,nih12,duke3,duke12} [{nih4,nih12,duke3,duke12} ...]
+                        List of desired reports to generate
+```
+
+
+### Considerations
+- While the generation of previous reports is supported, the `--query-date` must be after 2022-03-31.
+- Depending on the report, 'other' responses to the race prompts require manual adjustment.
 
 
 ## rep_ndar

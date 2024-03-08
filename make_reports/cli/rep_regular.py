@@ -47,11 +47,10 @@ def _get_args():
         default=date.today().strftime("%Y-%m-%d"),
         help=textwrap.dedent(
             """\
-            Used with --manager-reports.
-            A Y-m-d formatted date AFTER 2022-04-01 used to find a
-            submission window e.g. 2022-06-06 would find all data
-            between 2022-01-01 and 2022-12-31 when doing an annual
-            report.
+            YYYY-MM-DD format, after 2022-04-01.
+            Used to find a submission window e.g. 2022-06-06
+            would find all data between 2022-01-01 and 2022-12-31
+            when doing an annual report.
             (default : today's date (%(default)s))
             """
         ),

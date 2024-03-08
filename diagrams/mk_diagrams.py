@@ -546,3 +546,78 @@ with Diagram("process rep_ndar", graph_attr=graph_attr, show=False):
     rsc_mk_ndar >> ndar_reports
 
 # %%
+with Diagram("process rep_regular", graph_attr=graph_attr, show=False):
+    with Cluster("cli"):
+        cli_rep_regular = CommandLineInterface("rep_regular")
+
+    with Cluster("workflows"):
+        with Cluster("required_reports"):
+            wf_mk_reg_report = Compute("make_regular_reports")
+
+    with Cluster("resources"):
+        with Cluster("build_reports"):
+            with Cluster("DemoAll"):
+                rsc_mk_compl = DataPipeline("make_complete")
+            with Cluster("ManagerRegular"):
+                rsc_mk_reg_report = DataPipeline("make_foo")
+
+        with Cluster("manage_data"):
+            with Cluster("GetRedcap"):
+                rsc_get_redcap = DataPipeline("get_redcap")
+
+        with Cluster("report_helper"):
+            rsc_pull_rc = Compute("pull_redcap_data")
+
+        with Cluster("sql_database"):
+            rsc_db_connect = Compute("DbConnect")
+            with Cluster("DbUpdate"):
+                rsc_db_update = Compute("update_db")
+
+        with Cluster("survey_clean"):
+            with Cluster("CleanRedcap"):
+                rsc_sur_cl_rc = Compute("clean surveys")
+
+        with Cluster("survey_download"):
+            rsc_sur_dl_rc = Compute("dl_redcap")
+
+    with Cluster("reference_files"):
+        ref_file = Storage("report_keys")
+
+    rsc_db_emorep = Database("db_emorep")
+    db_redcap = Database("REDCap")
+
+    with Cluster("Keoki"):
+        reg_files = Storage("regular_reports")
+
+    #
+    cli_rep_regular >> wf_mk_reg_report >> reg_files
+    (
+        wf_mk_reg_report
+        >> Edge(color="")
+        << rsc_mk_reg_report
+        >> Edge(color="")
+        << rsc_mk_compl
+    )
+
+    #
+    (
+        rsc_mk_compl
+        >> Edge(color="")
+        << rsc_get_redcap
+        >> Edge(color="")
+        << rsc_sur_cl_rc
+    )
+    rsc_get_redcap >> rsc_db_update >> rsc_db_connect >> rsc_db_emorep
+    rsc_mk_compl >> rsc_db_update
+    (
+        rsc_get_redcap
+        >> Edge(color="")
+        << rsc_sur_dl_rc
+        >> Edge(color="")
+        << rsc_pull_rc
+        << db_redcap
+    )
+    rsc_sur_dl_rc << ref_file
+
+
+# %%
