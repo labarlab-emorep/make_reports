@@ -143,7 +143,7 @@ optional arguments:
 This workflow is not unique and the same processes are utilized by other workflows (e.g. [rep_ndar](#rep_ndar)) -- accordingly it is not necessary to trigger this workflow before running others. This was added merely as a way of updating cleaned data on Keoki and `db_emorep` without needing to generate reports.
 
 
-### rep_get methods
+### Method Schema
 Schematic mapping the `rep_get` workflow to specific modules and methods of `make_reports`.
 ![process_get_survey](diagrams/process_get_surveys.png)
 
@@ -155,6 +155,57 @@ Schematic mapping the `rep_get` workflow to specific modules and methods of `mak
 ## rep_metrics
 
 ## chk_data
+This workflow checks BIDS derivatives for exepcted pipeline output for both EmoRep and Archival datasets. A progress dataframe is generated in `derivatives/track_data/<project>_pipeline_progress.csv` which contains:
+- a datetime.date of when the files were last generated if all expected data are found, or
+- the number of files encountered which did not meet expectations, or
+- NaN if no files are found
+
+
+### Setup
+Workflows that write output to the EmoRep data structure.
+
+
+### Usage
+Trigger sub-package help and usage via `$chk_data`:
+
+```
+(emorep)[nmm51-vm: ~]$chk_data
+usage: chk_data [-h] [--complete] [--project {emorep,archival}]
+
+Conduct data checking for EmoRep and Archival data.
+
+Compare detected files against known lists to identify
+participants with missing data (survey, scanner) or need
+processing of MRI data.
+
+Notes
+-----
+- Written to be executed on the local VM labarserv2
+- Assumes EmoRep data structure
+
+Examples
+--------
+chk_data --project emorep
+chk_data --project emorep --complete
+chk_data --project archival
+
+optional arguments:
+  -h, --help            show this help message and exit
+  --complete            Check for expected EmoRep survey and scanner files
+  --project {emorep,archival}
+                        Name of project to check for MRI processing output
+```
+
+
+### Considerations
+- Checked files for EmoRep can be adjusted in `make_reports.resources.check_data._CheckEmorep.info_emorep`.
+- Checked files for Archival can be adjusted in `make_reports.resources.check_data.CheckMri._info_archival`.
+
+
+### Method Schema
+Schematic mapping the `chk_data` workflow to specific modules and methods of `make_reports`.
+![process_chk_data](diagrams/process_chk_data.png)
+
 
 ## sur_stats
 
@@ -212,7 +263,7 @@ Required Arguments:
 - Only 5 failed password attemps may occur before your NDA account is locked.
 
 
-### gen_guids methods
+### Method Schema
 Schematic mapping the `gen_guids` workflow to specific modules and methods of `make_reports`.
 ![process_gen_guids](diagrams/process_gen_guids.png)
 
