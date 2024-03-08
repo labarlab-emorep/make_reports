@@ -12,8 +12,8 @@ Sub-package/workflow navigation:
 
 
 ## General Usage
-- Install into project environment on labarserv2 (see [here](https://github.com/labarlab/conda_labarserv2)) via `$ python setup.py install`.
-- Trigger general package help and usage via entrypoint `$ make_reports`.
+- Install into project environment on labarserv2 (see [here](https://github.com/labarlab/conda_labarserv2)) via `$python setup.py install`.
+- Trigger general package help and usage via entrypoint `$make_reports`.
 
 ```
 (emorep)[nmm51-vm: day2_movies]$make_reports
@@ -95,7 +95,7 @@ data_survey
 
 
 ### Usage
-Trigger sub-package help and usage via `$ rep_get`:
+Trigger sub-package help and usage via `$rep_get`:
 
 ```
 (emorep)[nmm51-vm: ~]$rep_get
@@ -159,5 +159,64 @@ Schematic mapping the `rep_get` workflow to specific modules and methods of `mak
 ## sur_stats
 
 ## gen_guids
+This workflow downloads REDCap demographic information to use in conjunction with the NDA's `guid-tool` for the purpose of generating participant GUIDs. These GUIDs are written to `/mnt/keoki/experiments2/EmoRep/Exp2_Compute_Emotion/data_survey/redcap/output_guid_*.txt`. It can also check for GUID copy-paste errors by comparing generated GUIDs with those in REDCap.
+
+
+### Setup
+- Install the `guid-tool`(see [here](https://nda.nih.gov/nda/nda-tools)) into OS.
+- Update PATH with the install location (e.g. `$export PATH=${PATH}:/opt/nda_guid`).
+- Generate and store API token for REDCap (see [above](#general-requirements)).
+
+### Usage
+Trigger sub-package help and usage via `$gen_guids`:
+
+```
+(emorep)[nmm51-vm: ~]$gen_guids
+usage: gen_guids [-h] [--find-mismatch] [--proj-dir PROJ_DIR] -n USER_NAME
+
+Generate GUIDs for EmoRep.
+
+Utilize RedCap demographic information to generate a batch
+of GUIDs using the NDA's guid-tool for linux. Compare generated
+GUIDs to those in RedCap survey.
+
+Generated GUIDs are written to:
+    <proj_dir>/data_survey/redcap/output_guid_*.txt
+
+Notes
+-----
+Requires global variable 'PAT_REDCAP_EMOREP' in user env, which
+holds the personal access token to the emorep REDCap database.
+
+Examples
+--------
+gen_guids -n nmuncy
+gen_guids -n nmuncy --find-mismatch
+
+optional arguments:
+  -h, --help            show this help message and exit
+  --find-mismatch       Check for mismatches between generated
+                        GUIDs and those in the RedCap survey.
+  --proj-dir PROJ_DIR   Path to project's experiment directory
+                        (default : /mnt/keoki/experiments2/EmoRep/Exp2_Compute_Emotion)
+
+Required Arguments:
+  -n USER_NAME, --user-name USER_NAME
+                        NDA user name
+
+```
+
+
+### Considerations
+- Your password length will not appear (for security purposes).
+- Only 5 failed password attemps may occur before your NDA account is locked.
+
+
+### gen_guids methods
+Schematic mapping the `gen_guids` workflow to specific modules and methods of `make_reports`.
+![process_gen_guids](diagrams/process_gen_guids.png)
+
 
 ## Diagrams
+Diagram of imports.
+![Imports](diagrams/imports.png)

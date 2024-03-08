@@ -159,30 +159,49 @@ with Diagram("process gen_guids", graph_attr=graph_attr, show=False):
     with Cluster("workflows.required_reports"):
         wf_gen_guids = Compute("generate_guids")
 
-    with Cluster("resources.build_reports"):
-        with Cluster("GenerateGuids"):
-            rsc_mk_guids = Compute("make_guids")
-            rsc_chk_guids = Compute("check_guids")
+    with Cluster("resources"):
+        with Cluster("build_reports"):
+            with Cluster("GenerateGuids"):
+                rsc_mk_guids = Compute("make_guids")
+                rsc_chk_guids = Compute("check_guids")
 
-    with Cluster("resources.manage_data"):
-        with Cluster("GetRedcap.get_redcap"):
-            rsc_get_demo = Compute("demographics")
-            rsc_get_guid = Compute("guid")
+        with Cluster("manage_data"):
+            with Cluster("GetRedcap.get_redcap"):
+                rsc_get_demo = Compute("demographics")
+                rsc_get_guid = Compute("guid")
+
+        with Cluster("survey_download"):
+            rsc_sur_dl_rc = Compute("dl_redcap")
+
+        with Cluster("report_helper"):
+            rsc_pull_rc = Compute("pull_redcap_data")
+
+    with Cluster("reference_files"):
+        ref_file = Storage("report_keys")
 
     with Cluster("subshell"):
         sys_guid_tool = Bash("guid-tool")
         sys_write_txt = Storage("write TXT")
 
-    cli_gen_guids >> wf_gen_guids
-    wf_gen_guids >> rsc_mk_guids
+    db_nda = Database("NDA")
+    db_redcap = Database("REDCap")
+
+    # Make guids
+    cli_gen_guids >> wf_gen_guids >> rsc_mk_guids
     rsc_mk_guids << rsc_get_demo
     rsc_mk_guids >> sys_guid_tool
     sys_guid_tool >> sys_write_txt
+    db_nda >> sys_guid_tool
 
-    wf_gen_guids >> rsc_chk_guids
-    rsc_chk_guids << rsc_get_guid
+    # Check guids
+    wf_gen_guids >> rsc_chk_guids << rsc_get_guid
     rsc_chk_guids >> rsc_mk_guids
     rsc_chk_guids << sys_write_txt
+
+    # GetRedcap
+    rsc_get_demo << rsc_sur_dl_rc << ref_file
+    rsc_sur_dl_rc >> Edge(color="") << rsc_pull_rc << db_redcap
+    rsc_get_guid << rsc_sur_dl_rc
 
 
 # %%
