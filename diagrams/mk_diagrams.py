@@ -423,6 +423,7 @@ with Diagram("process rep_ndar", graph_attr=graph_attr, show=False):
 
     with Cluster("Keoki"):
         bids_files = Storage("BIDS files")
+        ndar_reports = Storage("ndar_upload")
 
     with Cluster("resources"):
 
@@ -542,5 +543,6 @@ with Diagram("process rep_ndar", graph_attr=graph_attr, show=False):
     rsc_mk_ndar << rsc_get_sury_age
     rsc_mk_ndar << rsc_calc_age_mo
     rsc_mk_ndar << rsc_mine_tpl << ref_tpl
+    rsc_mk_ndar >> ndar_reports
 
 # %%

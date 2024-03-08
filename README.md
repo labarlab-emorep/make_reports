@@ -150,7 +150,78 @@ Schematic mapping the `rep_get` workflow to specific modules and methods of `mak
 
 ## rep_regular
 
+
 ## rep_ndar
+This workflow generates datasets and reports required for the biannual NDAR upload. Reports are written to `/mnt/keoki/experiments2/EmoRep/Exp2_Compute_Emotion/ndar_upload/cycle_*` and associated data to `/mnt/keoki/experiments2/EmoRep/Exp2_Compute_Emotion/ndar_upload/data_[beh|mri|phys]`.
+
+
+### Setup
+- Generate and store API tokens for REDCap and Qualtrics in user environment (see [above](#general-requirements)).
+- Store MySQL password for `db_emorep` in user environment.
+
+
+### Usage
+Trigger sub-package help and usage via `$rep_ndar`:
+
+```
+(emorep)[nmm51-vm: ~]$rep_ndar
+usage: rep_ndar [-h] [--proj-dir PROJ_DIR] [--report-all] [--report-names REPORT_NAMES [REPORT_NAMES ...]] -c CLOSE_DATE
+
+Generate NDAR reports for EmoRep project.
+
+Organize project data and generate reports for regular
+NDAR submissions. Reports are written to:
+    <proj_dir>/ndar_upload/cycle_<close_date>
+
+Required data (e.g. image03) are copied to:
+    <proj_dir>/ndar_upload/data_<foo>
+
+Notes
+-----
+* Available reports:
+    affim01, als01, bdi01, brd01, demo_info01, emrq01,
+    image03, panas01, pswq01, restsurv01, rrs01,
+    stai01, tas01
+* Requires global variables 'PAT_REDCAP_EMOREP' and
+    'PAT_QUALTRICS_EMOREP' in user env, which hold the
+    personal access tokens to the emorep REDCap and
+    Qualtrics databases, respectively.
+
+Examples
+--------
+rep_ndar -c 2022-12-01 --report-names demo_info01 affim01
+rep_ndar -c 2022-12-01 --report-all
+
+optional arguments:
+  -h, --help            show this help message and exit
+  --proj-dir PROJ_DIR   Path to project's experiment directory
+                        (default : /mnt/keoki/experiments2/EmoRep/Exp2_Compute_Emotion)
+  --report-all          Make all planned NDA reports.
+                        True if "--report-all" else False.
+  --report-names REPORT_NAMES [REPORT_NAMES ...]
+                        Make specific NDA reports by name.
+                        e.g. --report-names affim01 als01
+
+Required Arguments:
+  -c CLOSE_DATE, --close-date CLOSE_DATE
+                        YYYY-MM-DD format.
+                        Close date for NDAR submission cycle, e.g.
+                        "--close-date 2022-12-01" for 2023-01-15
+                        submission. Used to submit data from
+                        participants in the correct cycle.
+
+```
+
+
+### Considerations
+- The file `make_reports.dataframes.track_status.csv` is curated manually.
+- Report column names are derived from `make_reports.reference_files.*_template.csv`.
+
+
+### Method Schema
+Schematic mapping of `rep_ndar` workflow to specific modules and methods of `make_reports`.
+![process_rep_ndar](diagrams/process_rep_ndar.png)
+
 
 ## rep_metrics
 This workflow generates snapshots of data to aid recruitment efforts, including demographics distrubtion, particpant retention, and scan pacing. Output files are written to `/mnt/keoki/experiments2/EmoRep/Exp2_Compute_Emotion/analyses/metrics_recruit`.
