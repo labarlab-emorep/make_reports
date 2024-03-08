@@ -206,6 +206,11 @@ Required Arguments:
 - Depending on the report, 'other' responses to the race prompts require manual adjustment.
 
 
+### Method Schema
+Schematic mapping the `rep_regular` workflow to specific modules and methods of `make_reports`.
+![process_rep_regular](diagrams/process_rep_regular.png)
+
+
 ## rep_ndar
 This workflow generates datasets and reports required for the biannual NDAR upload. Reports are written to `/mnt/keoki/experiments2/EmoRep/Exp2_Compute_Emotion/ndar_upload/cycle_*` and associated data to `/mnt/keoki/experiments2/EmoRep/Exp2_Compute_Emotion/ndar_upload/data_[beh|mri|phys]`.
 
