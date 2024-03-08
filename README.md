@@ -153,6 +153,71 @@ Schematic mapping the `rep_get` workflow to specific modules and methods of `mak
 ## rep_ndar
 
 ## rep_metrics
+This workflow generates snapshots of data to aid recruitment efforts, including demographics distrubtion, particpant retention, and scan pacing. Output files are written to `/mnt/keoki/experiments2/EmoRep/Exp2_Compute_Emotion/analyses/metrics_recruit`.
+
+
+### Setup
+- Generate and store API token for REDCap (see [above](#general-requirements)).
+- First-level output of [func_model](https://github.com/labarlab-emorep/func_model) in EmoRep data structure (if using `--prop-motion`).
+
+
+### Usage
+Trigger sub-package help and usage via `$rep_metrics`:
+
+```
+(emorep)[nmm51-vm: ~]$rep_metrics
+usage: rep_metrics [-h] [--participant-flow] [--proj-dir PROJ_DIR] [--prop-motion] [--recruit-demo] [--scan-pace]
+
+Generate descriptive metrics about recruitment.
+
+Make plots and reports to give snapshots of the data:
+    -   recruit-demo : Mine REDCap demographics to compare the
+            actual enrolled demographic profile versus the
+            proposed to help curtail under-representation.
+    -   scan-pace : Quantify and plot the number of scans
+            attempted each week, to help understand recruitment
+            pace and adjustments.
+    -   participant-flow : Draw PRISMA flowchart of participant
+            flow, exclusion, lost-to-follow-up, and withdrawal
+            for Experiment2
+    -   prop-motion : Calculate the proportion of volumes that
+            exceed framewise displacement thresholds.
+
+Plots and reports are written to:
+    <proj-dir>/analyses/metrics_recruit
+
+Notes
+-----
+Options --recruit-demo, --participant-flow, --scan-pace require
+global variable 'PAT_REDCAP_EMOREP' in user env, which holds the
+personal access token to the emorep REDCap database.
+
+Examples
+--------
+rep_metrics --prop-motion
+rep_metrics --recruit-demo
+rep_metrics --participant-flow
+rep_metrics --scan-pace
+
+optional arguments:
+  -h, --help           show this help message and exit
+  --participant-flow   Draw participant PRISMA flowchart
+  --proj-dir PROJ_DIR  Path to project's experiment directory
+                       (default : /mnt/keoki/experiments2/EmoRep/Exp2_Compute_Emotion)
+  --prop-motion        Calculate proportion of volumes that exceed FD threshold
+  --recruit-demo       Calculate recruitment demographics
+  --scan-pace          Plot weekly scanning pace
+```
+
+
+### Considerations
+- The file `make_reports.dataframes.track_status.csv` is curated manually.
+
+
+### Method Schema
+Schematic mapping the `rep_metrics` workflow to specific modules and methods of `make_reports`.
+![process_rep_metrics](diagrams/process_rep_metrics.png)
+
 
 ## chk_data
 This workflow checks BIDS derivatives for exepcted pipeline output for both EmoRep and Archival datasets. A progress dataframe is generated in `derivatives/track_data/<project>_pipeline_progress.csv` which contains:

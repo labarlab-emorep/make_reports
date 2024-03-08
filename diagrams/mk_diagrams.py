@@ -370,13 +370,15 @@ with Diagram("process rep_metrics", graph_attr=graph_attr, show=False):
 
     with Cluster("Keoki"):
         bids_files = Storage("BIDS files")
+        metric_files = Storage("metrics_recruit")
 
     #
     cli_get_surveys >> wf_get_metrics
-    wf_get_metrics >> rsc_demographics
-    wf_get_metrics >> rsc_scan_pace
+    wf_get_metrics >> rsc_demographics >> metric_files
+    wf_get_metrics >> rsc_scan_pace >> metric_files
     wf_get_metrics >> rsc_cens_vols << bids_files
-    wf_get_metrics >> rsc_draw_prisma
+    rsc_cens_vols >> metric_files
+    wf_get_metrics >> rsc_draw_prisma >> metric_files
 
     #
     (
