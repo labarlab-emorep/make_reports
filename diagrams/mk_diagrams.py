@@ -621,3 +621,58 @@ with Diagram("process rep_regular", graph_attr=graph_attr, show=False):
 
 
 # %%
+with Diagram("process sur_stats", graph_attr=graph_attr, show=False):
+    with Cluster("cli"):
+        cli_rep_regular = CommandLineInterface("sur_stats")
+
+    with Cluster("workflows"):
+        with Cluster("behavioral_reports"):
+            wf_calc_task = Compute("calc_task_stats")
+
+    with Cluster("resources"):
+        with Cluster("calc_surveys"):
+            with Cluster("EmorepTask"):
+                rsc_calc_intense = Compute("select_intensity")
+                rsc_calc_emotion = Compute("select_emotion")
+            with Cluster("RestRatings"):
+                rsc_calc_rest = Compute("write_stats")
+            with Cluster("StimRatings"):
+                rsc_calc_endo = Compute("endorsements")
+                rsc_calc_arosval = Compute("arousal_valence")
+
+        with Cluster("manage_data"):
+            with Cluster("GetQualtrics"):
+                rsc_get_qual = DataPipeline("get_qualtrics")
+            with Cluster("GetRest"):
+                rsc_get_rest = DataPipeline("get_rest")
+            with Cluster("GetTask"):
+                rsc_get_task = DataPipeline("get_task")
+
+    with Cluster("Keoki"):
+        sur_out = Storage("metrics_surveys")
+        bids_files = Storage("BIDS files")
+
+    # Resting stats
+    (
+        cli_rep_regular
+        >> wf_calc_task
+        >> Edge(color="")
+        << rsc_calc_rest
+        >> sur_out
+    )
+    wf_calc_task >> sur_out
+    rsc_calc_rest << rsc_get_rest  # << bids_files
+
+    # Post scan ratings stats
+    wf_calc_task >> Edge(color="") << rsc_get_qual
+    wf_calc_task >> rsc_calc_endo >> sur_out
+    wf_calc_task >> rsc_calc_arosval >> sur_out
+
+    # Task stats
+    wf_calc_task >> Edge(lhead="cluster_EmorepTask") >> rsc_calc_intense
+    rsc_get_task >> Edge(lhead="cluster_EmorepTask") >> rsc_calc_intense
+    rsc_calc_intense >> sur_out
+    rsc_calc_emotion >> sur_out
+
+
+# %%
