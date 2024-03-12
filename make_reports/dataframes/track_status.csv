@@ -5,7 +5,7 @@ ER0057,,excl,excl,Compliance,visit1 marked lost bc didn't do Emotion surveys; da
 ER0080,,excl,excl,BDI,not using data; duplicate with ER1002
 ER0086,lost,lost,lost,Time Conflict,
 ER0087,,,lost,Time Conflict,
-ER0103,,lost,lost,EAE,day2 Adverse Event
+ER0103,,excl,excl,EAE,day2 Adverse Event
 ER0140,,lost,lost,Unknown,
 ER0162,,excl,excl,BDI,
 ER0166,,,lost,Unknown,
@@ -14,7 +14,7 @@ ER0193,lost,lost,lost,Unknown,visit1 marked lost bc didn't do Emotion surveys
 ER0213,lost,lost,lost,Unknown,visit1 marked lost bc didn't do Emotion surveys
 ER0216,,,excl,EAE,day3 Adverse Event
 ER0228,,,lost,Unknown,
-ER0229,,,lost,EAE,day3 Adverse Event
+ER0229,,,excl,EAE,day3 Adverse Event
 ER0246,lost,lost,lost,Unknown,visit1 marked lost bc didn't do Emotion surveys
 ER0300,,lost,lost,Unknown,
 ER0325,,excl,excl,BDI,day2 & day3 BDI scores exceeded the threshold (20)
@@ -28,9 +28,12 @@ ER0631,,lost,lost,Unknown,
 ER0736,,,lost,Unknown,
 ER0744,,lost,lost,Time Conflict,
 ER0800,,,lost,Unknown,
-ER0909,,,lost,EAE,day3 Adverse event
+ER0909,,,excl,EAE,day3 Adverse event
 ER0911,,,lost,Time Conflict,
-ER0962,,,lost,EAE,day3 Adverse Event
+ER0962,,,excl,EAE,day3 Adverse Event
 ER1014,,,lost,Unknown,
 ER1024,lost,lost,lost,Time Conflict,visit1 marked lost bc didn't do Emotion surveys
+ER1107,,lost,lost,Time Conflict,
+ER1135,,,lost,Personal Preference,
 ER1137,,,lost,Unknown,
+ER1145,lost,lost,lost,Unknown,visit1 marked lost bc didn't do Emotion surveys
