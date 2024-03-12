@@ -30,7 +30,7 @@ ER0909,,JG,,,bad_run,bad_run,bad_run,YD,,incomplete,incomplete,incomplete,incomp
 ER0962,,SS,,,incomplete,incomplete,incomplete,,not_collected,not_collected,not_collected,not_collected,not_collected,"day2 run6 EAE, missing run6-8 and rest run for mri, behav and physio; day3 EAE"
 ER1002,,,,,,,,YD,,,,incomplete,,day3 missing rest ratings behav file
 ER1006,,,,,,,,YD,,,bad_run,,,day3 run6 missing end of mri file
-ER1023,,SS,,,incomplete,,,,,,,,,day2 run1 mri file missing
+ER1023,,SS,,,bad_run,bad_run,bad_run,,,,,,,day2 run1 sync box issue
 ER1066,,SS,,,incomplete,incomplete,,,,,,,,day2 runs 1 & 2 missing for mri & behav data
 ER1107,,not_collected,not_collected,not_collected,not_collected,not_collected,not_collected,,not_collected,not_collected,not_collected,not_collected,not_collected,day2 & day3 lost
 ER1132,,AS,,,,bad_run,,,,,,,,day2 run1 behav file missing
