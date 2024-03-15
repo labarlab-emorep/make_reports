@@ -18,6 +18,7 @@ gen_guids -n nmuncy
 gen_guids -n nmuncy --find-mismatch
 
 """
+
 import sys
 import textwrap
 from getpass import getpass
@@ -36,9 +37,8 @@ def _get_args():
         action="store_true",
         help=textwrap.dedent(
             """\
-            Whether to check for mismatches between generated
-            GUIDs and those in the RedCap survey,
-            True if "--get-redcap" else False.
+            Check for mismatches between generated
+            GUIDs and those in the RedCap survey.
             """
         ),
     )
