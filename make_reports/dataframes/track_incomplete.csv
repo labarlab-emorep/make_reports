@@ -25,6 +25,7 @@ ER0693,,SS,,,bad_run,,bad_run,,,,,,,day2 run1 short mri & physio files
 ER0697,,SS,,,incomplete,incomplete,incomplete,,,,,,,day2 missing rest & rest ratings; day2 empty run-01 physio file
 ER0730,,,,,,,,SS,,,,,bad_run,day3 missing run2 physio files
 ER0736,incomplete,,,,,,,,not_collected,not_collected,not_collected,not_collected,not_collected,day1 survey incomplete; day3 lost
+ER0769,,SS,,,,,bad_run,,,,,,,day2 run7 acqknowledge crash - partial acquisition
 ER0802,,SS,,incomplete,,,,,,,,,,day2 behav rest data missing
 ER0909,,JG,,,bad_run,bad_run,bad_run,YD,,incomplete,incomplete,incomplete,incomplete,"day2 run6 missing mri, behav, physio files; day3 EAE at run2"
 ER0962,,SS,,,incomplete,incomplete,incomplete,,not_collected,not_collected,not_collected,not_collected,not_collected,"day2 run6 EAE, missing run6-8 and rest run for mri, behav and physio; day3 EAE"
