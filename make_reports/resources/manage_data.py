@@ -251,9 +251,6 @@ class GetQualtrics(survey_clean.CleanQualtrics):
         withdrew_list = [x for x in part_comp.all.keys()]
         super().__init__(self._proj_dir, pilot_list, withdrew_list)
 
-        # Start mysql server connection
-        self._up_mysql = sql_database.DbUpdate()
-
     def _download_qualtrics(self, survey_list: list) -> dict:
         """Get, write, and return Qualtrics survey info.
 
@@ -302,6 +299,9 @@ class GetQualtrics(survey_clean.CleanQualtrics):
             {pilot|study: {visit: {survey_name: pd.DataFrame}}}
 
         """
+        # Start mysql server connection
+        up_mysql = sql_database.DbUpdate()
+
         # Map survey name to survey_clean.CleanQualtrics method
         clean_map = {
             "EmoRep_Session_1": "clean_session_1",
@@ -329,10 +329,10 @@ class GetQualtrics(survey_clean.CleanQualtrics):
             # Trigger relevant cleaning method
             clean_method = getattr(self, clean_map[omni_name])
             clean_method(df_raw)
-            self._unpack_qualtrics()
-        self._up_mysql.close_db()
+            self._unpack_qualtrics(up_mysql)
+        up_mysql.close_db()
 
-    def _unpack_qualtrics(self):
+    def _unpack_qualtrics(self, up_mysql):
         """Organize cleaned qualtrics data, trigger writing."""
         for data_type in self.clean_qualtrics.keys():
             # Get attr data_study|pilot
@@ -352,7 +352,7 @@ class GetQualtrics(survey_clean.CleanQualtrics):
                     # Update mysql db_emorep with study (not pilot) data
                     if is_pilot:
                         continue
-                    self._up_mysql.update_db(
+                    up_mysql.update_db(
                         df.copy(), sur_name, int(visit[-1]), "qualtrics"
                     )
 

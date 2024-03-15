@@ -24,6 +24,7 @@ rep_ndar -c 2022-12-01 --report-names demo_info01 affim01
 rep_ndar -c 2022-12-01 --report-all
 
 """
+
 import sys
 import textwrap
 from datetime import datetime
@@ -78,11 +79,10 @@ def _get_args():
         type=str,
         help=textwrap.dedent(
             """\
-            YYYY-MM-DD format.
-            Close date for NDAR submission cycle, e.g.
-            "--close-date 2022-12-01" for 2023-01-15
-            submission. Used to submit data from
-            participants in the correct cycle.
+            YYYY-06-01 or YYYY-12-01.
+            Close date for NDAR submission cycle. Used to submit
+            data for correct cycle (current or retroactively)
+            e.g. 2022-12-01 for 2023-01-15 submission due date.
             """
         ),
         required=True,
@@ -103,7 +103,16 @@ def main():
     proj_dir = args.proj_dir
     close_date = datetime.strptime(args.close_date, "%Y-%m-%d").date()
 
-    # Chek for pats
+    # Validate close_dates
+    valid_dates = [
+        f"{x}-{y}-01"
+        for x in ["2021", "2022", "2023", "2024", "2025", "2026"]
+        for y in ["06", "12"]
+    ]
+    if args.close_date not in valid_dates:
+        raise ValueError(f"--close-date arg not found in : {valid_dates}")
+
+    # Check for pats
     report_helper.check_qualtrics_pat()
     report_helper.check_redcap_pat()
 
