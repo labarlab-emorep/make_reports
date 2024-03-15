@@ -143,11 +143,6 @@ optional arguments:
 This workflow is not unique and the same processes are utilized by other workflows (e.g. [rep_ndar](#rep_ndar)) -- accordingly it is not necessary to trigger this workflow before running others. This was added merely as a way of updating cleaned data on Keoki and `db_emorep` without needing to generate reports.
 
 
-### Method Schema
-Schematic mapping the `rep_get` workflow to specific modules and methods of `make_reports`.
-![process_get_survey](diagrams/process_get_surveys.png)
-
-
 ## rep_regular
 This workflow generates reportes required regularly by the NIH and Duke. Individual reports are requested by specifying the name of the institution + the frequency in months, e.g. a report submitted to the NIH every 12 months is requested via `--names nih12`.
 
@@ -204,11 +199,6 @@ Required Arguments:
 ### Considerations
 - While the generation of previous reports is supported, the `--query-date` must be after 2022-03-31.
 - Depending on the report, 'other' responses to the race prompts require manual adjustment.
-
-
-### Method Schema
-Schematic mapping the `rep_regular` workflow to specific modules and methods of `make_reports`.
-![process_rep_regular](diagrams/process_rep_regular.png)
 
 
 ## rep_ndar
@@ -278,11 +268,6 @@ Required Arguments:
 - Report column names are derived from `make_reports.reference_files.*_template.csv`.
 
 
-### Method Schema
-Schematic mapping of `rep_ndar` workflow to specific modules and methods of `make_reports`.
-![process_rep_ndar](diagrams/process_rep_ndar.png)
-
-
 ## rep_metrics
 This workflow generates snapshots of data to aid recruitment efforts, including demographics distrubtion, particpant retention, and scan pacing. Output files are written to `/mnt/keoki/experiments2/EmoRep/Exp2_Compute_Emotion/analyses/metrics_recruit`.
 
@@ -345,11 +330,6 @@ optional arguments:
 - The file `make_reports.dataframes.track_status.csv` is curated manually.
 
 
-### Method Schema
-Schematic mapping the `rep_metrics` workflow to specific modules and methods of `make_reports`.
-![process_rep_metrics](diagrams/process_rep_metrics.png)
-
-
 ## chk_data
 This workflow checks BIDS derivatives for exepcted pipeline output for both EmoRep and Archival datasets. A progress dataframe is generated in `derivatives/track_data/<project>_pipeline_progress.csv` which contains:
 - a datetime.date of when the files were last generated if all expected data are found, or
@@ -398,12 +378,71 @@ optional arguments:
 - Checked files for Archival can be adjusted in `make_reports.resources.check_data.CheckMri._info_archival`.
 
 
-### Method Schema
-Schematic mapping the `chk_data` workflow to specific modules and methods of `make_reports`.
-![process_chk_data](diagrams/process_chk_data.png)
-
-
 ## sur_stats
+This workflow generates descriptive statistics for participant survey and task responses. Output tables and figures are written to `/mnt/keoki/experiments2/EmoRep/Exp2_Compute_Emotion/analyses/metrics_surveys`.
+
+
+### Setup
+- Generate and store API token for REDCap and Qualtrics (see [above](#general-requirements)).
+
+
+### Usage
+Trigger sub-package help and usage via `$sur_stats`:
+
+```
+(emorep)[nmm51-vm: ~]$sur_stats
+usage: sur_stats [-h] [--draw-plots] [--make-tables] [--proj-dir PROJ_DIR] [--survey-all]
+                 [--survey-avail] [--survey-names SURVEY_NAMES [SURVEY_NAMES ...]]
+                 [--write-json]
+
+Generate descriptives for survey data.
+
+Download, clean, and calculate descriptive statistics and plots
+for REDCap, Qualtrics, rest-ratings, and stim-ratings surveys.
+
+Output files are written to:
+    <proj_dir>/analyses/metrics_surveys
+
+Notes
+-----
+* Appropriate database tokens required, defined in user env via
+    'PAT_REDCAP_EMOREP' and/or 'PAT_QUALTRICS_EMOREP'.
+* General descriptive stats, all data are included.
+
+Examples
+--------
+sur_stats --survey-avail
+sur_stats --survey-all --draw-plots
+sur_stats --survey-names AIM ALS stim --write-json
+sur_stats --survey-names rest task --write-json --draw-plots
+sur_stats --make-tables --draw-plots
+
+optional arguments:
+  -h, --help            show this help message and exit
+  --draw-plots          Whether figures should be generated.
+                        True if "--draw-plot" else False.
+  --make-tables         Whether to compile generated dataframes into tables. Uses
+                        data from all surveys available (similar to --survey-all).
+                        Replaces --survey-list.
+                        True if "--make-table" else False.
+  --proj-dir PROJ_DIR   Path to project's experiment directory
+                        (default : /mnt/keoki/experiments2/EmoRep/Exp2_Compute_Emotion)
+  --survey-all          Generate descriptive statistics and draw plots
+                        for all surveys. Replaces --survey-list.
+                        See --survey-avail for list.
+  --survey-avail        Print list of surveys availble for descriptive statistics.
+  --survey-names SURVEY_NAMES [SURVEY_NAMES ...]
+                        Requres --draw-plots or --write-json.
+                        List of surveys, for generating descriptive statistics
+                        and drawing figures. See --survey-avail for list.
+  --write-json          Whether write Qualtrics and RedCap descriptive
+                        stats out to JSON file.
+```
+
+
+### Considerations
+Generated stats, tables, and plots include data from all participants.
+
 
 ## gen_guids
 This workflow downloads REDCap demographic information to use in conjunction with the NDA's `guid-tool` for the purpose of generating participant GUIDs. These GUIDs are written to `/mnt/keoki/experiments2/EmoRep/Exp2_Compute_Emotion/data_survey/redcap/output_guid_*.txt`. It can also check for GUID copy-paste errors by comparing generated GUIDs with those in REDCap.
@@ -413,6 +452,7 @@ This workflow downloads REDCap demographic information to use in conjunction wit
 - Install the `guid-tool`(see [here](https://nda.nih.gov/nda/nda-tools)) into OS.
 - Update PATH with the install location (e.g. `$export PATH=${PATH}:/opt/nda_guid`).
 - Generate and store API token for REDCap (see [above](#general-requirements)).
+
 
 ### Usage
 Trigger sub-package help and usage via `$gen_guids`:
@@ -459,11 +499,39 @@ Required Arguments:
 - Only 5 failed password attemps may occur before your NDA account is locked.
 
 
-### Method Schema
-Schematic mapping the `gen_guids` workflow to specific modules and methods of `make_reports`.
-![process_gen_guids](diagrams/process_gen_guids.png)
-
-
 ## Diagrams
+
+
+### Module Imports
 Diagram of imports.
 ![Imports](diagrams/imports.png)
+
+
+### Schema: rep_get
+Schematic mapping the `rep_get` workflow to specific modules and methods of `make_reports`.
+![process_get_survey](diagrams/process_get_surveys.png)
+
+
+### Schema: rep_regular
+Schematic mapping the `rep_regular` workflow to specific modules and methods of `make_reports`.
+![process_rep_regular](diagrams/process_rep_regular.png)
+
+
+### Schema: rep_ndar
+Schematic mapping of `rep_ndar` workflow to specific modules and methods of `make_reports`.
+![process_rep_ndar](diagrams/process_rep_ndar.png)
+
+
+### Schema: rep_metrics
+Schematic mapping the `rep_metrics` workflow to specific modules and methods of `make_reports`.
+![process_rep_metrics](diagrams/process_rep_metrics.png)
+
+
+### Schema: chk_data
+Schematic mapping the `chk_data` workflow to specific modules and methods of `make_reports`.
+![process_chk_data](diagrams/process_chk_data.png)
+
+
+### Schema: gen_guids
+Schematic mapping the `gen_guids` workflow to specific modules and methods of `make_reports`.
+![process_gen_guids](diagrams/process_gen_guids.png)
