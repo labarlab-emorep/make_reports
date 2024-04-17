@@ -23,6 +23,7 @@ ER0643,,,,,,,,SS,,,bad_run,,bad_run,day3 run1 missing mri & physio files
 ER0647,,YD,,,,incomplete,,,,,,,,day2 missing post-rest behav ratings
 ER0693,,SS,,,bad_run,,bad_run,,,,,,,day2 run1 short mri & physio files
 ER0697,,SS,,,incomplete,incomplete,incomplete,,,,,,,day2 missing rest & rest ratings; day2 empty run-01 physio file
+ER0724,,not_collected,not_collected,not_collected,not_collected,not_collected,not_collected,,not_collected,not_collected,not_collected,not_collected,not_collected,day2 & day3 lost
 ER0730,,,,,,,,SS,,,,,bad_run,day3 missing run2 physio files
 ER0736,incomplete,,,,,,,,not_collected,not_collected,not_collected,not_collected,not_collected,day1 survey incomplete; day3 lost
 ER0769,,SS,,,,,bad_run,,,,,,,day2 run7 acqknowledge crash - partial acquisition
@@ -38,4 +39,5 @@ ER1132,,AS,,,,bad_run,,,,,,,,day2 run1 behav file missing
 ER1135,,,,,,,,,not_collected,not_collected,not_collected,not_collected,not_collected,day3 lost
 ER1136,,JG,,,,,bad_run,SS,,,not_collected,,,day2: sync box not started - bad resting-state physio data; day3 all MRI data corrupted per reconstruction failed
 ER1137,,AS,,,,incomplete,,,not_collected,not_collected,not_collected,not_collected,not_collected,day2 post-rest ratings behav file missing; day3: lost
+ER1142,,not_collected,not_collected,not_collected,not_collected,not_collected,not_collected,,not_collected,not_collected,not_collected,not_collected,not_collected,day2 & day3 lost
 ER1152,,JG,,,incomplete,incomplete,incomplete,,,,,,,day2 rest & post-rest not run

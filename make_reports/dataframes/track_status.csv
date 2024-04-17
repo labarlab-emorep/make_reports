@@ -25,6 +25,7 @@ ER0581,,,lost,Unknown,
 ER0618,lost,lost,lost,Time Conflict,visit1 marked lost bc didn't do Emotion surveys
 ER0620,excl,excl,excl,Eligibility,
 ER0631,,lost,lost,Unknown,
+ER0724,,lost,lost,Unknown,
 ER0736,,,lost,Unknown,
 ER0744,,lost,lost,Time Conflict,
 ER0800,,,lost,Unknown,
@@ -36,4 +37,6 @@ ER1024,lost,lost,lost,Time Conflict,visit1 marked lost bc didn't do Emotion surv
 ER1107,,lost,lost,Time Conflict,
 ER1135,,,lost,Personal Preference,
 ER1137,,,lost,Unknown,
+ER1142,,lost,lost,Time Conflict,
 ER1145,lost,lost,lost,Unknown,visit1 marked lost bc didn't do Emotion surveys
+ER1194,lost,lost,lost,Personal Preference,visit1 marked lost bc didn't do Emotion surveys
