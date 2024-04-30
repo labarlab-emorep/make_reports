@@ -1,5 +1,18 @@
+import pytest
+import pandas as pd
+from make_reports.resources import report_helper
+
+
 def test_drop_participant():
-    pass
+    df = pd.DataFrame(
+        data={"subjid": ["ER01", "ER02", "ER03"], "value": [1, 2, 3]}
+    )
+    df = report_helper.drop_participant("ER03", df, "subjid")
+    df_ref = pd.DataFrame(data={"subjid": ["ER01", "ER02"], "value": [1, 2]})
+    pd.testing.assert_frame_equal(df_ref, df)
+
+    with pytest.raises(ValueError):
+        df = report_helper.drop_participant("ER02", df, "Subject")
 
 
 def test_check_redcap_pat():
