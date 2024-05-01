@@ -298,8 +298,8 @@ class MakeNdarReports(_BuildArgs):
 
     Methods
     -------
-    make_report(report_list: list)
-        Generate bi-annual NDAR reports.
+    make_report()
+        Generate requested bi-annual NDAR reports.
 
     Example
     -------
@@ -331,6 +331,7 @@ class MakeNdarReports(_BuildArgs):
             "emrq01": ["NdarEmrq01", "ERQ"],
             "image03": ["NdarImage03", None],
             "iec01": ["NdarIec01", "iec_mult"],
+            "ndar_subject01": ["NdarSubject01", None],
             "panas01": ["NdarPanas01", "PANAS"],
             "pswq01": ["NdarPswq01", "PSWQ"],
             "restsurv01": ["NdarRest01", "rest_ratings"],

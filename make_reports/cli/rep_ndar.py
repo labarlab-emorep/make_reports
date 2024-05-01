@@ -11,8 +11,8 @@ Notes
 -----
 * Available reports:
     affim01, als01, bdi01, brd01, demo_info01, emrq01,
-    image03, iec01, panas01, pswq01, restsurv01, rrs01,
-    stai01, tas01
+    image03, iec01, ndar_subject01, panas01, pswq01,
+    restsurv01, rrs01, stai01, tas01
 * Requires global variables 'PAT_REDCAP_EMOREP' and
     'PAT_QUALTRICS_EMOREP' in user env, which hold the
     personal access tokens to the emorep REDCap and
@@ -21,6 +21,7 @@ Notes
 Examples
 --------
 rep_ndar -c 2022-12-01 --names demo_info01 affim01
+rep_ndar -c 2022-12-01 --not-image03
 rep_ndar -c 2022-12-01 --all
 
 """
@@ -121,6 +122,7 @@ def main():
         "emrq01",
         "iec01",
         "image03",
+        "ndar_subject01",
         "panas01",
         "pswq01",
         "restsurv01",
