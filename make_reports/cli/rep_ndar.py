@@ -11,7 +11,7 @@ Notes
 -----
 * Available reports:
     affim01, als01, bdi01, brd01, demo_info01, emrq01,
-    image03, panas01, pswq01, restsurv01, rrs01,
+    image03, iec01, panas01, pswq01, restsurv01, rrs01,
     stai01, tas01
 * Requires global variables 'PAT_REDCAP_EMOREP' and
     'PAT_QUALTRICS_EMOREP' in user env, which hold the
@@ -20,8 +20,8 @@ Notes
 
 Examples
 --------
-rep_ndar -c 2022-12-01 --report-names demo_info01 affim01
-rep_ndar -c 2022-12-01 --report-all
+rep_ndar -c 2022-12-01 --names demo_info01 affim01
+rep_ndar -c 2022-12-01 --all
 
 """
 
@@ -38,7 +38,11 @@ def _get_args():
     parser = ArgumentParser(
         description=__doc__, formatter_class=RawTextHelpFormatter
     )
-
+    parser.add_argument(
+        "--not-image03",
+        action="store_true",
+        help="Make all reports except for image03",
+    )
     parser.add_argument(
         "--proj-dir",
         type=str,
@@ -51,25 +55,15 @@ def _get_args():
         ),
     )
     parser.add_argument(
-        "--report-all",
+        "--all",
         action="store_true",
-        help=textwrap.dedent(
-            """\
-            Make all planned NDA reports.
-            True if "--report-all" else False.
-            """
-        ),
+        help="Make all reports",
     )
     parser.add_argument(
-        "--report-names",
+        "--names",
         type=str,
         nargs="+",
-        help=textwrap.dedent(
-            """\
-            Make specific NDA reports by name.
-            e.g. --report-names affim01 als01
-            """
-        ),
+        help="Make specific NDA reports by name",
     )
 
     required_args = parser.add_argument_group("Required Arguments")
@@ -98,8 +92,9 @@ def _get_args():
 def main():
     """Capture arguments and trigger workflow."""
     args = _get_args().parse_args()
-    ndar_reports = args.report_names
-    ndar_reports_all = args.report_all
+    ndar_reports = args.names
+    ndar_reports_all = args.all
+    not_image03 = args.not_image03
     proj_dir = args.proj_dir
     close_date = datetime.strptime(args.close_date, "%Y-%m-%d").date()
 
@@ -124,6 +119,7 @@ def main():
         "brd01",
         "demo_info01",
         "emrq01",
+        "iec01",
         "image03",
         "panas01",
         "pswq01",
@@ -134,6 +130,8 @@ def main():
     ]
     if ndar_reports_all:
         ndar_reports = valid_reports
+    if not_image03:
+        ndar_reports = [x for x in valid_reports if x != "image03"]
     for chk_rep in ndar_reports:
         if chk_rep not in valid_reports:
             raise ValueError(f"Unexpected report name : {chk_rep}")

@@ -2,9 +2,9 @@
 
 dl_mri_log : get MRI visit logs
 dl_completion_log : get completion log
-dl_prescreening : get prescreening responses
-dl_redcap : download REDCap surveys
-download qualtrics : download Qualtrics surveys
+dl_redcap : download REDCap surveys, demographics, consent,
+    guids, and screener
+dl_qualtrics : download Qualtrics surveys
 
 """
 
@@ -15,16 +15,12 @@ from make_reports.resources import report_helper
 from make_reports import reference_files
 
 
-def dl_mri_log():
+def dl_mri_log() -> pd.DataFrame:
     """Download and combine MRI Visit Logs by session.
 
     Returns a reduced report, containing only a datetime column
     and visit identifier. Used for calculating weekly scan
     attempts.
-
-    Returns
-    -------
-    pd.DataFrame
 
     """
 
@@ -63,15 +59,11 @@ def dl_mri_log():
     return df
 
 
-def dl_completion_log():
+def dl_completion_log() -> pd.DataFrame:
     """Return Completion log.
 
     Only includes participants who have a value in the
     'prescreening_completed' field.
-
-    Returns
-    -------
-    pd.DataFrame
 
     """
     with pkg_resources.open_text(
@@ -85,36 +77,13 @@ def dl_completion_log():
     return df_compl
 
 
-def dl_prescreening():
-    """Return reduced prescreening survey.
-
-    Returns
-    -------
-    pd.DataFrame
-
-    """
-    with pkg_resources.open_text(
-        reference_files, "report_keys_redcap.json"
-    ) as jf:
-        report_keys = json.load(jf)
-    df_pre = report_helper.pull_redcap_data(report_keys["prescreen"])
-    df_pre = df_pre[
-        (df_pre["permission"] == 1)
-        & (df_pre["prescreening_survey_complete"] == 2)
-    ].reset_index(drop=True)
-    df_out = df_pre[
-        ["record_id", "permission", "prescreening_survey_complete"]
-    ].copy()
-    return df_out
-
-
 def _dl_info(database, survey_name):
     """Gather API survey IDs and organization mapping.
 
     Parameters
     ----------
     database : str
-        [redcap | qualtrics]
+        {"redcap", "qualtrics"}
     survey_name : str
         Individual survey name from database
 
@@ -161,15 +130,14 @@ def _dl_info(database, survey_name):
     return (report_org, report_keys)
 
 
-def dl_redcap(proj_dir, survey_list):
+def dl_redcap(survey_list):
     """Download EmoRep survey data from RedCap.
 
     Parameters
     ----------
-    proj_dir : path
-        Location of parent directory for project
     survey_list : list
-        RedCap survey names
+        RedCap survey names as found in
+        reference_files.report_keys_redcap.json
 
     Returns
     -------
@@ -187,6 +155,7 @@ def dl_redcap(proj_dir, survey_list):
         "guid",
         "bdi_day2",
         "bdi_day3",
+        "prescreen",
     ]
     for chk in survey_list:
         if chk not in valid_list:
@@ -201,15 +170,14 @@ def dl_redcap(proj_dir, survey_list):
     return out_dict
 
 
-def dl_qualtrics(proj_dir, survey_list):
+def dl_qualtrics(survey_list):
     """Download EmoRep survey data from Qualtrics.
 
     Parameters
     ----------
-    proj_dir : path
-        Location of parent directory for project
     survey_name : list
-        Qualtrics survey names
+        Qualtrics survey names as found in
+        reference_files.report_keys_qualtrics.json
 
     Returns
     -------
