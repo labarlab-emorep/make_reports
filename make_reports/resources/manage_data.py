@@ -92,7 +92,7 @@ class GetRedcap(survey_clean.CleanRedcap):
             {"demographics": (False, pd.DataFrame)}
 
         """
-        raw_redcap = survey_download.dl_redcap(self._proj_dir, survey_list)
+        raw_redcap = survey_download.dl_redcap(survey_list)
 
         # Write rawdata to csv, skip writing PHI
         for sur_name in raw_redcap:
@@ -108,6 +108,26 @@ class GetRedcap(survey_clean.CleanRedcap):
             _write_dfs(df, out_file)
         return raw_redcap
 
+    @property
+    def _clean_map(self) -> dict:
+        """Return mapping of survey to cleaning, visit name.
+
+        Key: survey name (reference_files.report_keys_redcap.json)
+        Value: tuple
+            [0] = survey_clean.CleanRedcap method
+            [1] = visit name
+
+        """
+        return {
+            "prescreen": ["clean_prescreen", "visit_day0"],
+            "demographics": ["clean_demographics", "visit_day1"],
+            "consent_pilot": ["clean_consent", "visit_day1"],
+            "consent_v1.22": ["clean_consent", "visit_day1"],
+            "guid": ["clean_guid", "visit_day0"],
+            "bdi_day2": ["clean_bdi_day23", "visit_day2"],
+            "bdi_day3": ["clean_bdi_day23", "visit_day3"],
+        }
+
     def get_redcap(self, survey_list=None):
         """Get and clean RedCap survey info.
 
@@ -120,6 +140,7 @@ class GetRedcap(survey_clean.CleanRedcap):
         survey_list : list, optional
             {
                 "demographics",
+                "prescreen",
                 "consent_pilot",
                 "consent_v1.22",
                 "guid",
@@ -134,25 +155,21 @@ class GetRedcap(survey_clean.CleanRedcap):
             {pilot|study: {visit: {survey_name: pd.DataFrame}}}
 
         """
-        # Align survey name with survey_clean.CleanRedcap method, visit
-        clean_map = {
-            "demographics": ["clean_demographics", "visit_day1"],
-            "consent_pilot": ["clean_consent", "visit_day1"],
-            "consent_v1.22": ["clean_consent", "visit_day1"],
-            "guid": ["clean_guid", "visit_day0"],
-            "bdi_day2": ["clean_bdi_day23", "visit_day2"],
-            "bdi_day3": ["clean_bdi_day23", "visit_day3"],
-        }
 
-        # Download and write raw data, account for user input
-        if survey_list:
-            for chk_sur in survey_list:
-                if chk_sur not in clean_map.keys():
+        def _validate(sur_names: list):
+            """Raise ValueError if unsupported survey name specified."""
+            for chk_sur in sur_names:
+                if chk_sur not in self._clean_map.keys():
                     raise ValueError(
                         f"Unexpected RedCap report name : {chk_sur}"
                     )
-        else:
-            survey_list = list(clean_map.keys())
+
+        # Validate survey list and download data
+        clean_map = self._clean_map
+        survey_list = (
+            list(clean_map.keys()) if not survey_list else survey_list
+        )
+        _validate(survey_list)
         raw_redcap = self._download_redcap(survey_list)
 
         # Clean each survey and build clean_redcap attr
@@ -261,9 +278,7 @@ class GetQualtrics(survey_clean.CleanQualtrics):
             {"Session 2 & 3 Survey_latest": ("visit_day23", pd.DataFrame)}
 
         """
-        raw_qualtrics = survey_download.dl_qualtrics(
-            self._proj_dir, survey_list
-        )
+        raw_qualtrics = survey_download.dl_qualtrics(survey_list)
 
         # Coordinate writing to disk -- write session2&3 surveys to
         # visit_day2 to avoid duplication.

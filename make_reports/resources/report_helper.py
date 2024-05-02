@@ -19,6 +19,7 @@ ParticipantComplete : deprecated, track participant, data completion status
 AddStatus : deprecated, add participant complete status to dataframe
 
 """
+
 import os
 import sys
 import io
@@ -225,7 +226,7 @@ def pull_qualtrics_data(
     req_file_zipped = io.BytesIO(request_download.content)
     with zipfile.ZipFile(req_file_zipped) as req_file:
         with req_file.open(f"{survey_name}.csv") as f:
-            df = pd.read_csv(f)
+            df = pd.read_csv(f, low_memory=False)
     print(f"\n\tSuccessfully downloaded : {survey_name}.csv")
     return df
 
@@ -366,6 +367,7 @@ def redcap_dict() -> dict:
     # Value : output parent directory name, False to avoid writing
     return {
         "demographics": False,
+        "prescreen": False,
         "consent_pilot": False,
         "consent_v1.22": False,
         "guid": "redcap",

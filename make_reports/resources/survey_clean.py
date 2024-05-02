@@ -51,6 +51,8 @@ class CleanRedcap:
         Generate clean attrs for demographic data
     clean_guid()
         Generate clean attrs for GUID report
+    clean_prescreen()
+        Generate clean attrs for prescreener responses
 
     """
 
@@ -267,11 +269,6 @@ class CleanRedcap:
             ".", "", regex=False
         )
 
-    def _res_idx(self):
-        """Reset df_[pilot|study] indices."""
-        self.df_study.reset_index(drop=True, inplace=True)
-        self.df_pilot.reset_index(drop=True, inplace=True)
-
     def clean_demographics(self, df_raw):
         """Cleaning method for RedCap demographics survey.
 
@@ -311,20 +308,42 @@ class CleanRedcap:
         self._clean_city_state()
         self._clean_middle_name()
 
-        # Drop participants
+        # Drop participants, separate pilot from study data
         self._df_raw = self._drop_subj(self._df_raw)
+        self._make_study_pilot()
 
-        # Separate pilot from study data
-        pilot_list = [int(x[-1]) for x in self._pilot_list]
+    def _make_study_pilot(
+        self, subj_col: str = "record_id", alpha_subjid: bool = False
+    ):
+        """Set attrs df_pilot, df_study.
+
+        Split _df_raw into pilot and study dataframes.
+
+        """
+        if not hasattr(self, "_df_raw"):
+            raise AttributeError("Missing attr self._df_raw")
+        if subj_col not in self._df_raw.columns:
+            raise KeyError(f"Missing column name in self._df_raw : {subj_col}")
+
+        # Determine pilot subj Id
+        if alpha_subjid:
+            pilot_list = self._pilot_list
+        else:
+            pilot_list = [int(x[-1]) for x in self._pilot_list]
+
+        # Mask pilot, study subjs
         idx_pilot = self._df_raw[
-            self._df_raw["record_id"].isin(pilot_list)
+            self._df_raw[subj_col].isin(pilot_list)
         ].index.tolist()
         idx_study = self._df_raw[
-            ~self._df_raw["record_id"].isin(pilot_list)
+            ~self._df_raw[subj_col].isin(pilot_list)
         ].index.tolist()
+
+        # Split dataframe
         self.df_pilot = self._df_raw.loc[idx_pilot]
         self.df_study = self._df_raw.loc[idx_study]
-        self._res_idx()
+        self.df_study.reset_index(drop=True, inplace=True)
+        self.df_pilot.reset_index(drop=True, inplace=True)
 
     def clean_consent(self, df_raw):
         """Cleaning method for RedCap consent survey.
@@ -351,18 +370,38 @@ class CleanRedcap:
         )
         df_raw = df_raw[df_raw[col_drop].notna()]
 
-        # Drop participants
-        df_raw = self._drop_subj(df_raw)
+        # Drop participants, separate pilot from study data
+        self._df_raw = self._drop_subj(df_raw)
+        self._make_study_pilot()
 
-        # Separate pilot from study data
-        pilot_list = [int(x[-1]) for x in self._pilot_list]
-        idx_pilot = df_raw[df_raw["record_id"].isin(pilot_list)].index.tolist()
-        idx_study = df_raw[
-            ~df_raw["record_id"].isin(pilot_list)
-        ].index.tolist()
-        self.df_pilot = df_raw.loc[idx_pilot]
-        self.df_study = df_raw.loc[idx_study]
-        self._res_idx()
+    def clean_prescreen(self, df_raw):
+        """Cleaning method for RedCap prescreening survey.
+
+        Only return participants who have finished prescreener and
+        gave permission for info usage.
+
+        Parameters
+        ----------
+        df_raw : pd.DataFrame
+            Original REDCap export of prescreener survey
+
+        Attributes
+        ----------
+        df_study : pd.DataFrame
+            Clean prescreen info for study participants
+        df_pilot : pd.DataFrame
+            Clean prescreen info for pilot participants
+
+        """
+        # Determine survey completion and permission
+        df_raw = df_raw[
+            (df_raw["permission"] == 1)
+            & (df_raw["prescreening_survey_complete"] == 2)
+        ].reset_index(drop=True)
+
+        # Drop participants, separate pilot from study data
+        self._df_raw = self._drop_subj(df_raw)
+        self._make_study_pilot()
 
     def clean_guid(self, df_raw):
         """Cleaning method for RedCap GUID survey.
@@ -385,19 +424,9 @@ class CleanRedcap:
         # Drop rows without guid
         df_raw = df_raw[df_raw["guid"].notna()]
 
-        # Drop participants
-        df_raw = self._drop_subj(df_raw)
-
-        # Separate pilot from study data
-        idx_pilot = df_raw[
-            df_raw["study_id"].isin(self._pilot_list)
-        ].index.tolist()
-        idx_study = df_raw[
-            ~df_raw["study_id"].isin(self._pilot_list)
-        ].index.tolist()
-        self.df_pilot = df_raw.loc[idx_pilot]
-        self.df_study = df_raw.loc[idx_study]
-        self._res_idx()
+        # Drop participants, separate pilot from study data
+        self._df_raw = self._drop_subj(df_raw)
+        self._make_study_pilot(subj_col="study_id", alpha_subjid=True)
 
         # Update db_emorep.ref_subj for enrolled study subjs
         up_db_emorep = sql_database.DbUpdate()
@@ -463,15 +492,8 @@ class CleanRedcap:
             df_raw = df_raw.reset_index(drop=True)
 
         # Separate pilot from study data
-        idx_pilot = df_raw[
-            df_raw["study_id"].isin(self._pilot_list)
-        ].index.tolist()
-        idx_study = df_raw[
-            ~df_raw["study_id"].isin(self._pilot_list)
-        ].index.tolist()
-        self.df_pilot = df_raw.loc[idx_pilot]
-        self.df_study = df_raw.loc[idx_study]
-        self._res_idx()
+        self._df_raw = df_raw
+        self._make_study_pilot(subj_col="study_id", alpha_subjid=True)
 
     def _drop_subj(self, df: pd.DataFrame) -> pd.DataFrame:
         """Drop certain subjects from dataframe."""
