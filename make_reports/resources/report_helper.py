@@ -15,8 +15,8 @@ redcap_dict : REDCAP survey mappings
 qualtrics_dict : Qualtrics survey mappings
 CheckIncomplete : TODO
 CheckStatus : Make participant status change available for use
-ParticipantComplete : deprecated, track participant, data completion status
-AddStatus : deprecated, add participant complete status to dataframe
+ParticipantComplete : Deprecated, track participant, data completion status
+AddStatus : Deprecated, add participant complete status to dataframe
 
 """
 
@@ -26,6 +26,7 @@ import io
 import requests
 import json
 import csv
+import glob
 import zipfile
 import pandas as pd
 import numpy as np
@@ -246,6 +247,13 @@ def mine_template(template_file):
         [1] = list of nda column names
 
     """
+    valid_names = [
+        os.path.basename(x)
+        for x in glob.glob(f"{reference_files.__path__[0]}/*_template.csv")
+    ]
+    if template_file not in valid_names:
+        raise ValueError(f"Unexpected template name : {template_file}")
+
     with pkg_resources.open_text(reference_files, template_file) as tf:
         reader = csv.reader(tf)
         row_info = [row for idx, row in enumerate(reader)]
@@ -313,7 +321,7 @@ def calc_age_mo(subj_dob, subj_dos):
     return subj_age_mo
 
 
-def get_survey_age(df_survey, df_demo, subj_col):
+def get_survey_age(df_survey, df_demo):
     """Add interview_age, interview_date to df_survey.
 
     interview_age addition will be age-in-months, and
@@ -334,7 +342,7 @@ def get_survey_age(df_survey, df_demo, subj_col):
     """
     # Extract survey datetime info
     df_survey["datetime"] = pd.to_datetime(df_survey["datetime"])
-    subj_survey = df_survey[subj_col].tolist()
+    subj_survey = df_survey["src_subject_id"].tolist()
     subj_dos = df_survey["datetime"].tolist()
 
     # Extract date-of-birth info for participants in survey
@@ -391,6 +399,7 @@ def qualtrics_dict() -> dict:
     }
 
 
+# TODO
 class CheckIncomplete:
     """Title.
 
@@ -647,7 +656,9 @@ class CheckStatus:
     def _add_change(self, status: str):
         """Change visit value to status if necessary."""
         self.status_change(status)
-        for v_num in reversed(self._v_list):  # reverse to allow clearing
+        for v_num in reversed(
+            self._v_list
+        ):  # reversed to allow status clearing
             visit_dict = getattr(self, f"visit{v_num}")
             if not visit_dict:
                 continue
@@ -669,6 +680,7 @@ class CheckStatus:
         while v_num < 3:
             v_num += 1
             self._df.loc[idx_subj, f"visit{v_num}_status"] = np.NaN
+            self._df.loc[idx_subj, f"visit{v_num}_reason"] = np.NaN
 
 
 class ParticipantComplete:

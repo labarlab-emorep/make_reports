@@ -192,9 +192,7 @@ class NdarAffim01(_CleanDemo):
         df_aim_nda = pd.merge(self._df_aim, df_nda, on="src_subject_id")
 
         # Find survey age-in-months
-        df_aim_nda = report_helper.get_survey_age(
-            df_aim_nda, self._df_demo, "src_subject_id"
-        )
+        df_aim_nda = report_helper.get_survey_age(df_aim_nda, self._df_demo)
 
         # Sum aim responses
         aim_list = [x for x in df_aim_nda.columns if "aim" in x]
@@ -319,9 +317,7 @@ class NdarAls01(_CleanDemo):
         # Combine demographic and als dataframes
         df_nda = self._df_demo[["subjectkey", "src_subject_id", "sex"]].copy()
         df_als_nda = pd.merge(self._df_als, df_nda, on="src_subject_id")
-        df_als_nda = report_helper.get_survey_age(
-            df_als_nda, self._df_demo, "src_subject_id"
-        )
+        df_als_nda = report_helper.get_survey_age(df_als_nda, self._df_demo)
 
         # Build dataframe from nda columns, update with demo and als data
         self.df_report = pd.DataFrame(
@@ -493,9 +489,7 @@ class NdarBdi01(_CleanDemo):
         df_bdi_demo = pd.merge(df_bdi_remap, df_nda, on="src_subject_id")
 
         # Calculate age in months of visit
-        df_bdi_demo = report_helper.get_survey_age(
-            df_bdi_demo, self._df_demo, "src_subject_id"
-        )
+        df_bdi_demo = report_helper.get_survey_age(df_bdi_demo, self._df_demo)
         df_bdi_demo["visit"] = sess
 
         # Build dataframe from nda columns, update with df_bdi_demo data
@@ -893,9 +887,7 @@ class NdarEmrq01(_CleanDemo):
         # Combine demographic and erq dataframes
         df_nda = self._df_demo[["subjectkey", "src_subject_id", "sex"]].copy()
         df_emrq_nda = pd.merge(df_emrq, df_nda, on="src_subject_id")
-        df_emrq_nda = report_helper.get_survey_age(
-            df_emrq_nda, self._df_demo, "src_subject_id"
-        )
+        df_emrq_nda = report_helper.get_survey_age(df_emrq_nda, self._df_demo)
 
         # Build dataframe from nda columns, update with df_final_emrq data
         df_report = pd.DataFrame(
@@ -2142,7 +2134,7 @@ class NdarPanas01(_CleanDemo):
         df_nda = self._df_demo[["subjectkey", "src_subject_id", "sex"]].copy()
         df_panas_demo = pd.merge(df_panas, df_nda, on="src_subject_id")
         df_panas_demo = report_helper.get_survey_age(
-            df_panas_demo, self._df_demo, "src_subject_id"
+            df_panas_demo, self._df_demo
         )
 
         # Build dataframe from nda columns, update with df_panas_demo data
@@ -2475,9 +2467,7 @@ class NdarPswq01(_CleanDemo):
         # Combine demographic and erq dataframes
         df_nda = self._df_demo[["subjectkey", "src_subject_id", "sex"]]
         df_pswq_nda = pd.merge(self._df_pswq, df_nda, on="src_subject_id")
-        df_pswq_nda = report_helper.get_survey_age(
-            df_pswq_nda, self._df_demo, "src_subject_id"
-        )
+        df_pswq_nda = report_helper.get_survey_age(df_pswq_nda, self._df_demo)
 
         # Build dataframe from nda columns, update with df_final_emrq data
         df_report = pd.DataFrame(
@@ -2679,7 +2669,7 @@ class NdarRest01(_CleanDemo):
 
         # Calculate age in months of visit, update visit
         df_rest_demo = report_helper.get_survey_age(
-            df_rest_demo, self._df_demo, "src_subject_id"
+            df_rest_demo, self._df_demo
         )
         df_rest_demo["visit"] = sess
 
@@ -2817,9 +2807,7 @@ class NdarRrs01(_CleanDemo):
         # Combine demographic and rrs dataframes
         df_nda = self._df_demo[["subjectkey", "src_subject_id", "sex"]]
         df_rrs_nda = pd.merge(self._df_study, df_nda, on="src_subject_id")
-        df_rrs_nda = report_helper.get_survey_age(
-            df_rrs_nda, self._df_demo, "src_subject_id"
-        )
+        df_rrs_nda = report_helper.get_survey_age(df_rrs_nda, self._df_demo)
 
         # Build dataframe from nda columns, update with demo and rrs data
         df_study_report = pd.DataFrame(
@@ -2984,7 +2972,7 @@ class NdarStai01(_CleanDemo):
             df_stai_trait, df_nda, on="src_subject_id"
         )
         df_stai_trait_nda = report_helper.get_survey_age(
-            df_stai_trait_nda, self._df_demo, "src_subject_id"
+            df_stai_trait_nda, self._df_demo
         )
 
         # Add visit info
@@ -3065,7 +3053,7 @@ class NdarStai01(_CleanDemo):
             df_stai_state_remap, df_nda, on="src_subject_id"
         )
         df_stai_state_nda = report_helper.get_survey_age(
-            df_stai_state_nda, self._df_demo, "src_subject_id"
+            df_stai_state_nda, self._df_demo
         )
 
         # Add visit info
@@ -3240,9 +3228,7 @@ class NdarTas01(_CleanDemo):
         # Combine demographic and stai dataframes
         df_nda = self._df_demo[["subjectkey", "src_subject_id", "sex"]]
         df_tas_nda = pd.merge(self._df_tas, df_nda, on="src_subject_id")
-        df_tas_nda = report_helper.get_survey_age(
-            df_tas_nda, self._df_demo, "src_subject_id"
-        )
+        df_tas_nda = report_helper.get_survey_age(df_tas_nda, self._df_demo)
 
         # Build dataframe from nda columns, update with demo and stai data
         self.df_report = pd.DataFrame(
