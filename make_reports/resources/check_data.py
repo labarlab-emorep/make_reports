@@ -5,6 +5,7 @@ CheckEmorepComplete : determine which EmoRep participants
     are missing data
 
 """
+
 import os
 import glob
 import time
@@ -76,14 +77,21 @@ class _ChkRsc:
         self._search_path = search_path
         self._search_str = search_str
         self._num_exp = num_exp
-        col_out = Pool(num_proc).starmap(
-            self._compare_count,
-            [(subj,) for subj in subj_list],
-        )
+
+        # Multiprocess each subject's search
+        with Pool(num_proc) as pool:
+            col_out = pool.starmap(
+                self._compare_count,
+                [(subj,) for subj in subj_list],
+            )
         self.update_df(col_out, step)
 
     def update_df(self, in_val: list, col_name: str):
         """Update column of df_mri."""
+        if not hasattr(self, "df_mri"):
+            raise AttributeError(
+                "Missing attr df_mri, run start_df method first"
+            )
         idx_sess = self.df_mri.index[
             self.df_mri["sess"] == self._sess
         ].tolist()
@@ -102,7 +110,7 @@ class _CheckEmorep(_ChkRsc):
         subj_list: list,
         raw_dir: Union[str, os.PathLike],
         deriv_dir: Union[str, os.PathLike],
-        sess: str = "ses-day2",
+        sess: str = "day2",
     ):
         """Initialize."""
         self._sess = sess
@@ -258,7 +266,7 @@ class _CheckEmorep(_ChkRsc):
             "dot-sep-stim": (
                 os.path.join(self._deriv_dir, "classify_rest"),
                 "func/df_dot-product_model-sep_con-stim_*.csv",
-                1,
+                2,
             ),
         }
 

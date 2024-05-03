@@ -20,6 +20,7 @@ def check_test_env():
         "PAT_REDCAP_EMOREP",
         "PAT_QUALTRICS_EMOREP",
         "SQL_PASS",
+        "PROJ_DIR",
     ]:
         try:
             os.environ[glob_var]
