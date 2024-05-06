@@ -10,17 +10,23 @@ Notes
 -----
 * Appropriate database tokens required, defined in user env via
     'PAT_REDCAP_EMOREP' and/or 'PAT_QUALTRICS_EMOREP'.
+
 * General descriptive stats, all data are included.
+
+* Available survey names:
+    BDI, AIM, ALS, ERQ, PANAS, PSWQ, RRS, STAI_Trait, STAI_State,
+    TAS, rest (post-rest ratings), stim (post-scan stim ratings),
+    task (in-scan task responses)
 
 Examples
 --------
-sur_stats --survey-avail
-sur_stats --survey-all --draw-plots
-sur_stats --survey-names AIM ALS stim --write-json
-sur_stats --survey-names rest task --write-json --draw-plots
-sur_stats --make-tables --draw-plots
+sur_stats --all
+sur_stats --names AIM ALS stim
+sur_stats --names rest task --write-json
+sur_stats --make-tables
 
 """
+
 import sys
 import textwrap
 from argparse import ArgumentParser, RawTextHelpFormatter
@@ -34,24 +40,13 @@ def _get_args():
         description=__doc__, formatter_class=RawTextHelpFormatter
     )
     parser.add_argument(
-        "--draw-plots",
-        action="store_true",
-        help=textwrap.dedent(
-            """\
-            Whether figures should be generated.
-            True if "--draw-plot" else False.
-            """
-        ),
-    )
-    parser.add_argument(
         "--make-tables",
         action="store_true",
         help=textwrap.dedent(
             """\
             Whether to compile generated dataframes into tables. Uses
-            data from all surveys available (similar to --survey-all).
-            Replaces --survey-list.
-            True if "--make-table" else False.
+            data from all surveys available (similar to --all).
+            Replaces --names.
             """
         ),
     )
@@ -67,35 +62,23 @@ def _get_args():
         ),
     )
     parser.add_argument(
-        "--survey-all",
+        "--all",
         action="store_true",
         help=textwrap.dedent(
             """\
             Generate descriptive statistics and draw plots
-            for all surveys. Replaces --survey-list.
-            See --survey-avail for list.
+            for all surveys. Replaces --names.
             """
         ),
     )
     parser.add_argument(
-        "--survey-avail",
-        action="store_true",
-        help=textwrap.dedent(
-            """\
-            Print list of surveys availble for descriptive statistics.
-            True if "--available-reports" else False.
-            """
-        ),
-    )
-    parser.add_argument(
-        "--survey-names",
+        "--names",
         nargs="+",
         type=str,
         help=textwrap.dedent(
             """\
-            Requres --draw-plots or --write-json.
             List of surveys, for generating descriptive statistics
-            and drawing figures. See --survey-avail for list.
+            and drawing figures.
             """
         ),
     )
@@ -106,7 +89,6 @@ def _get_args():
             """\
             Whether write Qualtrics and RedCap descriptive
             stats out to JSON file.
-            True if "--write-json" else False.
             """
         ),
     )
@@ -121,19 +103,11 @@ def _get_args():
 def main():
     """Capture arguments and trigger workflows."""
     args = _get_args().parse_args()
-    draw_plot = args.draw_plots
     write_json = args.write_json
     make_tables = args.make_tables
     proj_dir = args.proj_dir
-    survey_list = args.survey_names
-    survey_all = args.survey_all
-    survey_avail = args.survey_avail
-
-    # Validate input
-    if survey_list and (not draw_plot and not write_json):
-        raise ValueError(
-            "Option --survey-names requires --draw-plots or --write-json."
-        )
+    survey_list = args.names
+    survey_all = args.all
 
     # Set redcap/qualtircs and scan lists
     sur_rc = ["BDI"]
@@ -152,21 +126,14 @@ def main():
     sur_scan = ["rest", "stim", "task"]
     sur_all = sur_rc_qual + sur_scan
 
-    # Check user-specified survey names
-    if survey_list:
-        for sur in survey_list:
-            if sur not in sur_all:
-                raise ValueError(
-                    "Unexpected survey requested : "
-                    + f"{sur}, see --survey-avail."
-                )
-
-    # Manage avail, all options
-    if survey_avail:
-        print(f"Available surveys : \n\t{sur_all}")
-        sys.exit(0)
+    # Manage all option
     if survey_all or make_tables:
         survey_list = sur_all
+
+    # Validate survey names (in case user specified)
+    for sur in survey_list:
+        if sur not in sur_all:
+            raise ValueError(f"Unexpected survey requested : {sur}")
 
     # Check tokens
     for chk_sur in survey_list:
@@ -186,12 +153,10 @@ def main():
 
     if sur_online:
         sur_stat = behavioral_reports.CalcRedcapQualtricsStats(proj_dir)
-        sur_stat.gen_stats_plots(sur_online, draw_plot, write_json)
+        sur_stat.gen_stats_plots(sur_online, write_json)
 
     if sur_scanner:
-        _ = behavioral_reports.calc_task_stats(
-            proj_dir, sur_scanner, draw_plot
-        )
+        _ = behavioral_reports.calc_task_stats(proj_dir, sur_scanner)
 
 
 if __name__ == "__main__":
