@@ -368,18 +368,25 @@ class _DescStat:
 
         # Draw plot
         plt.hist(
-            [
-                df_plot.loc[df_plot[fac_col] == fac_a, "sum"],
-                df_plot.loc[df_plot[fac_col] == fac_b, "sum"],
-            ],
+            df_plot.loc[df_plot[fac_col] == fac_a, "sum"],
             bins=range(0, int(df_plot["sum"].max())),
-            stacked=True,
-            color=["cyan", "Purple"],
+            alpha=0.5,
+            label=fac_a,
+            color="blue",
+            edgecolor="black",
+        )
+        plt.hist(
+            df_plot.loc[df_plot[fac_col] == fac_b, "sum"],
+            bins=range(0, int(df_plot["sum"].max())),
+            alpha=0.5,
+            label=fac_b,
+            color="purple",
             edgecolor="black",
         )
         plt.xlabel("Response Total")
         plt.ylabel("Frequency")
         plt.title(main_title)
+        plt.legend([fac_a, fac_b])
 
         # Write and close plot
         plt.savefig(out_path, dpi=300)

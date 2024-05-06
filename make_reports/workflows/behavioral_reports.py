@@ -77,7 +77,7 @@ class _Visit1:
         report_dict.update(self._sur_stat.calc_row_stats())
         self.sur_descript[self._sur_name]["full"] = report_dict
 
-        # Write JSON and figures
+        # Write JSON
         if self._write_json:
             stat_out = os.path.join(
                 self._out_dir, f"stats_{self._sur_name}.json"
@@ -85,6 +85,8 @@ class _Visit1:
             with open(stat_out, "w") as jf:
                 json.dump(report_dict, jf)
                 print(f"\tSaved descriptive stats : {stat_out}")
+
+        # Draw box and histogram plots
         if self._draw_box:
             plot_out = os.path.join(
                 self._out_dir, f"plot_{self._sur_name}_boxplot-single.png"
@@ -143,7 +145,7 @@ class _Visit1:
             report_dict.update(_stat_dict)
             self.sur_descript[self._sur_name][sub_name] = report_dict
 
-            # Write stat JSON and boxplot
+            # Write stat JSON
             if self._write_json:
                 sub_stat_out = os.path.join(
                     self._out_dir, f"stats_{self._sur_name}_{sub_name}.json"
@@ -151,6 +153,8 @@ class _Visit1:
                 with open(sub_stat_out, "w") as jf:
                     json.dump(report_dict, jf)
                     print(f"\tSaved descriptive stats : {sub_stat_out}")
+
+            # Draw box and histogram plots
             if self._draw_box:
                 sub_plot_out = os.path.join(
                     self._out_dir,
@@ -223,12 +227,14 @@ class _Visit23:
         report_dict.update(sur_stat.calc_factor_stats(fac_col, fac_a, fac_b))
         _flatten(report_dict)
 
-        # Write stats to JSON, draw boxplot
+        # Write stats to JSON
         if write_json:
             stat_out = os.path.join(out_dir, f"stats_{sur_name}.json")
             with open(stat_out, "w") as jf:
                 json.dump(report_dict, jf)
                 print(f"\tSaved descriptive stats : {stat_out}")
+
+        # Draw box and histogram plots
         if draw_box:
             plot_out = os.path.join(
                 out_dir, f"plot_{sur_name}_boxplot-double.png"
@@ -393,7 +399,7 @@ class CalcRedcapQualtricsStats:
 
 
 # %%
-def calc_task_stats(proj_dir, survey_list, draw_plot):
+def calc_task_stats(proj_dir, survey_list, draw_plot=True):
     """Calculate stats for in- and post-scanner surveys.
 
     Generate dataframes for the requested surveys, calculcate
@@ -408,7 +414,7 @@ def calc_task_stats(proj_dir, survey_list, draw_plot):
     survey_list : list
         {"rest", "stim", "task"}
         Survey names, for triggering different workflows
-    draw_plot : bool
+    draw_plot : bool, optional
         Whether to draw plots
 
     Returns
