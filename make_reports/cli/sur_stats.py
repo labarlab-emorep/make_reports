@@ -21,6 +21,7 @@ sur_stats --survey-names rest task --write-json --draw-plots
 sur_stats --make-tables --draw-plots
 
 """
+
 import sys
 import textwrap
 from argparse import ArgumentParser, RawTextHelpFormatter
@@ -186,7 +187,7 @@ def main():
 
     if sur_online:
         sur_stat = behavioral_reports.CalcRedcapQualtricsStats(proj_dir)
-        sur_stat.gen_stats_plots(sur_online, draw_plot, write_json)
+        sur_stat.gen_stats_plots(sur_online, write_json)
 
     if sur_scanner:
         _ = behavioral_reports.calc_task_stats(
