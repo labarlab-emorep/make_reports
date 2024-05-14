@@ -150,13 +150,110 @@ class Test_CheckEmorep:
         ) == chk_dict["deface"]
 
 
-def test_CheckEmorep():
-    pass
+def test_CheckMri_emorep():
+    # Setup to instantiate CheckMri for EmoRep
+    emorep_dir = os.path.join(
+        os.environ["PROJ_DIR"],
+        "Exp2_Compute_Emotion",
+        "data_scanner_BIDS",
+    )
+    raw_dir = os.path.join(
+        emorep_dir,
+        "rawdata",
+    )
+    deriv_dir = os.path.join(emorep_dir, "derivatives")
+    subj_list = ["ER0009", "ER0087"]
+    chk_mri = check_data.CheckMri(
+        subj_list, ["day2", "day3"], raw_dir, deriv_dir
+    )
+    chk_mri.check_emorep()
+
+    # Check shape and certain column names
+    assert (4, 15) == chk_mri.df_mri.shape
+    for chk_col in [
+        "task-rest",
+        "fsl-rest",
+        "fsl-sep-first",
+        "fsl-sep-second",
+        "fsl-lss",
+        "dot-sep-stim",
+    ]:
+        assert chk_col in chk_mri.df_mri.columns.to_list()
+
+    # Check certain fields
+    assert 1 == chk_mri.df_mri.loc[0, "dot-sep-stim"]
+    assert "2023-04-13" == chk_mri.df_mri.loc[1, "task-rest"]
+    assert "2023-12-07" == chk_mri.df_mri.loc[2, "fsl-sep-first"]
 
 
-def test_CheckMri():
-    pass
+class TestCheckMri:
 
+    @pytest.fixture(autouse=True)
+    def _setup(self):
+        archival_dir = os.path.join(
+            os.environ["PROJ_DIR"],
+            "Exp3_Classify_Archival",
+            "data_mri_BIDS",
+        )
+        self.raw_dir = os.path.join(
+            archival_dir,
+            "rawdata",
+        )
+        self.deriv_dir = os.path.join(archival_dir, "derivatives")
+        subj_list = ["08326", "13809"]
+        self.chk_mri = check_data.CheckMri(
+            subj_list, ["BAS1"], self.raw_dir, self.deriv_dir
+        )
+        self.chk_mri.check_archival()
 
-def test_CheckEmorepComplete():
-    pass
+    def test_check_archival(self):
+        # Check shape and column names
+        assert (2, 8) == self.chk_mri.df_mri.shape
+        for chk_col in [
+            "subid",
+            "sess",
+            "anat",
+            "func",
+            "fmriprep",
+            "fsl-preproc",
+            "fsl-rest",
+            "dot-sep-stim",
+        ]:
+            assert chk_col in self.chk_mri.df_mri.columns.to_list()
+
+        # Check certain fields
+        assert "13809" == self.chk_mri.df_mri.loc[1, "subid"]
+        assert "BAS1" == self.chk_mri.df_mri.loc[1, "sess"]
+        assert "2023-05-16" == self.chk_mri.df_mri.loc[0, "anat"]
+        assert 2 == self.chk_mri.df_mri.loc[0, "fsl-preproc"]
+        assert "2023-08-29" == self.chk_mri.df_mri.loc[1, "fsl-rest"]
+
+    def test_info_archival(self):
+        col_names, chk_dict = self.chk_mri._info_archival()
+
+        # Check some column names
+        for chk_col in [
+            "subid",
+            "sess",
+            "anat",
+            "func",
+            "fmriprep",
+            "fsl-preproc",
+            "fsl-rest",
+            "dot-sep-stim",
+        ]:
+            assert chk_col in col_names
+
+        # Check some dict values
+        assert (self.raw_dir, "anat/*.nii.gz", 1) == chk_dict["anat"]
+        assert (self.raw_dir, "func/*.nii.gz", 1) == chk_dict["func"]
+        assert (
+            os.path.join(self.deriv_dir, "pre_processing/fmriprep"),
+            "func/*desc-preproc_bold.nii.gz",
+            1,
+        ) == chk_dict["fmriprep"]
+        assert (
+            os.path.join(self.deriv_dir, "model_fsl"),
+            "func/run-01_level-first_name-rest.feat/stats/cope1.nii.gz",
+            1,
+        ) == chk_dict["fsl-rest"]

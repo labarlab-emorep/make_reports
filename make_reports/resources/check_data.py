@@ -1,8 +1,6 @@
 """Resources for checking data completeness.
 
 CheckMri : check for expected rawdata and derivatives
-CheckEmorepComplete : determine which EmoRep participants
-    are missing data
 
 """
 
@@ -301,9 +299,9 @@ class CheckMri(_CheckEmorep):
         Subjects encountered in project sourcedata
     sess_list : list
         Session identifiers without BIDS formatting
-    raw_dir : path
+    raw_dir : str, os.PathLike
         Location of project rawdata
-    deriv_dir : path
+    deriv_dir : str, os.PathLike
         Location of project derivatives
 
     Attributes
