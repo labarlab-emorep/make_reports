@@ -77,57 +77,25 @@ def dl_completion_log() -> pd.DataFrame:
     return df_compl
 
 
-def _dl_info(database, survey_name):
-    """Gather API survey IDs and organization mapping.
+def _get_ids(database: str) -> dict:
+    """Return API survey IDs.
 
     Parameters
     ----------
     database : str
         {"redcap", "qualtrics"}
-    survey_name : str
-        Individual survey name from database
-
-    Returns
-    -------
-    tuple
-        [0] dict : key = survey name, value = organization map
-        [1] dict : key = survey name, value = survey ID
-
-    Raises
-    ------
-    ValueError
-        When a survey_name is specified that does not exist in the
-        reference methods and files.
+        Database name
 
     """
+    if database not in ["redcap", "qualtrics"]:
+        raise ValueError(f"Unexpected database name : {database}")
+
     # Load keys
     with pkg_resources.open_text(
         reference_files, f"report_keys_{database}.json"
     ) as jf:
         report_keys = json.load(jf)
-
-    # Use proper report_helper method
-    h_meth = getattr(report_helper, f"{database}_dict")
-    h_map = h_meth()
-
-    # Check if survey_name is valid
-    if survey_name not in h_map.keys():
-        raise ValueError(
-            f"Survey name {survey_name} was not found in "
-            + f"make_reports.report_helper.{database}_dict."
-        )
-
-    # Determine which surveys to download based on user input
-    report_org = {survey_name: h_map[survey_name]}
-
-    # Check that surveys have a key
-    for h_key in report_org:
-        if h_key not in report_keys.keys():
-            raise ValueError(
-                f"Missing key pair for survey : {h_key}, check "
-                + f"make_reports.reference_files.report_keys_{database}.json"
-            )
-    return (report_org, report_keys)
+    return report_keys
 
 
 def dl_redcap(survey_list):
@@ -150,23 +118,26 @@ def dl_redcap(survey_list):
     # Validate survey list
     valid_list = [
         "demographics",
+        "prescreen",
         "consent_pilot",
         "consent_v1.22",
         "guid",
         "bdi_day2",
         "bdi_day3",
-        "prescreen",
     ]
     for chk in survey_list:
         if chk not in valid_list:
             raise ValueError(f"Survey name '{chk}' not valid")
 
+    # Determine organization directory names, get survey keys
+    org_dict = report_helper.redcap_dict()
+    sur_keys = _get_ids("redcap")
+
     # Download, return data
     out_dict = {}
     for sur_name in survey_list:
-        rep_org, rep_key = _dl_info("redcap", sur_name)
-        df = report_helper.pull_redcap_data(rep_key[sur_name])
-        out_dict[sur_name] = (rep_org[sur_name], df)
+        df = report_helper.pull_redcap_data(sur_keys[sur_name])
+        out_dict[sur_name] = (org_dict[sur_name], df)
     return out_dict
 
 
@@ -186,7 +157,7 @@ def dl_qualtrics(survey_list):
         {"Session 2 & 3 Survey_latest": ("visit_day23", pd.DataFrame)}
 
     """
-    print("\nPulling Qualtrics surveys ...")
+    # Validate survey list
     valid_list = [
         "EmoRep_Session_1",
         "Session 2 & 3 Survey",
@@ -196,29 +167,31 @@ def dl_qualtrics(survey_list):
         if chk not in valid_list:
             raise ValueError(f"Survey name '{chk}' not valid")
 
+    # Determine organization directory names, get survey keys
+    org_dict = report_helper.qualtrics_dict()
+    sur_keys = _get_ids("qualtrics")
+
     # Get survey names, keys, directory mapping
     out_dict = {}
     for sur_name in survey_list:
-        # Setup for data pull
-        report_org, report_keys = _dl_info("qualtrics", sur_name)
-        datacenter_id = report_keys["datacenter_ID"]
-        dir_name = report_org[sur_name]
+        # Determine post_label status
         post_labels = (
             True
             if sur_name == "FINAL - EmoRep Stimulus Ratings - fMRI Study"
             else False
         )
-        survey_id = report_keys[sur_name]
 
         # Get data
         df = report_helper.pull_qualtrics_data(
             sur_name,
-            survey_id,
-            datacenter_id,
+            sur_keys[sur_name],
+            sur_keys["datacenter_ID"],
             post_labels,
         )
-        if isinstance(dir_name, list):
+
+        # Build dict value
+        if isinstance(org_dict[sur_name], list):
             out_dict[sur_name] = ("visit_day23", df)
         else:
-            out_dict[sur_name] = (dir_name, df)
+            out_dict[sur_name] = (org_dict[sur_name], df)
     return out_dict
