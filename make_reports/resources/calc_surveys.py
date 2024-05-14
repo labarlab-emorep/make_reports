@@ -13,6 +13,7 @@ StimRatings : generate stats, plots for stimulus ratings task
 EmorepTask : generate stats, plots emorep task
 
 """
+
 # %%
 import os
 from typing import Tuple
@@ -212,6 +213,52 @@ class _DescStat:
         plt.close()
         print(f"\t\tDrew boxplot : {out_path}")
 
+    def draw_single_histogram(self, main_title, out_path, bin_num=20):
+        """Draw histogram for single factor.
+
+        Parameters
+        ----------
+        main_title : str
+            Main title of boxplot
+        out_path : path
+            Output location and file name of figure
+
+        Examples
+        --------
+        stat_obj = _DescStat(
+            pd.DataFrame, col_data=["col_a", "col_b", "col_c"]
+        )
+        stat_obj.draw_single_boxplot("Title", "/path/to/output/fig.png")
+
+        stat_obj.df = df_subscale
+        stat_obj.col_data = ["col_x", "col_y"]
+        stat_obj.draw_single_histogram(
+            "Sub title", "/path/to/output/fig_sub.png"
+        )
+
+        """
+        # Get needed data and setup dataframe
+        self._valid_cols()
+        df_plot = self.df.copy()
+        df_plot[self.col_data] = df_plot[self.col_data].astype("Int64")
+        df_plot["sum"] = df_plot[self.col_data].sum(axis=1)
+
+        # Draw plot
+        plt.hist(
+            df_plot["sum"],
+            bins=range(0, int(df_plot["sum"].max())),
+            color="skyblue",
+            edgecolor="black",
+        )
+        plt.xlabel("Response Total")
+        plt.ylabel("Frequency")
+        plt.title(main_title)
+
+        # Write and close plot
+        plt.savefig(out_path, dpi=300)
+        plt.close()
+        print(f"\t\tDrew histogram : {out_path}")
+
     def draw_double_boxplot(
         self,
         fac_col: str,
@@ -279,6 +326,72 @@ class _DescStat:
         plt.savefig(out_path, dpi=300)
         print(f"\t\tDrew boxplot : {out_path}")
         plt.close()
+
+    def draw_double_histogram(
+        self,
+        fac_col: str,
+        fac_a: str,
+        fac_b: str,
+        main_title: str,
+        out_path: str,
+    ):
+        """Draw histogram for two factors.
+
+        Parameters
+        ----------
+        fac_col : str
+            Column name of pd.DataFrame containing fac_a, fac_b.
+        fac_a : str
+            Factor A name, e.g. "Visit 2"
+        fac_b : str
+            Factor B name, e.g. "Visit 3"
+        main_title : str
+            Main title of boxplot
+        out_path : str, os.PathLike
+            Output location and file name of figure
+
+        Example
+        -------
+        stat_obj = _DescStat(
+            pd.DataFrame, col_data=["col_a", "col_b", "col_c"]
+        )
+        stat_obj.draw_double_histogram(
+            "visit", "Visit 2", "Visit 3", "Title", "/path/to/output/fig.png"
+        )
+
+        """
+        # Get needed data and setup dataframe
+        self._valid_cols()
+        df_plot = self.df.copy()
+        df_plot[self.col_data] = df_plot[self.col_data].astype("Int64")
+        df_plot["sum"] = df_plot[self.col_data].sum(axis=1)
+
+        # Draw plot
+        plt.hist(
+            df_plot.loc[df_plot[fac_col] == fac_a, "sum"],
+            bins=range(0, int(df_plot["sum"].max())),
+            alpha=0.5,
+            label=fac_a,
+            color="blue",
+            edgecolor="black",
+        )
+        plt.hist(
+            df_plot.loc[df_plot[fac_col] == fac_b, "sum"],
+            bins=range(0, int(df_plot["sum"].max())),
+            alpha=0.5,
+            label=fac_b,
+            color="purple",
+            edgecolor="black",
+        )
+        plt.xlabel("Response Total")
+        plt.ylabel("Frequency")
+        plt.title(main_title)
+        plt.legend([fac_a, fac_b])
+
+        # Write and close plot
+        plt.savefig(out_path, dpi=300)
+        plt.close()
+        print(f"\t\tDrew histogram : {out_path}")
 
     def calc_long_stats(self, grp_a, grp_b):
         """Caculate descriptive stats from long-formatted dataframe.

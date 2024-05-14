@@ -6,6 +6,7 @@ calc_task_stats : generate descriptive stats for EmoRep task
 make_survey_table : organize multiple descriptive reports into tables
 
 """
+
 # %%
 import os
 import json
@@ -43,7 +44,6 @@ class _Visit1:
         """Initialize."""
         self._proj_dir = proj_dir
         self.sur_descript = {}
-        self._mk_subscale()
 
     def visit1_data(self):
         """Make clean_visit1 attr {survey_name: pd.DataFrame}."""
@@ -55,13 +55,15 @@ class _Visit1:
         self,
         sur_name: str,
         write_json: bool,
-        draw_plot: bool,
         out_dir: Union[str, os.PathLike],
+        draw_box: bool = False,
+        draw_hist: bool = True,
     ):
         """Generate descriptive stats and figures for visit 1 surveys."""
         self._sur_name = sur_name
         self._write_json = write_json
-        self._draw_plot = draw_plot
+        self._draw_box = draw_box
+        self._draw_hist = draw_hist
         self._out_dir = out_dir
 
         # Setup output dict for survey
@@ -75,7 +77,7 @@ class _Visit1:
         report_dict.update(self._sur_stat.calc_row_stats())
         self.sur_descript[self._sur_name]["full"] = report_dict
 
-        # Write JSON and figures
+        # Write JSON
         if self._write_json:
             stat_out = os.path.join(
                 self._out_dir, f"stats_{self._sur_name}.json"
@@ -83,11 +85,20 @@ class _Visit1:
             with open(stat_out, "w") as jf:
                 json.dump(report_dict, jf)
                 print(f"\tSaved descriptive stats : {stat_out}")
-        if self._draw_plot:
+
+        # Draw box and histogram plots
+        if self._draw_box:
             plot_out = os.path.join(
                 self._out_dir, f"plot_{self._sur_name}_boxplot-single.png"
             )
             self._sur_stat.draw_single_boxplot(
+                _get_title(self._sur_name), plot_out
+            )
+        if self._draw_hist:
+            plot_out = os.path.join(
+                self._out_dir, f"plot_{self._sur_name}_histogram-single.png"
+            )
+            self._sur_stat.draw_single_histogram(
                 _get_title(self._sur_name), plot_out
             )
 
@@ -95,9 +106,10 @@ class _Visit1:
         if self._sur_name in self._subscale_dict.keys():
             self._visit1_subscale()
 
-    def _mk_subscale(self):
+    @property
+    def _subscale_dict(self) -> dict:
         """Setup subscale names and column names for each survey."""
-        self._subscale_dict = {
+        return {
             "ALS": {
                 "Anx-Dep": [f"ALS_{x}" for x in [1, 3, 5, 6, 7]],
                 "Dep-Ela": [
@@ -133,7 +145,7 @@ class _Visit1:
             report_dict.update(_stat_dict)
             self.sur_descript[self._sur_name][sub_name] = report_dict
 
-            # Write stat JSON and boxplot
+            # Write stat JSON
             if self._write_json:
                 sub_stat_out = os.path.join(
                     self._out_dir, f"stats_{self._sur_name}_{sub_name}.json"
@@ -141,12 +153,20 @@ class _Visit1:
                 with open(sub_stat_out, "w") as jf:
                     json.dump(report_dict, jf)
                     print(f"\tSaved descriptive stats : {sub_stat_out}")
-            if self._draw_plot:
+
+            # Draw box and histogram plots
+            if self._draw_box:
                 sub_plot_out = os.path.join(
                     self._out_dir,
                     f"plot_{self._sur_name}_{sub_name}_boxplot-single.png",
                 )
                 self._sur_stat.draw_single_boxplot(sub_title, sub_plot_out)
+            if self._draw_hist:
+                sub_plot_out = os.path.join(
+                    self._out_dir,
+                    f"plot_{self._sur_name}_{sub_name}_histogram-single.png",
+                )
+                self._sur_stat.draw_single_histogram(sub_title, sub_plot_out)
 
 
 class _Visit23:
@@ -180,8 +200,9 @@ class _Visit23:
         df_day2: pd.DataFrame,
         df_day3: pd.DataFrame,
         write_json: bool,
-        draw_plot: bool,
         out_dir: Union[str, os.PathLike],
+        draw_box: bool = False,
+        draw_hist: bool = True,
     ):
         """Generate descriptive stats and figures for visit 2, 3 surveys."""
         # Set factor column, values
@@ -206,17 +227,30 @@ class _Visit23:
         report_dict.update(sur_stat.calc_factor_stats(fac_col, fac_a, fac_b))
         _flatten(report_dict)
 
-        # Write stats to JSON, draw boxplot
+        # Write stats to JSON
         if write_json:
             stat_out = os.path.join(out_dir, f"stats_{sur_name}.json")
             with open(stat_out, "w") as jf:
                 json.dump(report_dict, jf)
                 print(f"\tSaved descriptive stats : {stat_out}")
-        if draw_plot:
+
+        # Draw box and histogram plots
+        if draw_box:
             plot_out = os.path.join(
                 out_dir, f"plot_{sur_name}_boxplot-double.png"
             )
             sur_stat.draw_double_boxplot(
+                fac_col,
+                fac_a,
+                fac_b,
+                _get_title(sur_name),
+                plot_out,
+            )
+        if draw_hist:
+            plot_out = os.path.join(
+                out_dir, f"plot_{sur_name}_histogram-double.png"
+            )
+            sur_stat.draw_double_histogram(
                 fac_col,
                 fac_a,
                 fac_b,
@@ -239,14 +273,14 @@ class CalcRedcapQualtricsStats:
 
     Parameters
     ----------
-    proj_dir : path
+    proj_dir : str, os.PathLike
         Location of project's experiment directory
 
     Attributes
     ----------
     survey_descriptives : dict
         Generated descriptive stats for specified surveys
-    out_dir : path
+    out_dir : str, os.PathLike
         Output destination for generated files
 
     Methods
@@ -276,7 +310,6 @@ class CalcRedcapQualtricsStats:
     def gen_stats_plots(
         self,
         sur_list,
-        draw_plot,
         write_json,
     ):
         """Coordinate plot and statistic generation.
@@ -288,16 +321,12 @@ class CalcRedcapQualtricsStats:
         ----------
         sur_list : list
             REDCap or Qualtrics survey abbreviations
-        draw_plot : bool
-            Whether to generate, write figure
         write_json : bool
             Whether to save generated descriptive
             statistics to JSON
 
         """
         # Validate types, setup
-        if not isinstance(draw_plot, bool):
-            raise TypeError("Expected draw_plot type bool")
         if not isinstance(write_json, bool):
             raise TypeError("Expected type bool for write_json")
         self._setup()
@@ -317,9 +346,7 @@ class CalcRedcapQualtricsStats:
             v1 = _Visit1(self._proj_dir)
             v1.visit1_data()
             for sur_name in get_visit1:
-                v1.visit1_stats_plots(
-                    sur_name, write_json, draw_plot, self.out_dir
-                )
+                v1.visit1_stats_plots(sur_name, write_json, self.out_dir)
             self.survey_descriptives.update(v1.sur_descript)
 
         # Get visit2/3 redcap data, generate stats/plots
@@ -335,7 +362,6 @@ class CalcRedcapQualtricsStats:
                     v23._clean_visit23_rc["visit_day2"][sur_name],
                     v23._clean_visit23_rc["visit_day3"][sur_name],
                     write_json,
-                    draw_plot,
                     self.out_dir,
                 )
             self.survey_descriptives.update(v23.sur_descript)
@@ -349,7 +375,6 @@ class CalcRedcapQualtricsStats:
                     v23._clean_visit23_qual["visit_day2"][sur_name],
                     v23._clean_visit23_qual["visit_day3"][sur_name],
                     write_json,
-                    draw_plot,
                     self.out_dir,
                 )
             self.survey_descriptives.update(v23.sur_descript)
@@ -374,7 +399,7 @@ class CalcRedcapQualtricsStats:
 
 
 # %%
-def calc_task_stats(proj_dir, survey_list, draw_plot):
+def calc_task_stats(proj_dir, survey_list, draw_plot=True):
     """Calculate stats for in- and post-scanner surveys.
 
     Generate dataframes for the requested surveys, calculcate
@@ -384,12 +409,12 @@ def calc_task_stats(proj_dir, survey_list, draw_plot):
 
     Parameters
     ----------
-    proj_dir : path
+    proj_dir : str, os.PathLike
         Location of project's experiment directory
     survey_list : list
-        [rest | stim | task]
+        {"rest", "stim", "task"}
         Survey names, for triggering different workflows
-    draw_plot : bool
+    draw_plot : bool, optional
         Whether to draw plots
 
     Returns
@@ -477,7 +502,7 @@ def make_survey_table(proj_dir, sur_online, sur_scanner):
 
     Parameters
     ----------
-    proj_dir : path
+    proj_dir : str, os.PathLike
         Location of project's experiment directory
     sur_online : list
         All abbreviations for surveys done remotely
@@ -489,7 +514,6 @@ def make_survey_table(proj_dir, sur_online, sur_scanner):
     calc_rcq = CalcRedcapQualtricsStats(proj_dir)
     calc_rcq.gen_stats_plots(
         sur_online,
-        False,
         False,
     )
     data_rcq = calc_rcq.survey_descriptives
