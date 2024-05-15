@@ -35,24 +35,22 @@ def test_get_ids_qualtrics():
     assert "SV_emJra2UBm4Ulhqu" == ql_dict["EmoRep_Session_1"]
 
 
-def test_dl_redcap():
+def test_dl_redcap(fixt_dl_red):
     with pytest.raises(ValueError):
         _ = survey_download.dl_redcap(["foobar"])
 
-    rc_dict = survey_download.dl_redcap(["demographics", "bdi_day2"])
-    assert not rc_dict["demographics"][0]
-    assert isinstance(rc_dict["demographics"][1], pd.DataFrame)
-    assert "visit_day2" == rc_dict["bdi_day2"][0]
-    assert isinstance(rc_dict["bdi_day2"][1], pd.DataFrame)
+    assert not fixt_dl_red.red_dict["demographics"][0]
+    assert isinstance(fixt_dl_red.red_dict["demographics"][1], pd.DataFrame)
+    assert "visit_day2" == fixt_dl_red.red_dict["bdi_day2"][0]
+    assert isinstance(fixt_dl_red.red_dict["bdi_day2"][1], pd.DataFrame)
 
 
-def test_dl_qualtrics():
+def test_dl_qualtrics(fixt_dl_qual):
     with pytest.raises(ValueError):
         _ = survey_download.dl_qualtrics(["foobar"])
 
-    ql_dict = survey_download.dl_qualtrics(
-        ["EmoRep_Session_1", "Session 2 & 3 Survey"]
+    assert "visit_day1" == fixt_dl_qual.qual_dict["EmoRep_Session_1"][0]
+    assert "visit_day23" == fixt_dl_qual.qual_dict["Session 2 & 3 Survey"][0]
+    assert isinstance(
+        fixt_dl_qual.qual_dict["EmoRep_Session_1"][1], pd.DataFrame
     )
-    assert "visit_day1" == ql_dict["EmoRep_Session_1"][0]
-    assert "visit_day23" == ql_dict["Session 2 & 3 Survey"][0]
-    assert isinstance(ql_dict["EmoRep_Session_1"][1], pd.DataFrame)

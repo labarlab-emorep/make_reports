@@ -78,8 +78,7 @@ class GetRedcap(survey_clean.CleanRedcap):
     def __init__(self, proj_dir):
         """Initialize."""
         self._proj_dir = proj_dir
-        pilot_list = report_helper.pilot_list()
-        super().__init__(self._proj_dir, pilot_list)
+        super().__init__()
 
     def _download_redcap(self, survey_list: list) -> dict:
         """Get, write, and return RedCap survey info.

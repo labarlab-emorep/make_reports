@@ -27,13 +27,6 @@ class CleanRedcap:
     demographic dataframes for NIH/Duke reporting purposes but are
     removed from the BDI dataframes.
 
-    Parameters
-    ----------
-    proj_dir : str, os.PathLike
-        Location of project directory
-    pilot_list : list
-        Pilot participant IDs
-
     Attributes
     ----------
     df_study : pd.DataFrame
@@ -56,37 +49,10 @@ class CleanRedcap:
 
     """
 
-    def __init__(self, proj_dir, pilot_list):
-        """Initialize."""
-        self._proj_dir = proj_dir
-        self._pilot_list = pilot_list
+    def _dob_convert(self):
+        """Convert df_raw column 'dob' to datetime.date."""
 
-    def _dob_convert(self, dob_list):
-        """Helper method for _clean_demographics.
-
-        Resolves participant free date-of-birth responses by
-        interpreting and converting them into datetime objects.
-
-        Parameters
-        ----------
-        dob_list : list
-            Participant date-of-birth responses
-
-        Returns
-        -------
-        list
-            Participant date-of-birth datetime obj
-
-        Raises
-        ------
-        ValueError
-            When numeric dob response does not match expected formats
-        TypeError
-            When dob response does not match expected formats
-
-        """
-
-        # Manage nesting nightmare with inner function
+        # Sequester the conditional nightmare
         def _num_convert(dob):
             """Interpret numeric dates."""
             # Attempt to parse date string, account for formats
@@ -115,7 +81,7 @@ class CleanRedcap:
 
         # Convert each dob free response or redcap datetime
         dob_clean = []
-        for dob in dob_list:
+        for dob in self._df_raw["dob"].tolist():
             if dob in dob_switch:
                 dob_clean.append(pd.to_datetime(dob_switch[dob]).date())
             elif "/" in dob or "-" in dob:
@@ -126,62 +92,44 @@ class CleanRedcap:
                 dob_clean.append(_num_convert(dob))
             else:
                 raise TypeError(f"Unrecognized datetime str: {dob}.")
-        return dob_clean
+        self._df_raw["dob"] = dob_clean
 
-    def _get_educ_years(self):
-        """Get participant education level.
+    def _get_educ_years(self) -> list:
+        """Convert df_raw column 'years_education' to accurate years."""
 
-        Use info from years_education column when they are numeric,
-        otherwise use educate_switch to convert from level_education
-        to number of years.
-
-        Returns
-        -------
-        list
-            Years of participant education (int)
-
-        """
-        # Convert education level to years
-        educate_switch = {2: 12, 3: 13, 4: 14, 5: 16, 6: 17, 7: 18, 8: 20}
-        year_str_switch = {
+        # Switch level to years, including special cases
+        level_switch = {2: 12, 3: 13, 4: 14, 5: 16, 6: 17, 7: 18, 8: 20}
+        spec_switch = {
             "1984": 20,
             "PhD degree (18 years of school in total)": 18,
             "Undergraduate Degree": 16,
         }
 
-        # Get education level, and self-report of years educated
+        # Convert education into years
         edu_year = self._df_raw["years_education"].tolist()
         edu_level = self._df_raw["level_education"].tolist()
-        record_id = self._df_raw["record_id"].tolist()
-
-        # Convert education into years
         subj_educate = []
-        for _year, _level, _id in zip(edu_year, edu_level, record_id):
+        for year, level in zip(edu_year, edu_level):
+
             # Patch education level issues, deal with self-reports
-            if _year in year_str_switch.keys():
-                edu_value = year_str_switch[_year]
+            if year in spec_switch.keys():
+                edu_value = spec_switch[year]
             else:
                 try:
-                    edu_value = int(_year)
+                    edu_value = int(year)
                 except ValueError:
-                    edu_value = educate_switch[_level]
+                    edu_value = level_switch[level]
 
             # Adjust for self-report years vs education level
-            if edu_value <= 12 and _level >= 3:
-                edu_value = educate_switch[_level]
+            if edu_value <= 12 and level >= 3:
+                edu_value = level_switch[level]
 
             subj_educate.append(edu_value)
-        return subj_educate
+        self._df_raw["years_education"] = subj_educate
 
     def _clean_city_state(self):
-        """Fix city-of-birth free response.
-
-        Account for formats:
-            - San Jose
-            - San Jose, California
-            - San Jose CA
-
-        """
+        """Fix city-of-birth free response."""
+        # Accound for formats San Jose; San Jose, California; San Jose CA
         self._df_raw = self._df_raw.rename(columns={"city": "city-state"})
         city_state = self._df_raw["city-state"].tolist()
         city_list = []
@@ -205,9 +153,9 @@ class CleanRedcap:
             city_list.append(h_city)
             state_list.append(h_state)
 
+        # Make new columns, reorder columns
         self._df_raw["city"] = city_list
         self._df_raw["state"] = state_list
-
         self._df_raw = self._df_raw.drop("city-state", axis=1)
         col_reorder = [
             "record_id",
@@ -290,19 +238,12 @@ class CleanRedcap:
         """
         self._df_raw = df_raw
 
-        # Reorder columns, drop rows without last name response
-        col_names = self._df_raw.columns.tolist()
-        col_reorder = col_names[-1:] + col_names[-2:-1] + col_names[:-2]
-        self._df_raw = self._df_raw[col_reorder]
+        # Drop rows without last name response
         self._df_raw = self._df_raw[self._df_raw["lastname"].notna()]
 
-        # Convert DOB response to datetime
-        dob_list = self._df_raw["dob"].tolist()
-        dob_clean = self._dob_convert(dob_list)
-        self._df_raw["dob"] = dob_clean
-
-        # Fix years of education
-        self._df_raw["years_education"] = self._get_educ_years()
+        # Convert DOB response to datetime, fix years of education
+        self._dob_convert()
+        self._get_educ_years()
 
         # Fix place of birth, middle name responses
         self._clean_city_state()
@@ -327,9 +268,9 @@ class CleanRedcap:
 
         # Determine pilot subj Id
         if alpha_subjid:
-            pilot_list = self._pilot_list
+            pilot_list = report_helper.pilot_list()
         else:
-            pilot_list = [int(x[-1]) for x in self._pilot_list]
+            pilot_list = [int(x[-1]) for x in report_helper.pilot_list()]
 
         # Mask pilot, study subjs
         idx_pilot = self._df_raw[
