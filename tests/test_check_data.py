@@ -4,6 +4,7 @@ import math
 from make_reports.resources import check_data
 
 
+@pytest.mark.chk_data
 class Test_ChkRsc:
 
     @pytest.fixture(autouse=True)
@@ -87,6 +88,7 @@ class Test_ChkRsc:
         ]
 
 
+@pytest.mark.chk_data
 class Test_CheckEmorep:
 
     @pytest.fixture(autouse=True)
@@ -150,6 +152,7 @@ class Test_CheckEmorep:
         ) == chk_dict["deface"]
 
 
+@pytest.mark.chk_data
 def test_CheckMri_emorep():
     # Setup to instantiate CheckMri for EmoRep
     emorep_dir = os.path.join(
@@ -186,6 +189,7 @@ def test_CheckMri_emorep():
     assert "2023-12-07" == chk_mri.df_mri.loc[2, "fsl-sep-first"]
 
 
+@pytest.mark.chk_data
 class TestCheckMri:
 
     @pytest.fixture(autouse=True)

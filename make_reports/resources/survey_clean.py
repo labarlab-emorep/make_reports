@@ -347,7 +347,8 @@ class CleanRedcap:
     def clean_guid(self, df_raw):
         """Cleaning method for RedCap GUID survey.
 
-        Only return participants who have an assigned GUID.
+        Only return participants who have an assigned GUID. Also
+        updates db_emorep.ref_subj.
 
         Parameters
         ----------
@@ -392,7 +393,7 @@ class CleanRedcap:
             Clean bdi info for pilot participants
 
         """
-        # Rename then remove unneeded columns, reorder
+        # Rename and remove unneeded columns, reorder
         drop_list = ["guid_timestamp", "redcap_survey_identifier"]
         df_raw = df_raw.drop(drop_list, axis=1)
         if "q_1_v2" in df_raw.columns.tolist():
@@ -450,15 +451,6 @@ class CleanQualtrics:
     Find downloaded original/raw Qualtrics survey responses, and
     convert values into usable dataframe tyeps and formats.
 
-    Parameters
-    ----------
-    proj_dir : str, os.PathLike
-        Location of project directory
-    pilot_list : list
-        Pilot participant IDs
-    withdrew_list : list
-        Participants IDs who withdrew consent
-
     Attributes
     ----------
     data_study : dict
@@ -479,11 +471,12 @@ class CleanQualtrics:
 
     """
 
-    def __init__(self, proj_dir, pilot_list, withdrew_list):
+    def __init__(self):
         """Initialize."""
-        self._proj_dir = proj_dir
-        self._pilot_list = pilot_list
-        self._withdrew_list = withdrew_list
+        self._pilot_list = report_helper.pilot_list()
+        part_comp = report_helper.CheckStatus()
+        part_comp.status_change("withdrew")
+        self._withdrew_list = [x for x in part_comp.all.keys()]
 
     def clean_session_1(self, df_raw):
         """Cleaning method for visit 1 surveys.
@@ -564,6 +557,8 @@ class CleanQualtrics:
             ].index.tolist()
             df_pilot = df_sur.loc[idx_pilot]
             df_study = df_sur.loc[idx_study]
+            df_pilot.reset_index(drop=True, inplace=True)
+            df_study.reset_index(drop=True, inplace=True)
 
             # Update dictionaries
             data_pilot[sur_name] = df_pilot
@@ -661,6 +656,8 @@ class CleanQualtrics:
                 ].index.tolist()
                 df_pilot = df_sub.loc[idx_pilot]
                 df_study = df_sub.loc[idx_study]
+                df_pilot.reset_index(drop=True, inplace=True)
+                df_study.reset_index(drop=True, inplace=True)
 
                 # Update dicts
                 data_study[f"visit_{day_str}"][sur_key] = df_study
@@ -758,6 +755,7 @@ class CleanQualtrics:
         ]
         self._df_study = pd.DataFrame(columns=out_names)
         df_pilot = pd.DataFrame(columns=out_names)
+        df_pilot.reset_index(drop=True, inplace=True)
 
         # Update self._df_raw with each participant's responses
         self._stim_keys()
@@ -776,6 +774,8 @@ class CleanQualtrics:
         )
         df_study_day2 = self._df_study[sess_mask]
         df_study_day3 = self._df_study[~sess_mask]
+        df_study_day2.reset_index(drop=True, inplace=True)
+        df_study_day3.reset_index(drop=True, inplace=True)
 
         # Make ouput attributes, just use df_pilot as filler
         self.data_study = {

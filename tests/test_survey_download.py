@@ -3,6 +3,7 @@ import pandas as pd
 from make_reports.resources import survey_download
 
 
+@pytest.mark.rep_get
 def test_dl_mri_log():
     df = survey_download.dl_mri_log()
     assert 2 == df.shape[1]
@@ -10,6 +11,7 @@ def test_dl_mri_log():
     assert ["day2", "day3"] == df.Visit.unique().tolist()
 
 
+@pytest.mark.rep_get
 def test_dl_completion_log():
     df = survey_download.dl_completion_log()
     assert 27 == df.shape[1]
@@ -18,6 +20,7 @@ def test_dl_completion_log():
     assert 2 == df.loc[4, "completion_log_complete"]
 
 
+@pytest.mark.rep_get
 def test_get_ids_redcap():
     with pytest.raises(ValueError):
         _ = survey_download._get_ids("foobar")
@@ -28,6 +31,7 @@ def test_get_ids_redcap():
     assert "48985" == rc_dict["bdi_day3"]
 
 
+@pytest.mark.rep_get
 def test_get_ids_qualtrics():
     ql_dict = survey_download._get_ids("qualtrics")
     assert "duke" == ql_dict["organization_ID"]
@@ -35,6 +39,7 @@ def test_get_ids_qualtrics():
     assert "SV_emJra2UBm4Ulhqu" == ql_dict["EmoRep_Session_1"]
 
 
+@pytest.mark.rep_get
 def test_dl_redcap(fixt_dl_red):
     with pytest.raises(ValueError):
         _ = survey_download.dl_redcap(["foobar"])
@@ -45,6 +50,7 @@ def test_dl_redcap(fixt_dl_red):
     assert isinstance(fixt_dl_red.red_dict["bdi_day2"][1], pd.DataFrame)
 
 
+@pytest.mark.rep_get
 def test_dl_qualtrics(fixt_dl_qual):
     with pytest.raises(ValueError):
         _ = survey_download.dl_qualtrics(["foobar"])

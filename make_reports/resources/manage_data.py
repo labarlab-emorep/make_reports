@@ -23,7 +23,6 @@ import numpy as np
 from multiprocessing import Pool
 from make_reports.resources import survey_download
 from make_reports.resources import survey_clean
-from make_reports.resources import report_helper
 from make_reports.resources import sql_database
 
 
@@ -261,11 +260,7 @@ class GetQualtrics(survey_clean.CleanQualtrics):
     def __init__(self, proj_dir):
         """Initialize."""
         self._proj_dir = proj_dir
-        pilot_list = report_helper.pilot_list()
-        part_comp = report_helper.CheckStatus()
-        part_comp.status_change("withdrew")
-        withdrew_list = [x for x in part_comp.all.keys()]
-        super().__init__(self._proj_dir, pilot_list, withdrew_list)
+        super().__init__()
 
     def _download_qualtrics(self, survey_list: list) -> dict:
         """Get, write, and return Qualtrics survey info.
