@@ -1772,21 +1772,57 @@ class NdarIec01(_CleanDemo):
         self._df_als["als_datetime"] = pd.to_datetime(self._df_als["datetime"])
         self._df_als["als_datetime"] = self._df_als["als_datetime"].dt.date
         self._df_als["src_subject_id"] = self._df_als["study_id"]
+        self._df_als.drop("datetime", axis=1, inplace=True)
 
     def _proc_bdi(self):
         """Process df_bdi_day2 for required input."""
         # Prep df for merge
+        self._df_bdi["bdi_datetime"] = pd.to_datetime(self._df_bdi["datetime"])
+        self._df_bdi["bdi_datetime"] = self._df_bdi["bdi_datetime"].dt.date
         self._df_bdi["src_subject_id"] = self._df_bdi["study_id"]
+        self._df_bdi.drop("datetime", axis=1, inplace=True)
 
         # Sum values
         val_cols = [x for x in self._df_bdi.columns if "BDI" in x]
         self._df_bdi["bdi_sum"] = self._df_bdi[val_cols].sum(axis=1)
 
-        # Determine exclusion criteria
-        self._df_bdi["excl_crit3"] = 0
-        self._df_bdi.loc[self._df_bdi.bdi_sum > 14, "excl_crit3"] = 1
+        # Determine excl4 criterion
         self._df_bdi["excl_crit4"] = 0
         self._df_bdi.loc[self._df_bdi.BDI_9 > 2, "excl_crit4"] = 1
+
+        # Determine excl3 criterion
+        self._df_bdi["excl_crit3"] = np.nan
+        self._df_bdi.loc[
+            self._df_bdi.bdi_datetime >= self._bdi_change_date, "excl_crit3"
+        ] = 0
+        self._df_bdi.loc[
+            (self._df_bdi["bdi_sum"] > 20)
+            & (self._df_bdi["bdi_datetime"] >= self._bdi_change_date),
+            "excl_crit3",
+        ] = 1
+
+        # Determine excl3_alt criterion
+        self._df_bdi["excl_crit3_alt"] = np.nan
+        self._df_bdi.loc[
+            self._df_bdi.bdi_datetime < self._bdi_change_date, "excl_crit3_alt"
+        ] = 0
+        self._df_bdi.loc[
+            (self._df_bdi["bdi_sum"] > 14)
+            & (self._df_bdi["bdi_datetime"] < self._bdi_change_date),
+            "excl_crit3_alt",
+        ] = 1
+
+        # Account for missing BDI datetimes, add value to excl3
+        self._df_bdi.loc[
+            (self._df_bdi["bdi_datetime"].isna())
+            & (self._df_bdi["excl_crit3"].isna()),
+            "excl_crit3",
+        ] = 0
+        self._df_bdi.loc[
+            (self._df_bdi["bdi_datetime"].isna())
+            & (self._df_bdi["bdi_sum"] > 20),
+            "excl_crit3",
+        ] = 1
 
     def _proc_pre(self):
         """Process df_pre for required input."""
@@ -1851,7 +1887,11 @@ class NdarIec01(_CleanDemo):
             self._df_all.interview_date > self._df_all.als_datetime,
             "incl_crit1",
         ] = 0
-        self._df_all = self._df_all.fillna(888)
+
+        # Manage NaNs, account for meaningful NANs in excl_crit3
+        # and excl_crit3_alt.
+        not_excl3 = [x for x in self._df_all.columns if "excl_crit3" not in x]
+        self._df_all[not_excl3] = self._df_all[not_excl3].fillna(888)
 
         # Manage remaining int types (not found in proc_pre)
         # for persnickety validation.
@@ -1878,7 +1918,8 @@ class NdarIec01(_CleanDemo):
             ],
             "interview_age": self._df_all["interview_age"],
             "sex": self._df_all["sex"],
-            # "exclusion_crit3": self._df_all["excl_crit3"], # Waiting for NDA to add another field # noqa: E501
+            "exclusion_crit3": self._df_all["excl_crit3"],
+            "exclusion_crit3_alt": self._df_all["excl_crit3_alt"],
             "exclusion_crit4": self._df_all["excl_crit4"],
             "exclusion_crit5": self._df_all["excl_crit5"],
             "exclusion_crit6": self._df_all["excl_crit6"],
