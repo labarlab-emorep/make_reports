@@ -19,6 +19,12 @@ from make_reports.resources import report_helper
 class DbConnect:
     """Connect to mysql server and update db_emorep.
 
+    Parameters
+    ----------
+    db_name : str, optional
+        {"db_emorep", "db_emorep_unittest"}
+        Name of MySQL database
+
     Attributes
     ----------
     con : mysql.connector.connection_cext.CMySQLConnection
@@ -32,6 +38,8 @@ class DbConnect:
         Yield cursor
     exec_many()
         Update mysql db_emorep.tbl_* with multiple values
+    fetch_rows()
+        Return fetchall rows
 
     Notes
     -----
@@ -46,18 +54,21 @@ class DbConnect:
     )
     tbl_input = [(9, "ER0009"), (16, "ER0016")]
     db_con.exec_many(sql_cmd, tbl_input)
+    subj_rows = db_con.fetch_rows("select * from ref_subj")
     db_con.close_con()
 
     """
 
-    def __init__(self):
+    def __init__(self, db_name="db_emorep"):
         """Set db_con attr as mysql connection."""
         report_helper.check_sql_pass()
+        if db_name not in ["db_emorep", "db_emorep_unittest"]:
+            raise ValueError("Unexpected db_name")
         self.con = mysql.connector.connect(
             host="localhost",
             user=os.environ["USER"],
             password=os.environ["SQL_PASS"],
-            database="db_emorep",
+            database=db_name,
         )
 
     @contextmanager
@@ -71,8 +82,8 @@ class DbConnect:
 
     def exec_many(self, sql_cmd: str, value_list: list):
         """Update db_emorep via executemany."""
-        with self._con_cursor() as con:
-            con.executemany(sql_cmd, value_list)
+        with self._con_cursor() as cur:
+            cur.executemany(sql_cmd, value_list)
             self.con.commit()
 
     def fetch_rows(self, sql_cmd: str) -> list:
