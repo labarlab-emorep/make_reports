@@ -190,3 +190,23 @@ def simulate_demographics() -> pd.DataFrame:
         "record_id": [1, 2, 3, 4, 5, 6, 7, 8],
     }
     return pd.DataFrame.from_dict(demo_dict)
+
+
+def simulate_bdi() -> pd.DataFrame:
+    """Return simulated BDI data."""
+    bdi_dict = {
+        "study_id": ["ER01", "ER02", "ER03", "ER01", "ER02", "ER03"],
+        "sess_id": ["day2", "day2", "day2", "day3", "day3", "day3"],
+        "datetime": [
+            "2020-01-15",
+            "2020-01-15",
+            "2020-01-15",
+            "2020-01-16",
+            "2020-01-16",
+            "2020-01-16",
+        ],
+        "BDI_1": [1, 0, 0, 2, 0, 0],
+        "BDI_2": [0, 1, 0, 0, 2, 0],
+        "BDI_3": [0, 0, 1, 0, 0, 2],
+    }
+    return pd.DataFrame.from_dict(bdi_dict)

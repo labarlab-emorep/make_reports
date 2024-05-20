@@ -145,18 +145,21 @@ class _Recipes:
     ):
         """Update mysql db_emorep.ref_subj."""
         print("\tUpdating db_emorep.ref_subj ...")
-        for chk_col in ["subj_id", subj_col]:
-            if chk_col not in df.columns:
-                raise KeyError(
-                    f"Expected col {chk_col} in df, found : {df.columns}"
-                )
-        tbl_input = list(
-            df[["subj_id", subj_col]].itertuples(index=False, name=None)
-        )
+        col_list = ["subj_id", subj_col]
+        self._validate_cols(df, col_list)
+        tbl_input = list(df[col_list].itertuples(index=False, name=None))
         self._db_con.exec_many(
             "insert ignore into ref_subj (subj_id, subj_name) values (%s, %s)",
             tbl_input,
         )
+
+    def _validate_cols(self, df: pd.DataFrame, col_list: list):
+        """Raise error is missing column."""
+        for col_name in col_list:
+            if col_name not in df.columns:
+                raise KeyError(
+                    f"Expected col '{col_name}' in df, found : {df.columns}"
+                )
 
     def insert_survey_date(
         self,
@@ -166,6 +169,10 @@ class _Recipes:
     ):
         """Update mysql db_emorep.tbl_survey_date."""
         print(f"\tUpdating db_emorep.tbl_survey_date for {sur_low} ...")
+
+        # Validate df
+        col_list = ["subj_id", "sess_id", date_col]
+        self._validate_cols(df, col_list)
 
         # Prep df, manage NAN
         df = df.copy()
@@ -188,11 +195,9 @@ class _Recipes:
     def insert_basic_tbl(self, df: pd.DataFrame, sur_low: str):
         """Update mysql db_emorep for common (REDCap, Qualtrics) tables."""
         print(f"\tUpdating db_emorep.tbl_{sur_low} ...")
-        tbl_input = list(
-            df[["subj_id", "sess_id", "item", "resp"]].itertuples(
-                index=False, name=None
-            )
-        )
+        col_list = ["subj_id", "sess_id", "item", "resp"]
+        self._validate_cols(df, col_list)
+        tbl_input = list(df[col_list].itertuples(index=False, name=None))
         self._db_con.exec_many(
             f"insert ignore into tbl_{sur_low} "
             + f"(subj_id, sess_id, item_{sur_low}, resp_{sur_low}) "
@@ -207,22 +212,20 @@ class _Recipes:
     def insert_demographics(self, df: pd.DataFrame):
         """Update db_emorep.tbl_demographics."""
         self._print_tbl_out("demographics")
-        tbl_input = list(
-            df[
-                [
-                    "subj_id",
-                    "sess_id",
-                    "age",
-                    "interview_age",
-                    "years_education",
-                    "sex",
-                    "handedness",
-                    "race",
-                    "is_hispanic",
-                    "is_minority",
-                ]
-            ].itertuples(index=False, name=None)
-        )
+        col_list = [
+            "subj_id",
+            "sess_id",
+            "age",
+            "interview_age",
+            "years_education",
+            "sex",
+            "handedness",
+            "race",
+            "is_hispanic",
+            "is_minority",
+        ]
+        self._validate_cols(df, col_list)
+        tbl_input = list(df[col_list].itertuples(index=False, name=None))
         self._db_con.exec_many(
             "insert ignore into tbl_demographics "
             + "(subj_id, sess_id, age_yrs, age_mos, edu_yrs, "
@@ -231,27 +234,26 @@ class _Recipes:
             tbl_input,
         )
 
+    def _build_cols(self, col_list):
+        return "(" + ", ".join(col_list) + ")"
+
     def insert_psr(self, df: pd.DataFrame, sur_low: str):
         """Update mysql db_emorep.tbl_post_scan_ratings."""
         self._print_tbl_out(sur_low)
-        tbl_input = list(
-            df[
-                [
-                    "subj_id",
-                    "sess_id",
-                    "task_id",
-                    "emo_id",
-                    "stim_name",
-                    "resp_arousal",
-                    "resp_endorse",
-                    "resp_valence",
-                ]
-            ].itertuples(index=False, name=None)
-        )
+        col_list = [
+            "subj_id",
+            "sess_id",
+            "task_id",
+            "emo_id",
+            "stim_name",
+            "resp_arousal",
+            "resp_endorse",
+            "resp_valence",
+        ]
+        self._validate_cols(df, col_list)
+        tbl_input = list(df[col_list].itertuples(index=False, name=None))
         self._db_con.exec_many(
-            f"insert ignore into tbl_{sur_low} "
-            + "(subj_id, sess_id, task_id, emo_id, stim_name,"
-            + " resp_arousal, resp_endorse, resp_valence)"
+            f"insert ignore into tbl_{sur_low} {self._build_cols(col_list)}"
             + " values (%s, %s, %s, %s, %s, %s, %s, %s)",
             tbl_input,
         )
@@ -259,60 +261,50 @@ class _Recipes:
     def insert_rest_ratings(self, df: pd.DataFrame, sur_low: str):
         """Update mysql db_emorep.tbl_rest_ratings."""
         self._print_tbl_out(sur_low)
-        tbl_input = list(
-            df[
-                [
-                    "subj_id",
-                    "sess_id",
-                    "task_id",
-                    "emo_id",
-                    "resp_int",
-                    "resp_alpha",
-                ]
-            ].itertuples(index=False, name=None)
-        )
+        col_list = [
+            "subj_id",
+            "sess_id",
+            "task_id",
+            "emo_id",
+            "resp_int",
+            "resp_alpha",
+        ]
+        self._validate_cols(df, col_list)
+        tbl_input = list(df[col_list].itertuples(index=False, name=None))
         self._db_con.exec_many(
-            f"insert ignore into tbl_{sur_low} "
-            + "(subj_id, sess_id, task_id, emo_id, resp_int, resp_alpha) "
-            + "values (%s, %s, %s, %s, %s, %s)",
+            f"insert ignore into tbl_{sur_low} {self._build_cols(col_list)}"
+            + " values (%s, %s, %s, %s, %s, %s)",
             tbl_input,
         )
 
     def insert_in_scan_ratings(self, df: pd.DataFrame, sur_low: str):
         """Update mysql db_emorep.tbl_in_scan_ratings."""
         self._print_tbl_out(sur_low)
-        tbl_input = list(
-            df[
-                [
-                    "subj_id",
-                    "sess_id",
-                    "task_id",
-                    "run",
-                    "block_id",
-                    "resp_emo_id",
-                    "resp_intensity",
-                ]
-            ].itertuples(index=False, name=None)
-        )
+        col_list = [
+            "subj_id",
+            "sess_id",
+            "task_id",
+            "run",
+            "block_id",
+            "resp_emo_id",
+            "resp_intensity",
+        ]
+        self._validate_cols(df, col_list)
+        tbl_input = list(df[col_list].itertuples(index=False, name=None))
         self._db_con.exec_many(
-            f"insert ignore into tbl_{sur_low} "
-            + "(subj_id, sess_id, task_id, run, block_id, "
-            + "resp_emo_id, resp_intensity) "
-            + "values (%s, %s, %s, %s, %s, %s, %s)",
+            f"insert ignore into tbl_{sur_low} {self._build_cols(col_list)}"
+            + " values (%s, %s, %s, %s, %s, %s, %s)",
             tbl_input,
         )
 
     def insert_ref_sess_task(self, df: pd.DataFrame):
         """Update mysql db_emorep.ref_sess_task."""
-        tbl_input = list(
-            df[["subj_id", "sess_id", "task_id"]].itertuples(
-                index=False, name=None
-            )
-        )
+        col_list = ["subj_id", "sess_id", "task_id"]
+        self._validate_cols(df, col_list)
+        tbl_input = list(df[col_list].itertuples(index=False, name=None))
         self._db_con.exec_many(
-            "insert ignore into ref_sess_task "
-            + "(subj_id, sess_id, task_id)"
-            + "values (%s, %s, %s)",
+            f"insert ignore into ref_sess_task {self._build_cols(col_list)}"
+            + " values (%s, %s, %s)",
             tbl_input,
         )
 
