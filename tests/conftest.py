@@ -1,4 +1,5 @@
 import pytest
+import os
 from typing import Iterator
 from make_reports.resources import survey_download
 from make_reports.resources import survey_clean
@@ -16,10 +17,25 @@ def fixt_setup() -> Iterator[SupplyVars]:
     #
     helper.check_test_env()
 
+    #
+    test_dir = (
+        "/mnt/keoki/experiments2/EmoRep/Exp2_Compute_Emotion"
+        + "/code/unit_test/make_reports"
+    )
+    test_emorep = os.path.join(test_dir, "emorep")
+    test_archival = os.path.join(test_dir, "archival")
+    for _dir in [test_emorep, test_archival]:
+        if not os.path.exists(_dir):
+            os.makedirs(_dir)
+
     sup_vars = SupplyVars()
     sup_vars.proj_name1 = "emorep"
     sup_vars.proj_name2 = "archival"
+    sup_vars.test_emorep = test_emorep
     yield sup_vars
+
+
+# TODO make teardown
 
 
 @pytest.fixture(scope="session")

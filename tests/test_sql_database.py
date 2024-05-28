@@ -1,5 +1,6 @@
 import pytest
 import pandas as pd
+import pandas.api.types as ptypes
 from make_reports.resources import sql_database
 import helper
 
@@ -311,12 +312,112 @@ class Test_Recipes:
         assert 4 == data_chk[0][2]
 
 
-def test_TaskMaps():
-    pass
+class Test_TaskMaps:
+
+    @pytest.fixture(autouse=True)
+    def _setup(self, fixt_database):
+        self.task_map = sql_database._TaskMaps(fixt_database)
+
+    def test_init(self):
+        assert hasattr(self.task_map, "_ref_task")
+        assert hasattr(self.task_map, "_ref_emo")
+
+    def test_load_refs(self):
+        ref_task = {"movies": 1, "scenarios": 2}
+        assert ref_task == self.task_map._ref_task
+        assert "amusement" in list(self.task_map._ref_emo.keys())
+        assert 1 == self.task_map._ref_emo["amusement"]
+
+    def test_task_label(self):
+        ref_dict = {"stim-mov": "movies", "stim-sce": "scenarios"}
+        assert 1 == self.task_map.task_label(ref_dict, "stim-mov")
+        assert 2 == self.task_map.task_label(ref_dict, "stim-sce")
+
+    def test_emo_label(self):
+        ref_emo = {"emo-amu": "amusement", "emo-ang": "anger"}
+        assert 1 == self.task_map.emo_label(ref_emo, "emo-amu")
+        assert 2 == self.task_map.emo_label(ref_emo, "emo-ang")
 
 
-def test_PrepPsr():
-    pass
+@pytest.mark.rep_get
+@pytest.mark.long
+class Test_PrepPsr:
+
+    @pytest.fixture(autouse=True)
+    def _setup(self, fixt_database, fixt_cl_qual):
+        df = fixt_cl_qual.post_data["visit_day2"]["post_scan_ratings"].copy()
+        df["subj_id"] = df["study_id"].str[2:].astype(int)
+        df["sess_id"] = 2
+        self.prep_psr = sql_database._PrepPsr(df, fixt_database)
+        self.prep_psr.prep_dfs()
+
+    @pytest.mark.dependency()
+    def test_prep_dfs(self):
+        assert hasattr(self.prep_psr, "df_tidy")
+        assert hasattr(self.prep_psr, "df_date")
+
+    @pytest.mark.dependency(depends=["Test_PrepPsr::test_prep_dfs"])
+    def test_prep_tidy_shape(self):
+        # Test shape, column names needed by sql table
+        print(self.prep_psr.df_tidy.info())
+        assert 13 == self.prep_psr.df_tidy.shape[1]
+
+        col_int = [
+            "subj_id",
+            "sess_id",
+            "task_id",
+            "emo_id",
+            "resp_arousal",
+            "resp_valence",
+        ]
+        col_str = ["stim_name", "resp_endorse"]
+        col_all = col_int + col_str
+        for chk_col in col_all:
+            assert chk_col in list(self.prep_psr.df_tidy.columns)
+
+        # Test column types
+        assert all(
+            ptypes.is_numeric_dtype(self.prep_psr.df_tidy[col])
+            for col in col_int
+        )
+        assert all(
+            ptypes.is_string_dtype(self.prep_psr.df_tidy[col])
+            for col in col_str
+        )
+
+    @pytest.mark.dependency(
+        depends=[
+            "Test_PrepPsr::test_prep_dfs",
+            "Test_PrepPsr::test_prep_tidy_shape",
+        ]
+    )
+    def test_prep_tidy_data(self):
+        assert 9 == self.prep_psr.df_tidy.loc[0, "subj_id"]
+        assert 2 == self.prep_psr.df_tidy.loc[0, "sess_id"]
+        assert 1 == self.prep_psr.df_tidy.loc[0, "task_id"]
+        assert 1 == self.prep_psr.df_tidy.loc[0, "emo_id"]
+        assert "00001.mp4" == self.prep_psr.df_tidy.loc[0, "stim_name"]
+        assert "Amusement" == self.prep_psr.df_tidy.loc[0, "resp_endorse"]
+        assert 2 == self.prep_psr.df_tidy.loc[0, "resp_arousal"]
+        assert 6 == self.prep_psr.df_tidy.loc[0, "resp_valence"]
+
+    @pytest.mark.dependency(depends=["Test_PrepPsr::test_prep_dfs"])
+    def test_prep_date_shape(self):
+        assert 3 == self.prep_psr.df_date.shape[1]
+        assert ["subj_id", "sess_id", "datetime"] == list(
+            self.prep_psr.df_date.columns
+        )
+
+    @pytest.mark.dependency(
+        depends=[
+            "Test_PrepPsr::test_prep_dfs",
+            "Test_PrepPsr::test_prep_date_shape",
+        ]
+    )
+    def test_prep_date_data(self):
+        assert 9 == self.prep_psr.df_date.loc[0, "subj_id"]
+        assert 2 == self.prep_psr.df_date.loc[0, "sess_id"]
+        assert "2022-04-22" == self.prep_psr.df_date.loc[0, "datetime"]
 
 
 def test_DbUpdate():

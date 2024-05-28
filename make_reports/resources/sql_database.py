@@ -329,13 +329,13 @@ class _TaskMaps:
             for x in self._db_con.fetch_rows("select * from ref_emo")
         }
 
-    def task_label(self, row, row_name) -> int:
+    def task_label(self, row: dict, row_name: str) -> int:
         """Return task ID given task name."""
         for task_name, task_id in self._ref_task.items():
             if row[row_name] == task_name:
                 return task_id
 
-    def emo_label(self, row, row_name) -> int:
+    def emo_label(self, row: dict, row_name: str) -> int:
         """Return emotion ID given emotion name."""
         for emo_name, emo_id in self._ref_emo.items():
             if row[row_name] == emo_name:
@@ -348,14 +348,10 @@ class _PrepPsr(_TaskMaps):
     def __init__(
         self,
         df: pd.DataFrame,
-        sess_id: int,
         db_con: Type[DbConnect],
-        subj_col: str = "study_id",
     ):
         """Initialize."""
         self._df = df
-        self._sess_id = sess_id
-        self._subj_col = subj_col
         super().__init__(db_con)
 
     def prep_dfs(self):
@@ -421,7 +417,7 @@ class _PrepPsr(_TaskMaps):
         idx = list(np.unique(self.df_tidy["subj_id"], return_index=True)[1])
         self.df_date = self.df_tidy.loc[
             idx, ["subj_id", "sess_id", "datetime"]
-        ]
+        ].copy()
 
 
 # %%
@@ -521,7 +517,7 @@ class DbUpdate(_Recipes, _DfManip, _TaskMaps):
         """Update db_emorep tables with qualtrics data."""
         # Treat post_scan_ratings specifically
         if self._sur_name == "post_scan_ratings":
-            prep_psr = _PrepPsr(self._df.copy(), self._sess_id, self._db_con)
+            prep_psr = _PrepPsr(self._df.copy(), self._db_con)
             prep_psr.prep_dfs()
             self.insert_psr(prep_psr.df_tidy, self._sur_low)
             self.insert_survey_date(prep_psr.df_date, self._sur_low)
