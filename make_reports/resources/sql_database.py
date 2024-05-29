@@ -428,6 +428,12 @@ class DbUpdate(_Recipes, _DfManip, _TaskMaps):
 
     Inherits _Recipes, _DfManip, _TaskMaps.
 
+    Parameters
+    ----------
+    db_name : str, optional
+        {"db_emorep", "db_emorep_unittest"}
+        Name of MySQL database
+
     Methods
     -------
     update_db(*args)
@@ -443,9 +449,11 @@ class DbUpdate(_Recipes, _DfManip, _TaskMaps):
 
     """
 
-    def __init__(self):
+    def __init__(self, db_name="db_emorep"):
         """Initialize."""
-        self._db_con = DbConnect()
+        if db_name not in ["db_emorep", "db_emorep_unittest"]:
+            raise ValueError("Unexpected db_name")
+        self._db_con = DbConnect(db_name=db_name)
         _Recipes.__init__(self, self._db_con)
         _TaskMaps.__init__(self, self._db_con)
 

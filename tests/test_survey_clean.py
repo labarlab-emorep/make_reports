@@ -247,5 +247,43 @@ class TestCleanQualtrics:
         assert "Amusement" == df.loc[1, "response"]
 
 
-def test_clean_rest_ratings():
-    pass
+def test_clean_rest_ratings(fixt_org_rest):
+    # Check errors raised
+    with pytest.raises(ValueError):
+        _ = survey_clean.clean_rest_ratings("foo", "bar")
+    with pytest.raises(FileNotFoundError):
+        _ = survey_clean.clean_rest_ratings("day2", "bar")
+
+    # Get dataframe, test structure
+    df = fixt_org_rest.df
+    assert (2, 20) == df.shape
+    col_names = [
+        "study_id",
+        "visit",
+        "task",
+        "datetime",
+        "resp_type",
+        "AMUSEMENT",
+        "ANGER",
+        "ANXIETY",
+        "AWE",
+        "CALMNESS",
+        "CRAVING",
+        "DISGUST",
+        "EXCITEMENT",
+        "FEAR",
+        "HORROR",
+        "JOY",
+        "NEUTRAL",
+        "ROMANCE",
+        "SADNESS",
+        "SURPRISE",
+    ]
+    assert col_names == list(df.columns)
+
+    # Check some data
+    assert "ER0016" == df.loc[0, "study_id"]
+    assert "day2" == df.loc[0, "visit"]
+    assert "scenarios" == df.loc[0, "task"]
+    assert 1 == df.loc[0, "SURPRISE"]
+    assert "Not At All" == df.loc[1, "SURPRISE"]

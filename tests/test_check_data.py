@@ -8,13 +8,10 @@ from make_reports.resources import check_data
 class Test_ChkRsc:
 
     @pytest.fixture(autouse=True)
-    def _setup(self):
+    def _setup(self, fixt_setup):
         self.chk_rsc = check_data._ChkRsc()
         self.raw_dir = os.path.join(
-            os.environ["PROJ_DIR"],
-            "Exp2_Compute_Emotion",
-            "data_scanner_BIDS",
-            "rawdata",
+            fixt_setup.proj_emorep, "data_scanner_BIDS/rawdata"
         )
         self.subj = "sub-ER0009"
         self.sess = "ses-day2"
@@ -92,16 +89,9 @@ class Test_ChkRsc:
 class Test_CheckEmorep:
 
     @pytest.fixture(autouse=True)
-    def _setup(self):
-        emorep_dir = os.path.join(
-            os.environ["PROJ_DIR"],
-            "Exp2_Compute_Emotion",
-            "data_scanner_BIDS",
-        )
-        self.raw_dir = os.path.join(
-            emorep_dir,
-            "rawdata",
-        )
+    def _setup(self, fixt_setup):
+        emorep_dir = os.path.join(fixt_setup.proj_emorep, "data_scanner_BIDS")
+        self.raw_dir = os.path.join(emorep_dir, "rawdata")
         self.deriv_dir = os.path.join(emorep_dir, "derivatives")
         subj_list = ["ER0009", "ER0087"]
         self.chk_emo = check_data._CheckEmorep(
@@ -193,12 +183,8 @@ def test_CheckMri_emorep():
 class TestCheckMri:
 
     @pytest.fixture(autouse=True)
-    def _setup(self):
-        archival_dir = os.path.join(
-            os.environ["PROJ_DIR"],
-            "Exp3_Classify_Archival",
-            "data_mri_BIDS",
-        )
+    def _setup(self, fixt_setup):
+        archival_dir = os.path.join(fixt_setup.proj_archival, "data_mri_BIDS")
         self.raw_dir = os.path.join(
             archival_dir,
             "rawdata",

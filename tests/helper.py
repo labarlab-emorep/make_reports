@@ -1,6 +1,8 @@
 import os
+from typing import Type
 import pandas as pd
 import numpy as np
+from make_reports.resources import sql_database
 
 
 def check_test_env():
@@ -210,3 +212,114 @@ def simulate_bdi() -> pd.DataFrame:
         "BDI_3": [0, 0, 1, 0, 0, 2],
     }
     return pd.DataFrame.from_dict(bdi_dict)
+
+
+def unpack_rows(rows: list) -> dict:
+    """Return unpacked rows from SQL query."""
+    return {x[0]: x[1] for x in rows}
+
+
+def _make_refs(db_con: Type[sql_database.DbConnect]):
+    """Make ref tables needed for tests, sql_database._PrepPsr."""
+    for tbl_name in [
+        "ref_emo",
+        "ref_task",
+    ]:
+        with db_con._con_cursor() as cur:
+            cur.execute(f"drop table if exists db_emorep_unittest.{tbl_name}")
+            db_con.con.commit()
+        with db_con._con_cursor() as cur:
+            sql_cmd = (
+                f"create table db_emorep_unittest.{tbl_name} as "
+                + f"select * from db_emorep.{tbl_name}"
+            )
+            cur.execute(sql_cmd)
+            db_con.con.commit()
+
+
+def make_db_connect(db_con: Type[sql_database.DbConnect]):
+    """Make tables used by tests which reference fixt_db_connect."""
+    _make_refs(db_con)
+
+    # Build tables like those in db_emorep
+    for tbl_name in [
+        "ref_sess_task",
+        "ref_subj",
+        "tbl_in_scan_ratings",
+        "tbl_rest_ratings",
+        "tbl_post_scan_ratings",
+        "tbl_demographics",
+        "tbl_als",
+        "tbl_survey_date",
+    ]:
+        with db_con._con_cursor() as cur:
+            cur.execute(f"drop table if exists db_emorep_unittest.{tbl_name}")
+            db_con.con.commit()
+        with db_con._con_cursor() as cur:
+            sql_cmd = (
+                f"create table db_emorep_unittest.{tbl_name} like "
+                + f"db_emorep.{tbl_name}"
+            )
+            cur.execute(sql_cmd)
+            db_con.con.commit()
+
+
+def clean_db_connect(db_con: Type[sql_database.DbConnect]):
+    """Clean tables used by tests which reference fixt_db_connect."""
+    for tbl_name in [
+        "ref_emo",
+        "ref_task",
+        "ref_sess_task",
+        "ref_subj",
+        "tbl_in_scan_ratings",
+        "tbl_rest_ratings",
+        "tbl_post_scan_ratings",
+        "tbl_demographics",
+        "tbl_als",
+        "tbl_survey_date",
+    ]:
+        with db_con._con_cursor() as cur:
+            cur.execute(f"delete from db_emorep_unittest.{tbl_name}")
+            db_con.con.commit()
+
+
+def make_db_update(db_con: Type[sql_database.DbConnect]):
+    """Make tables used by tests which reference fixt_db_update."""
+    _make_refs(db_con)
+
+    # Build tables like those in db_emorep
+    for tbl_name in [
+        "tbl_aim",
+        "tbl_rrs",
+        "tbl_survey_date",
+        "tbl_post_scan_ratings",
+    ]:
+        with db_con._con_cursor() as cur:
+            cur.execute(f"drop table if exists db_emorep_unittest.{tbl_name}")
+            db_con.con.commit()
+        with db_con._con_cursor() as cur:
+            sql_cmd = (
+                f"create table db_emorep_unittest.{tbl_name} like "
+                + f"db_emorep.{tbl_name}"
+            )
+            cur.execute(sql_cmd)
+            db_con.con.commit()
+
+
+def clean_db_update(db_up: Type[sql_database.DbUpdate]):
+    """Clean tables used by tests which reference fixt_db_update.
+
+    Avoid cleaning tables used by fixt_db_connect.
+
+    """
+    for tbl_name in ["tbl_aim", "tbl_rrs"]:
+        with db_up._db_con._con_cursor() as cur:
+            cur.execute(f"delete from db_emorep_unittest.{tbl_name}")
+            db_up._db_con.con.commit()
+
+
+def df_foo() -> pd.DataFrame:
+    """Return short foo df."""
+    return pd.DataFrame.from_dict(
+        {"subj_id": [99, 999], "subj_name": ["FOO99", "FOO999"]}
+    )

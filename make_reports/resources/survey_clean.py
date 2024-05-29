@@ -887,8 +887,9 @@ def clean_rest_ratings(sess, rawdata_path):
     Parameters
     ----------
     sess : str
-        ["day2" | "day3"]
-    rawdata_path : path
+        {"day2","day3"}
+        Session identifier
+    rawdata_path : str, os.PathLike
         Location of BIDS rawdata
 
     Returns
@@ -907,6 +908,14 @@ def clean_rest_ratings(sess, rawdata_path):
     # Check arg
     if sess not in ["day2", "day3"]:
         raise ValueError(f"Improper session argument : sess={sess}")
+
+    # Find all session files
+    beh_search_path = f"{rawdata_path}/sub-*/ses-{sess}/beh"
+    beh_list = sorted(glob.glob(f"{beh_search_path}/*rest-ratings*.tsv"))
+    if not beh_list:
+        raise FileNotFoundError(
+            f"No rest-ratings files found in {beh_search_path}."
+        )
 
     # Setup session dataframe
     col_names = [
@@ -932,14 +941,6 @@ def clean_rest_ratings(sess, rawdata_path):
         "SURPRISE",
     ]
     df_sess = pd.DataFrame(columns=col_names)
-
-    # Find all session files
-    beh_search_path = f"{rawdata_path}/sub-*/ses-{sess}/beh"
-    beh_list = sorted(glob.glob(f"{beh_search_path}/*rest-ratings*.tsv"))
-    if not beh_list:
-        raise FileNotFoundError(
-            f"No rest-ratings files found in {beh_search_path}."
-        )
 
     # Add each participant's responses to df_sess
     for beh_path in beh_list:

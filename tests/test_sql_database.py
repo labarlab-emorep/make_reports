@@ -5,49 +5,12 @@ from make_reports.resources import sql_database
 import helper
 
 
-def clean_test_db(db_con):
-    # Clean for TestDbConnect
-    with db_con._con_cursor() as cur:
-        cur.execute("delete from ref_emo where emo_name like 'foo%'")
-        db_con.con.commit()
-
-    # Clean for _Recipes
-    with db_con._con_cursor() as cur:
-        cur.execute("delete from ref_subj where subj_name like 'FOO%'")
-        db_con.con.commit()
-
-    for tbl_name in [
-        "tbl_survey_date",
-        "tbl_als",
-        "tbl_demographics",
-        "tbl_post_scan_ratings",
-        "tbl_rest_ratings",
-        "tbl_in_scan_ratings",
-        "ref_sess_task",
-    ]:
-        with db_con._con_cursor() as cur:
-            cur.execute(f"delete from {tbl_name} where subj_id=99")
-            db_con.con.commit()
-
-
-@pytest.fixture(scope="module")
-def fixt_database():
-    db_con = sql_database.DbConnect(db_name="db_emorep_unittest")
-    yield db_con
-    clean_test_db(db_con)
-    db_con.close_con()
-
-
-def unpack_rows(rows: list) -> dict:
-    return {x[0]: x[1] for x in rows}
-
-
 @pytest.mark.rep_get
 class TestDbConnect:
 
     @pytest.fixture(autouse=True)
-    def _setup(self, fixt_database):
-        self.db_con = fixt_database
+    def _setup(self, fixt_db_connect):
+        self.db_con = fixt_db_connect
 
     @pytest.mark.dependency()
     def test_con_cursor(self):
@@ -62,7 +25,7 @@ class TestDbConnect:
         assert isinstance(rows, list)
         assert isinstance(rows[0], tuple)
 
-        emo_dict = unpack_rows(rows)
+        emo_dict = helper.unpack_rows(rows)
         assert emo_dict[3] == "anxiety"
         assert emo_dict[15] == "surprise"
 
@@ -78,7 +41,7 @@ class TestDbConnect:
         # Pull data
         sql_cmd = "select * from ref_emo where emo_name like 'foo%'"
         rows = self.db_con.fetch_rows(sql_cmd)
-        emo_dict = unpack_rows(rows)
+        emo_dict = helper.unpack_rows(rows)
         assert emo_dict[16] == "foo"
         assert emo_dict[17] == "foobar"
 
@@ -107,8 +70,8 @@ class Test_DfManip:
 class Test_Recipes:
 
     @pytest.fixture(autouse=True)
-    def _setup(self, fixt_database):
-        self.db_con = fixt_database
+    def _setup(self, fixt_db_connect):
+        self.db_con = fixt_db_connect
         self.recipe = sql_database._Recipes(self.db_con)
 
     def test_build_cols(self):
@@ -117,24 +80,20 @@ class Test_Recipes:
         )
 
     def test_validate_cols(self):
-        df = pd.DataFrame.from_dict(
-            {"subj_id": [99, 999], "subj_name": ["FOO99", "FOO999"]}
-        )
+        df = helper.df_foo()
         col_list = ["subj_id", "subj_name", "foobar"]
         with pytest.raises(KeyError):
             self.recipe._validate_cols(df, col_list)
 
     def test_insert_ref_subj(self):
         # Test insert
-        df = pd.DataFrame.from_dict(
-            {"subj_id": [99, 999], "subj_name": ["FOO99", "FOO999"]}
-        )
+        df = helper.df_foo()
         self.recipe.insert_ref_subj(df, subj_col="subj_name")
 
         # Pull data
         sql_cmd = "select * from ref_subj where subj_name like 'FOO%'"
         rows = self.db_con.fetch_rows(sql_cmd)
-        subj_dict = unpack_rows(rows)
+        subj_dict = helper.unpack_rows(rows)
         assert subj_dict[99] == "FOO99"
         assert subj_dict[999] == "FOO999"
 
@@ -315,8 +274,8 @@ class Test_Recipes:
 class Test_TaskMaps:
 
     @pytest.fixture(autouse=True)
-    def _setup(self, fixt_database):
-        self.task_map = sql_database._TaskMaps(fixt_database)
+    def _setup(self, fixt_db_connect):
+        self.task_map = sql_database._TaskMaps(fixt_db_connect)
 
     def test_init(self):
         assert hasattr(self.task_map, "_ref_task")
@@ -344,11 +303,11 @@ class Test_TaskMaps:
 class Test_PrepPsr:
 
     @pytest.fixture(autouse=True)
-    def _setup(self, fixt_database, fixt_cl_qual):
+    def _setup(self, fixt_db_connect, fixt_cl_qual):
         df = fixt_cl_qual.post_data["visit_day2"]["post_scan_ratings"].copy()
         df["subj_id"] = df["study_id"].str[2:].astype(int)
         df["sess_id"] = 2
-        self.prep_psr = sql_database._PrepPsr(df, fixt_database)
+        self.prep_psr = sql_database._PrepPsr(df, fixt_db_connect)
         self.prep_psr.prep_dfs()
 
     @pytest.mark.dependency()
@@ -420,5 +379,76 @@ class Test_PrepPsr:
         assert "2022-04-22" == self.prep_psr.df_date.loc[0, "datetime"]
 
 
-def test_DbUpdate():
-    pass
+@pytest.mark.long
+class TestDbUpdate:
+
+    @pytest.fixture(autouse=True)
+    def _setup(self, fixt_db_update):
+        self.fixt_up = fixt_db_update
+
+    def _pull_five(self, tbl_name: str, col_list: list) -> pd.DataFrame:
+        """Pull first 5 rows from table."""
+        with self.fixt_up.db_up._db_con._con_cursor() as cur:
+            cur.execute(f"select * from {tbl_name} limit 5")
+            results = cur.fetchall()
+        return pd.DataFrame(results, columns=col_list)
+
+    def test_update_db(self):
+        df = self.fixt_up.df_rrs.copy()
+        with pytest.raises(TypeError):
+            self.fixt_up.db_up.update_db(df, "RRS", "2", "qualtrics")
+        with pytest.raises(ValueError):
+            self.fixt_up.db_up.update_db(df, "RRS", 2, "foobar")
+        with pytest.raises(KeyError):
+            self.fixt_up.db_up.update_db(
+                df, "RRS", 2, "qualtrics", subj_col="foo"
+            )
+
+        #
+        self.fixt_up.db_up.update_db(df, "RRS", 1, "qualtrics")
+
+        #
+        df_pull = self._pull_five(
+            "tbl_rrs", ["subj_id", "sess_id", "item_rrs", "resp_rrs"]
+        )
+        assert (5, 4) == df_pull.shape
+        assert 9 == df_pull.loc[0, "subj_id"]
+        assert 1 == df_pull.loc[0, "item_rrs"]
+        assert 3 == df_pull.loc[0, "resp_rrs"]
+
+    def test_basic_prep(self):
+        self.fixt_up.db_up._df = pd.DataFrame.from_dict(
+            data={"study_id": ["ER1", "ER2"], "foo": ["a", "b"]}
+        )
+        self.fixt_up.db_up._sess_id = 2
+        self.fixt_up.db_up._subj_col = "study_id"
+        self.fixt_up.db_up._basic_prep()
+
+        assert "sess_id" in list(self.fixt_up.db_up._df.columns)
+        assert "subj_id" in list(self.fixt_up.db_up._df.columns)
+
+    def test_update_qualtrics(self):
+        # Run method
+        df = self.fixt_up.df_aim.copy()
+        self.fixt_up.db_up.update_db(df, "AIM", 1, "qualtrics")
+
+        # Pull data, test struct, data
+        df_pull = self._pull_five(
+            "tbl_aim", ["subj_id", "sess_id", "item_aim", "resp_aim"]
+        )
+        assert (5, 4) == df_pull.shape
+        assert 9 == df_pull.loc[0, "subj_id"]
+        assert 1 == df_pull.loc[0, "item_aim"]
+        assert 6 == df_pull.loc[0, "resp_aim"]
+
+    def test_update_redcap(self):
+        pass
+
+    def test_update_demographics(self):
+        pass
+
+    def test_update_rest_ratings(self):
+        pass
+
+    def test_update_in_scan_ratings(self):
+        pass
