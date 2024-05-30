@@ -126,7 +126,7 @@ class GetRedcap(survey_clean.CleanRedcap):
             "bdi_day3": ["clean_bdi_day23", "visit_day3"],
         }
 
-    def get_redcap(self, survey_list=None):
+    def get_redcap(self, survey_list=None, db_name="db_emorep"):
         """Get and clean RedCap survey info.
 
         Coordinate RedCap survey download, then match survey to cleaning
@@ -145,12 +145,20 @@ class GetRedcap(survey_clean.CleanRedcap):
                 "bdi_day2",
                 "bdi_day3"
             }
-            If None, pull all reports.
+            If None, pull all reports
+        db_name : str, optional
+            {"db_emorep", "db_emorep_unittest"}
+            Name of MySQL database
 
         Attributes
         ----------
         clean_redcap : dict
             {pilot|study: {visit: {survey_name: pd.DataFrame}}}
+
+        Returns
+        -------
+        list
+            Location of written files
 
         """
 
@@ -170,9 +178,12 @@ class GetRedcap(survey_clean.CleanRedcap):
         _validate(survey_list)
         raw_redcap = self._download_redcap(survey_list)
 
+        # Connect to db
+        up_db_emorep = sql_database.DbUpdate(db_name=db_name)
+
         # Clean each survey and build clean_redcap attr
-        up_db_emorep = sql_database.DbUpdate()
         self.clean_redcap = {"pilot": {}, "study": {}}
+        write_list = []
         for sur_name in raw_redcap:
             visit = clean_map[sur_name][1]
             dir_name, df_raw = raw_redcap[sur_name]
@@ -195,8 +206,14 @@ class GetRedcap(survey_clean.CleanRedcap):
 
             # Avoid writing PHI to disk
             if dir_name:
-                self._write_redcap(self.df_study, sur_name, dir_name, False)
-                self._write_redcap(self.df_pilot, sur_name, dir_name, True)
+                write_list.append(
+                    self._write_redcap(
+                        self.df_study, sur_name, dir_name, False
+                    )
+                )
+                write_list.append(
+                    self._write_redcap(self.df_pilot, sur_name, dir_name, True)
+                )
 
             # Update mysql db_emorep.tbl_bdi
             if key_name == "BDI":
@@ -204,10 +221,11 @@ class GetRedcap(survey_clean.CleanRedcap):
                     self.df_study.copy(), key_name, int(visit[-1]), "redcap"
                 )
         up_db_emorep.close_db()
+        return write_list
 
     def _write_redcap(
         self, df: pd.DataFrame, sur_name: str, dir_name: str, is_pilot: bool
-    ):
+    ) -> Union[str, os.PathLike]:
         """Determine output path and write dataframe."""
         out_name = "BDI" if "bdi" in sur_name else sur_name
         out_dir = "data_pilot/data_survey" if is_pilot else "data_survey"
@@ -218,6 +236,7 @@ class GetRedcap(survey_clean.CleanRedcap):
             f"df_{out_name}.csv",
         )
         _write_dfs(df, out_file)
+        return out_file
 
 
 class GetQualtrics(survey_clean.CleanQualtrics):
@@ -285,7 +304,7 @@ class GetQualtrics(survey_clean.CleanQualtrics):
             _write_dfs(df, out_file)
         return raw_qualtrics
 
-    def get_qualtrics(self, survey_list=None):
+    def get_qualtrics(self, survey_list=None, db_name="db_emorep"):
         """Get and clean Qualtrics survey info.
 
         Coordinate Qualtrics survey download, then match survey to cleaning
@@ -301,6 +320,9 @@ class GetQualtrics(survey_clean.CleanQualtrics):
                 "FINAL - EmoRep Stimulus Ratings - fMRI Study"
             }
             Qualtrics report names
+        db_name : str, optional
+            {"db_emorep", "db_emorep_unittest"}
+            Name of MySQL database
 
         Attributes
         ----------
@@ -309,7 +331,7 @@ class GetQualtrics(survey_clean.CleanQualtrics):
 
         """
         # Start mysql server connection
-        up_mysql = sql_database.DbUpdate()
+        up_mysql = sql_database.DbUpdate(db_name=db_name)
 
         # Map survey name to survey_clean.CleanQualtrics method
         clean_map = {
@@ -412,11 +434,18 @@ class GetRest:
         """Initialize."""
         self._proj_dir = proj_dir
 
-    def get_rest(self):
+    def get_rest(self, db_name="db_emorep"):
         """Coordinate cleaning of rest ratings survey.
 
         Cleaned surveys are written to disk and are available
         in clean_rest attr.
+
+        Parameters
+        ----------
+        db_name : str, optional
+            {"db_emorep", "db_emorep_unittest"}
+            Name of MySQL database
+
 
         Attributes
         ----------
@@ -426,8 +455,10 @@ class GetRest:
         """
         print("Cleaning survey : rest ratings")
 
+        # Connect to db
+        up_db_emorep = sql_database.DbUpdate(db_name=db_name)
+
         # Aggregate rest ratings, for each session day
-        up_db_emorep = sql_database.DbUpdate()
         self.clean_rest = {"pilot": {}, "study": {}}
         for data_type in self.clean_rest.keys():
             raw_dir, out_dir = self._rest_paths(data_type)
@@ -502,11 +533,17 @@ class GetTask:
         """Initialize."""
         self._proj_dir = proj_dir
 
-    def get_task(self):
+    def get_task(self, db_name="db_emorep"):
         """Coordinate finding and cleaning task responses.
 
         Data are written to disk, used to update mysql db_emorep,
         and available on clean_task attr.
+
+        Parameters
+        ----------
+        db_name : str, optional
+            {"db_emorep", "db_emorep_unittest"}
+            Name of MySQL database
 
         Attributes
         ----------
@@ -515,7 +552,7 @@ class GetTask:
 
         """
         # Start DbConnect here to avoid pickle issue
-        up_db_emorep = sql_database.DbUpdate()
+        up_db_emorep = sql_database.DbUpdate(db_name=db_name)
 
         # Aggregate data
         print("Aggregating in-scanner task responses ...")

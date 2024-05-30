@@ -344,7 +344,7 @@ class CleanRedcap:
         self._df_raw = self._drop_subj(df_raw)
         self._make_study_pilot()
 
-    def clean_guid(self, df_raw):
+    def clean_guid(self, df_raw, db_name="db_emorep"):
         """Cleaning method for RedCap GUID survey.
 
         Only return participants who have an assigned GUID. Also
@@ -354,6 +354,9 @@ class CleanRedcap:
         ----------
         df_raw : pd.DataFrame
             Original REDCap export of GUID survey
+        db_name : str, optional
+            {"db_emorep", "db_emorep_unittest"}
+            Name of MySQL database
 
         Attributes
         ----------
@@ -370,8 +373,10 @@ class CleanRedcap:
         self._df_raw = self._drop_subj(df_raw)
         self._make_study_pilot(subj_col="study_id", alpha_subjid=True)
 
+        # Connect to db
+        up_db_emorep = sql_database.DbUpdate(db_name=db_name)
+
         # Update db_emorep.ref_subj for enrolled study subjs
-        up_db_emorep = sql_database.DbUpdate()
         df_sql = self.df_study.copy()
         df_sql = df_sql.rename(columns={"record_id": "subj_id"})
         up_db_emorep.insert_ref_subj(df_sql)

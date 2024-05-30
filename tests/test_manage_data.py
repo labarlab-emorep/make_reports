@@ -2,6 +2,7 @@ import pytest
 import os
 import pandas as pd
 from make_reports.resources import manage_data
+import helper
 
 
 @pytest.mark.rep_get
@@ -42,6 +43,31 @@ class TestGetRedcap:
     def test_get_redcap(self):
         with pytest.raises(ValueError):
             self.get_red.get_redcap(survey_list=["foo"])
+
+        #
+        write_list = self.get_red.get_redcap(
+            survey_list=["bdi_day2"], db_name="db_emorep_unittest"
+        )
+        assert 2 == len(write_list)
+        assert os.path.exists(write_list[1])
+        assert "df_BDI.csv" == os.path.basename(write_list[0])
+        assert os.path.join(
+            self.proj_dir, "data_survey/visit_day2"
+        ) == os.path.dirname(write_list[0])
+
+    def test_write_redcap(self):
+        df = helper.df_foo()
+        file_path = self.get_red._write_redcap(df, "foo", "bar", False)
+        assert os.path.exists(file_path)
+        assert "df_foo.csv" == os.path.basename(file_path)
+        assert os.path.join(
+            self.proj_dir, "data_survey/bar"
+        ) == os.path.dirname(file_path)
+
+        file_path = self.get_red._write_redcap(df, "foo", "bar", True)
+        assert os.path.join(
+            self.proj_dir, "data_pilot/data_survey/bar"
+        ) == os.path.dirname(file_path)
 
 
 def test_GetQualtrics():

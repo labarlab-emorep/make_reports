@@ -39,6 +39,7 @@ def fixt_setup() -> Iterator[SupplyVars]:
 
 def pytest_sessionfinish(session, exitstatus):
     """Teardown if all tests passed."""
+    return
     if 0 == exitstatus:
         try:
             shutil.rmtree(helper.test_emorep())
@@ -153,7 +154,7 @@ def fixt_test_data(fixt_setup) -> Iterator[SupplyVars]:
 
     # Clean task data
     get_task = manage_data.GetTask(fixt_setup.test_emorep)
-    get_task.get_task()
+    get_task.get_task(db_name="db_emorep_unittest")
 
     # Yield object
     supp_vars = SupplyVars()
