@@ -1,5 +1,6 @@
 import os
 from typing import Type
+from typing import Union
 import pandas as pd
 import numpy as np
 from make_reports.resources import sql_database
@@ -291,6 +292,7 @@ def make_db_update(db_con: Type[sql_database.DbConnect]):
     for tbl_name in [
         "tbl_aim",
         "tbl_rrs",
+        "tbl_bdi",
         "tbl_survey_date",
         "tbl_post_scan_ratings",
     ]:
@@ -312,7 +314,7 @@ def clean_db_update(db_up: Type[sql_database.DbUpdate]):
     Avoid cleaning tables used by fixt_db_connect.
 
     """
-    for tbl_name in ["tbl_aim", "tbl_rrs"]:
+    for tbl_name in ["tbl_aim", "tbl_rrs", "tbl_bdi"]:
         with db_up._db_con._con_cursor() as cur:
             cur.execute(f"delete from db_emorep_unittest.{tbl_name}")
             db_up._db_con.con.commit()
@@ -323,3 +325,23 @@ def df_foo() -> pd.DataFrame:
     return pd.DataFrame.from_dict(
         {"subj_id": [99, 999], "subj_name": ["FOO99", "FOO999"]}
     )
+
+
+def proj_emorep() -> Union[str, os.PathLike]:
+    """Return path to emorep project directory."""
+    return "/mnt/keoki/experiments2/EmoRep/Exp2_Compute_Emotion"
+
+
+def test_emorep() -> Union[str, os.PathLike]:
+    """Return path to emorep test directory."""
+    return os.path.join(proj_emorep(), "code/unit_test/make_reports")
+
+
+def proj_archival() -> Union[str, os.PathLike]:
+    """Return path to archival project directory."""
+    return "/mnt/keoki/experiments2/EmoRep/Exp3_Classify_Archival"
+
+
+def test_archival() -> Union[str, os.PathLike]:
+    """Return path to archival test directory."""
+    return os.path.join(proj_archival(), "code/unit_test/make_reports")

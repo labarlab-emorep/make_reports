@@ -7,6 +7,7 @@ from typing import Type
 from make_reports.resources import survey_download
 from make_reports.resources import survey_clean
 from make_reports.resources import sql_database
+from make_reports.resources import manage_data
 import helper
 
 
@@ -20,38 +21,33 @@ class SupplyVars:
 def fixt_setup() -> Iterator[SupplyVars]:
     #
     helper.check_test_env()
-
-    #
-    proj_emorep = "/mnt/keoki/experiments2/EmoRep/Exp2_Compute_Emotion"
-    proj_archival = "/mnt/keoki/experiments2/EmoRep/Exp3_Classify_Archival"
-
-    #
-    test_emorep = os.path.join(
-        proj_emorep, "code/unit_test/make_reports/emorep"
-    )
-    test_archival = os.path.join(
-        proj_archival, "code/unit_test/make_reports/archival"
-    )
+    test_emorep = helper.test_emorep()
+    test_archival = helper.test_archival()
     for _dir in [test_emorep, test_archival]:
         if not os.path.exists(_dir):
             os.makedirs(_dir)
 
     supp_vars = SupplyVars()
-
     supp_vars.proj_name1 = "emorep"
     supp_vars.proj_name2 = "archival"
-    supp_vars.proj_emorep = proj_emorep
-    supp_vars.proj_archival = proj_archival
+    supp_vars.proj_emorep = helper.proj_emorep()
+    supp_vars.proj_archival = helper.proj_archival()
     supp_vars.test_emorep = test_emorep
     supp_vars.test_archival = test_archival
     yield supp_vars
 
 
-# TODO make teardown
+def pytest_sessionfinish(session, exitstatus):
+    """Teardown if all tests passed."""
+    if 0 == exitstatus:
+        try:
+            shutil.rmtree(helper.test_emorep())
+        except FileNotFoundError:
+            pass
 
 
 @pytest.fixture(scope="session")
-def fixt_dl_red(fixt_setup) -> Iterator[SupplyVars]:
+def fixt_dl_red() -> Iterator[SupplyVars]:
     """Download REDCap data."""
     supp_vars = SupplyVars()
     supp_vars.red_dict = survey_download.dl_redcap(
@@ -69,7 +65,19 @@ def fixt_dl_red(fixt_setup) -> Iterator[SupplyVars]:
 
 
 @pytest.fixture(scope="session")
-def fixt_dl_qual(fixt_setup) -> Iterator[SupplyVars]:
+def fixt_cl_red(fixt_dl_red) -> Iterator[SupplyVars]:
+    """Clean select REDCap data."""
+    clean_red = survey_clean.CleanRedcap()
+    supp_vars = SupplyVars()
+    clean_red.clean_bdi_day23(fixt_dl_red.red_dict["bdi_day3"][1])
+    supp_vars.df_bdi = clean_red.df_study
+    clean_red.clean_demographics(helper.simulate_demographics())
+    supp_vars.df_demo = clean_red.df_study
+    yield supp_vars
+
+
+@pytest.fixture(scope="session")
+def fixt_dl_qual() -> Iterator[SupplyVars]:
     """Download Qualtrics data."""
     supp_vars = SupplyVars()
     supp_vars.qual_dict = survey_download.dl_qualtrics(
@@ -112,12 +120,14 @@ def fixt_cl_qual(fixt_dl_qual) -> Iterator[SupplyVars]:
 
 
 @pytest.fixture(scope="session")
-def fixt_org_rest(fixt_setup) -> Iterator[SupplyVars]:
+def fixt_test_data(fixt_setup) -> Iterator[SupplyVars]:
     # Orienting paths
     proj_raw = os.path.join(
         fixt_setup.proj_emorep, "data_scanner_BIDS/rawdata"
     )
-    test_raw = os.path.join(fixt_setup.test_emorep, "rawdata")
+    test_raw = os.path.join(
+        fixt_setup.test_emorep, "data_scanner_BIDS/rawdata"
+    )
 
     # Copy rest beh data to test location
     subj = "sub-ER0016"
@@ -139,16 +149,23 @@ def fixt_org_rest(fixt_setup) -> Iterator[SupplyVars]:
 
     # Clean rest beh
     sess_id = sess.split("-")[-1]
-    df = survey_clean.clean_rest_ratings(sess_id, test_raw)
+    df_rest = survey_clean.clean_rest_ratings(sess_id, test_raw)
+
+    # Clean task data
+    get_task = manage_data.GetTask(fixt_setup.test_emorep)
+    get_task.get_task()
 
     # Yield object
-    org_rest = SupplyVars()
-    org_rest.df = df
-    yield org_rest
+    supp_vars = SupplyVars()
+    supp_vars.df_rest = df_rest
+    supp_vars.df_task = get_task.clean_task["study"]["visit_day2"][
+        "in_scan_task"
+    ]
+    yield supp_vars
 
 
 @pytest.fixture(scope="module")
-def fixt_db_connect(fixt_setup) -> Type[sql_database.DbConnect]:
+def fixt_db_connect() -> Type[sql_database.DbConnect]:
     db_con = sql_database.DbConnect(db_name="db_emorep_unittest")
     helper.make_db_connect(db_con)
     yield db_con
@@ -158,9 +175,9 @@ def fixt_db_connect(fixt_setup) -> Type[sql_database.DbConnect]:
 
 @pytest.fixture(scope="class")
 def fixt_db_update(
-    fixt_setup, fixt_cl_qual, fixt_org_rest, fixt_db_connect
+    fixt_cl_red, fixt_cl_qual, fixt_test_data, fixt_db_connect
 ) -> Iterator[SupplyVars]:
-    db_up = sql_database.DbUpdate(db_name="db_emorep_unittest")
+    db_up = sql_database.DbUpdate(db_con=fixt_db_connect)
     helper.make_db_update(db_up._db_con)
 
     # Aggregate data for easy testing, maintenance
@@ -168,6 +185,9 @@ def fixt_db_update(
     supp_vars.db_up = db_up
     supp_vars.df_aim = fixt_cl_qual.s1_data["visit_day1"]["AIM"]
     supp_vars.df_rrs = fixt_cl_qual.s1_data["visit_day1"]["RRS"]
+    supp_vars.df_bdi = fixt_cl_red.df_bdi
+    supp_vars.df_demo = fixt_cl_red.df_demo
+    supp_vars.df_rest = fixt_test_data.df_rest
+    supp_vars.df_task = fixt_test_data.df_task
     yield supp_vars
     helper.clean_db_update(db_up)
-    db_up.close_db()

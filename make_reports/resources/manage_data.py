@@ -511,7 +511,7 @@ class GetTask:
         Attributes
         ----------
         clean_task : dict
-            {study: visit: {"in_scan_task": pd.DataFrame}}
+            {"study": visit: {"in_scan_task": pd.DataFrame}}
 
         """
         # Start DbConnect here to avoid pickle issue
@@ -522,8 +522,13 @@ class GetTask:
         self.clean_task = {"study": {}}
         self._build_df()
 
-        # Build clean_task attr
-        for sess in ["day2", "day3"]:
+        # Identify sess values
+        sess_list = list(self._df_all["visit"].unique())
+        for sess in sess_list:
+            if sess not in ["day2", "day3"]:
+                raise ValueError(f"Unexpected visit value : {sess}")
+
+            # Subset dataframe by sess
             df_sess = self._df_all[self._df_all["visit"] == sess]
             self.clean_task["study"][f"visit_{sess}"] = {
                 "in_scan_task": df_sess

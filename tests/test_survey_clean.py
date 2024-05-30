@@ -143,8 +143,7 @@ class TestCleanRedcap_remaining:
 class TestCleanQualtrics:
 
     @pytest.fixture(autouse=True)
-    def _setup(self, fixt_dl_qual, fixt_cl_qual):
-        self.fixt_dl = fixt_dl_qual
+    def _setup(self, fixt_cl_qual):
         self.fixt_cl = fixt_cl_qual
 
     def test_init(self):
@@ -247,7 +246,7 @@ class TestCleanQualtrics:
         assert "Amusement" == df.loc[1, "response"]
 
 
-def test_clean_rest_ratings(fixt_org_rest):
+def test_clean_rest_ratings(fixt_test_data):
     # Check errors raised
     with pytest.raises(ValueError):
         _ = survey_clean.clean_rest_ratings("foo", "bar")
@@ -255,7 +254,7 @@ def test_clean_rest_ratings(fixt_org_rest):
         _ = survey_clean.clean_rest_ratings("day2", "bar")
 
     # Get dataframe, test structure
-    df = fixt_org_rest.df
+    df = fixt_test_data.df_rest
     assert (2, 20) == df.shape
     col_names = [
         "study_id",

@@ -433,6 +433,8 @@ class DbUpdate(_Recipes, _DfManip, _TaskMaps):
     db_name : str, optional
         {"db_emorep", "db_emorep_unittest"}
         Name of MySQL database
+    db_con : None, DbConnect, optional
+        Connection instance
 
     Methods
     -------
@@ -449,11 +451,11 @@ class DbUpdate(_Recipes, _DfManip, _TaskMaps):
 
     """
 
-    def __init__(self, db_name="db_emorep"):
+    def __init__(self, db_name="db_emorep", db_con=None):
         """Initialize."""
         if db_name not in ["db_emorep", "db_emorep_unittest"]:
             raise ValueError("Unexpected db_name")
-        self._db_con = DbConnect(db_name=db_name)
+        self._db_con = db_con if db_con else DbConnect(db_name=db_name)
         _Recipes.__init__(self, self._db_con)
         _TaskMaps.__init__(self, self._db_con)
 

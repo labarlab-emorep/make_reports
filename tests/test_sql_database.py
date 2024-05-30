@@ -1,4 +1,5 @@
 import pytest
+import datetime
 import pandas as pd
 import pandas.api.types as ptypes
 from make_reports.resources import sql_database
@@ -73,11 +74,6 @@ class Test_Recipes:
     def _setup(self, fixt_db_connect):
         self.db_con = fixt_db_connect
         self.recipe = sql_database._Recipes(self.db_con)
-
-    def test_build_cols(self):
-        assert "(foo, bar, foobar)" == self.recipe._build_cols(
-            ["foo", "bar", "foobar"]
-        )
 
     def test_validate_cols(self):
         df = helper.df_foo()
@@ -169,6 +165,11 @@ class Test_Recipes:
         assert "foo" == data_chk[0][7]
         assert "no" == data_chk[0][8]
         assert "no" == data_chk[0][9]
+
+    def test_build_cols(self):
+        assert "(foo, bar, foobar)" == self.recipe._build_cols(
+            ["foo", "bar", "foobar"]
+        )
 
     def test_insert_psr(self):
         # Test insert
@@ -393,6 +394,16 @@ class TestDbUpdate:
             results = cur.fetchall()
         return pd.DataFrame(results, columns=col_list)
 
+    def _pull_one(self, subj_id: int, sur_name: str) -> tuple:
+        """Pull row from tbl_survey_date for subj_id and sur_name."""
+        with self.fixt_up.db_up._db_con._con_cursor() as cur:
+            cur.execute(
+                f"select * from tbl_survey_date where subj_id={subj_id} "
+                + f"and sur_name='{sur_name}' limit 1"
+            )
+            results = cur.fetchall()
+        return results
+
     def test_update_db(self):
         df = self.fixt_up.df_rrs.copy()
         with pytest.raises(TypeError):
@@ -441,14 +452,88 @@ class TestDbUpdate:
         assert 1 == df_pull.loc[0, "item_aim"]
         assert 6 == df_pull.loc[0, "resp_aim"]
 
+        # Check survey_date
+        subj_id, _, sur_name, sur_date = self._pull_one(9, "aim")[0]
+        assert 9 == subj_id
+        assert "aim" == sur_name
+        assert datetime.date(2022, 4, 19) == sur_date
+
     def test_update_redcap(self):
-        pass
+        df = self.fixt_up.df_bdi.copy()
+        self.fixt_up.db_up.update_db(df, "BDI", 3, "redcap")
+
+        #
+        df_pull = self._pull_five(
+            "tbl_bdi", ["subj_id", "sess_id", "item_bdi", "resp_bdi"]
+        )
+        assert (5, 4) == df_pull.shape
+        assert 9 == df_pull.loc[0, "subj_id"]
+        assert "10" == df_pull.loc[1, "item_bdi"]
+        assert 0 == df_pull.loc[0, "resp_bdi"]
+
+        #
+        subj_id, _, sur_name, sur_date = self._pull_one(9, "bdi")[0]
+        assert 9 == subj_id
+        assert "bdi" == sur_name
+        assert datetime.date(2022, 4, 28) == sur_date
 
     def test_update_demographics(self):
+        # TODO test with DemoAll.final_demo
         pass
 
     def test_update_rest_ratings(self):
-        pass
+        df = self.fixt_up.df_rest.copy()
+        self.fixt_up.db_up.update_db(df, "rest_ratings", 2, "rest_ratings")
+
+        #
+        df_pull = self._pull_five(
+            "tbl_rest_ratings",
+            [
+                "subj_id",
+                "sess_id",
+                "task_id",
+                "emo_id",
+                "resp_int",
+                "resp_alpha",
+            ],
+        )
+        assert (5, 6) == df_pull.shape
+        assert 16 == df_pull.loc[1, "subj_id"]
+        assert 2 == df_pull.loc[1, "sess_id"]
+        assert 2 == df_pull.loc[1, "task_id"]
+        assert 1 == df_pull.loc[0, "emo_id"]
+        assert 2 == df_pull.loc[0, "resp_int"]
+        assert "Slightly" == df_pull.loc[0, "resp_alpha"]
+
+        subj_id, _, sur_name, sur_date = self._pull_one(16, "rest_ratings")[0]
+        assert 16 == subj_id
+        assert "rest_ratings" == sur_name
+        assert datetime.date(2022, 5, 5) == sur_date
 
     def test_update_in_scan_ratings(self):
-        pass
+        df = self.fixt_up.df_task.copy()
+        self.fixt_up.db_up.update_db(
+            df, "in_scan_ratings", 2, "in_scan_ratings"
+        )
+
+        #
+        df_pull = self._pull_five(
+            "tbl_in_scan_ratings",
+            [
+                "subj_id",
+                "sess_id",
+                "task_id",
+                "run",
+                "block_id",
+                "resp_emo_id",
+                "resp_intensity",
+            ],
+        )
+        assert (5, 7) == df_pull.shape
+        assert 16 == df_pull.loc[1, "subj_id"]
+        assert 2 == df_pull.loc[1, "sess_id"]
+        assert 2 == df_pull.loc[1, "task_id"]
+        assert 1 == df_pull.loc[0, "run"]
+        assert 2 == df_pull.loc[0, "block_id"]
+        assert 2 == df_pull.loc[0, "resp_emo_id"]
+        assert 7 == df_pull.loc[0, "resp_intensity"]
