@@ -70,8 +70,37 @@ class TestGetRedcap:
         ) == os.path.dirname(file_path)
 
 
-def test_GetQualtrics():
-    pass
+@pytest.mark.rep_get
+class TestGetQualtrics:
+
+    @pytest.fixture(autouse=True)
+    def _setup(self, fixt_setup):
+        self.proj_dir = fixt_setup.test_emorep
+        self.get_qual = manage_data.GetQualtrics(self.proj_dir)
+
+    def test_download_qualtrics(self):
+        sur_name = "EmoRep_Session_1"
+        raw_dict = self.get_qual._download_qualtrics([sur_name])
+
+        # Check return object
+        assert sur_name in list(raw_dict.keys())
+        assert "visit_day1" == raw_dict[sur_name][0]
+        assert isinstance(raw_dict[sur_name][1], pd.DataFrame)
+
+        # Check file written
+        chk_raw = os.path.join(
+            self.proj_dir, "data_survey", "visit_day1", f"raw_{sur_name}.csv"
+        )
+        assert os.path.exists(chk_raw)
+
+    def test_get_qualtrics(self):
+        pass
+
+    def test_unpack_qualtrics(self):
+        pass
+
+    def test_write_qualtrics(self):
+        pass
 
 
 def test_GetRest():
