@@ -1,5 +1,6 @@
 import pytest
 import os
+import glob
 import pandas as pd
 from make_reports.resources import manage_data
 from make_reports.resources import sql_database
@@ -211,5 +212,74 @@ class TestGetRest:
         assert os.path.exists(chk_path)
 
 
-def test_GetTask():
-    pass
+class TestGetTask:
+
+    @pytest.fixture(autouse=True)
+    def _setup(self, fixt_setup, fixt_db_connect, fixt_test_data):
+        self.proj_dir = fixt_setup.test_emorep
+        self.test_func = os.path.join(fixt_test_data.test_func)
+        self.get_task = manage_data.GetTask(self.proj_dir)
+        self.event_path = sorted(glob.glob(f"{self.test_func}/*events.tsv"))[0]
+
+    @pytest.mark.dependency()
+    def test_load_event(self):
+        df = self.get_task._load_event(self.event_path)
+        for chk_col in ["subj", "sess", "task", "run"]:
+            assert chk_col in list(df.columns)
+        assert (94, 12) == df.shape
+        assert "ER0016" == df.loc[0, "subj"]
+        assert "day2" == df.loc[0, "sess"]
+        assert "scenarios" == df.loc[0, "task"]
+        assert 1 == df.loc[0, "run"]
+
+    @pytest.mark.dependency(depends=["TestGetTask::test_load_event"])
+    def test_clean_df(self):
+        self.get_task._df_all = self.get_task._load_event(self.event_path)
+        self.get_task._clean_df()
+        for chk_col in [
+            "study_id",
+            "visit",
+            "task",
+            "run",
+            "block",
+            "resp_emotion",
+            "resp_intensity",
+        ]:
+            assert chk_col in list(self.get_task._df_all.columns)
+
+        assert (4, 7) == self.get_task._df_all.shape
+        assert "ER0016" == self.get_task._df_all.loc[0, "study_id"]
+        assert "day2" == self.get_task._df_all.loc[0, "visit"]
+        assert 1 == self.get_task._df_all.loc[0, "run"]
+        assert "anger" == self.get_task._df_all.loc[0, "block"]
+        assert "anger" == self.get_task._df_all.loc[0, "resp_emotion"]
+        assert 7 == self.get_task._df_all.loc[0, "resp_intensity"]
+
+    @pytest.mark.dependency(depends=["TestGetTask::test_clean_df"])
+    def test_build_df(self):
+        self.get_task._build_df()
+        assert hasattr(self.get_task, "_df_all")
+        assert (30, 7) == self.get_task._df_all.shape
+        assert 8 == self.get_task._df_all.loc[29, "run"]
+        assert "neutral" == self.get_task._df_all.loc[29, "block"]
+        assert "neutral" == self.get_task._df_all.loc[29, "resp_emotion"]
+        assert 5 == self.get_task._df_all.loc[29, "resp_intensity"]
+
+    @pytest.mark.dependency(depends=["TestGetTask::test_build_df"])
+    def test_get_task(self):
+        self.get_task.get_task(db_name="db_emorep_unittest")
+        assert hasattr(self.get_task, "clean_task")
+        assert isinstance(self.get_task.clean_task, dict)
+        assert "study" in list(self.get_task.clean_task.keys())
+        assert "visit_day2" in list(self.get_task.clean_task["study"].keys())
+        assert "in_scan_task" in list(
+            self.get_task.clean_task["study"]["visit_day2"].keys()
+        )
+        assert isinstance(
+            self.get_task.clean_task["study"]["visit_day2"]["in_scan_task"],
+            pd.DataFrame,
+        )
+        chk_path = os.path.join(
+            self.proj_dir, "data_survey/visit_day2", "df_in_scan_ratings.csv"
+        )
+        assert os.path.exists(chk_path)

@@ -159,6 +159,7 @@ def fixt_test_data(fixt_setup) -> Iterator[SupplyVars]:
     # Yield object
     supp_vars = SupplyVars()
     supp_vars.test_raw = test_raw
+    supp_vars.test_func = test_func
     supp_vars.df_rest = df_rest
     supp_vars.df_task = get_task.clean_task["study"]["visit_day2"][
         "in_scan_task"
