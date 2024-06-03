@@ -17,7 +17,7 @@ GetTask : aggregate and write emorep task responses (in_scan_ratings)
 # %%
 import os
 import glob
-from typing import Union, Tuple
+from typing import Union, Tuple, Type
 import pandas as pd
 import numpy as np
 from multiprocessing import Pool
@@ -304,7 +304,24 @@ class GetQualtrics(survey_clean.CleanQualtrics):
             _write_dfs(df, out_file)
         return raw_qualtrics
 
-    def get_qualtrics(self, survey_list=None, db_name="db_emorep"):
+    @property
+    def _clean_map(self) -> dict:
+        """Return mapping of survey to cleaning, visit name.
+
+        Key: survey name (reference_files.report_keys_qualtrics.json)
+        Value: survey_clean.CleanQualtrics method
+
+        """
+        return {
+            "EmoRep_Session_1": "clean_session_1",
+            "Session 2 & 3 Survey": "clean_session_23",
+            "FINAL - EmoRep Stimulus Ratings - "
+            + "fMRI Study": "clean_postscan_ratings",
+        }
+
+    def get_qualtrics(
+        self, survey_list=None, db_name="db_emorep", test_sur=None
+    ):
         """Get and clean Qualtrics survey info.
 
         Coordinate Qualtrics survey download, then match survey to cleaning
@@ -323,6 +340,8 @@ class GetQualtrics(survey_clean.CleanQualtrics):
         db_name : str, optional
             {"db_emorep", "db_emorep_unittest"}
             Name of MySQL database
+        test_sur : None, str, optional
+            Survey name (e.g. ALS), used for testing
 
         Attributes
         ----------
@@ -333,15 +352,8 @@ class GetQualtrics(survey_clean.CleanQualtrics):
         # Start mysql server connection
         up_mysql = sql_database.DbUpdate(db_name=db_name)
 
-        # Map survey name to survey_clean.CleanQualtrics method
-        clean_map = {
-            "EmoRep_Session_1": "clean_session_1",
-            "Session 2 & 3 Survey": "clean_session_23",
-            "FINAL - EmoRep Stimulus Ratings - "
-            + "fMRI Study": "clean_postscan_ratings",
-        }
-
-        # Download and write raw survey data
+        # Validate, make survey+list
+        clean_map = self._clean_map
         if survey_list:
             for chk_sur in survey_list:
                 if chk_sur not in clean_map.keys():
@@ -350,10 +362,13 @@ class GetQualtrics(survey_clean.CleanQualtrics):
                     )
         else:
             survey_list = list(clean_map.keys())
+
+        # Download and write raw survey data
         raw_qualtrics = self._download_qualtrics(survey_list)
 
         # Clean surveys and build clean_qualtrics attr
         self.clean_qualtrics = {"pilot": {}, "study": {}}
+        self._test_sur = test_sur
         for omni_name in raw_qualtrics:
             _, df_raw = raw_qualtrics[omni_name]
 
@@ -363,9 +378,11 @@ class GetQualtrics(survey_clean.CleanQualtrics):
             self._unpack_qualtrics(up_mysql)
         up_mysql.close_db()
 
-    def _unpack_qualtrics(self, up_mysql):
+    def _unpack_qualtrics(self, up_mysql: Type[sql_database.DbUpdate]):
         """Organize cleaned qualtrics data, trigger writing."""
+        # Manage pilot vs study data
         for data_type in self.clean_qualtrics.keys():
+
             # Get attr data_study|pilot
             is_pilot = True if data_type == "pilot" else False
             data_dict = getattr(self, f"data_{data_type}")
@@ -373,12 +390,17 @@ class GetQualtrics(survey_clean.CleanQualtrics):
             # Unpack data_dict
             for visit, sur_dict in data_dict.items():
                 for sur_name, df in sur_dict.items():
+
+                    # Check, control for testing
+                    if self._test_sur and sur_name != self._test_sur:
+                        continue
+
                     # Build attr clean_qualtrics, write
                     if visit not in self.clean_qualtrics[data_type].keys():
                         self.clean_qualtrics[data_type][visit] = {sur_name: df}
                     else:
                         self.clean_qualtrics[data_type][visit][sur_name] = df
-                    self._write_qualtrics(df, sur_name, visit, is_pilot)
+                    _ = self._write_qualtrics(df, sur_name, visit, is_pilot)
 
                     # Update mysql db_emorep with study (not pilot) data
                     if is_pilot:
@@ -389,7 +411,7 @@ class GetQualtrics(survey_clean.CleanQualtrics):
 
     def _write_qualtrics(
         self, df: pd.DataFrame, sur_name: str, visit: str, is_pilot: bool
-    ):
+    ) -> Union[str, os.PathLike]:
         """Determine output path and write dataframe."""
         out_dir = "data_pilot/data_survey" if is_pilot else "data_survey"
         out_file = os.path.join(
@@ -399,6 +421,7 @@ class GetQualtrics(survey_clean.CleanQualtrics):
             f"df_{sur_name}.csv",
         )
         _write_dfs(df, out_file)
+        return out_file
 
 
 class GetRest:
@@ -463,7 +486,12 @@ class GetRest:
         for data_type in self.clean_rest.keys():
             raw_dir, out_dir = self._rest_paths(data_type)
             for day in ["day2", "day3"]:
-                df_sess = survey_clean.clean_rest_ratings(day, raw_dir)
+
+                # Allow for missing dirs (for unit tests)
+                try:
+                    df_sess = survey_clean.clean_rest_ratings(day, raw_dir)
+                except FileNotFoundError:
+                    continue
 
                 # Build clean_rest attr, write out df
                 self.clean_rest[data_type][f"visit_{day}"] = {

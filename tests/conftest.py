@@ -158,6 +158,7 @@ def fixt_test_data(fixt_setup) -> Iterator[SupplyVars]:
 
     # Yield object
     supp_vars = SupplyVars()
+    supp_vars.test_raw = test_raw
     supp_vars.df_rest = df_rest
     supp_vars.df_task = get_task.clean_task["study"]["visit_day2"][
         "in_scan_task"
@@ -165,7 +166,7 @@ def fixt_test_data(fixt_setup) -> Iterator[SupplyVars]:
     yield supp_vars
 
 
-@pytest.fixture(scope="module")
+@pytest.fixture(scope="package")
 def fixt_db_connect() -> Type[sql_database.DbConnect]:
     db_con = sql_database.DbConnect(db_name="db_emorep_unittest")
     helper.make_db_connect(db_con)
@@ -179,7 +180,6 @@ def fixt_db_update(
     fixt_cl_red, fixt_cl_qual, fixt_test_data, fixt_db_connect
 ) -> Iterator[SupplyVars]:
     db_up = sql_database.DbUpdate(db_con=fixt_db_connect)
-    helper.make_db_update(db_up._db_con)
 
     # Aggregate data for easy testing, maintenance
     supp_vars = SupplyVars()
@@ -191,4 +191,3 @@ def fixt_db_update(
     supp_vars.df_rest = fixt_test_data.df_rest
     supp_vars.df_task = fixt_test_data.df_task
     yield supp_vars
-    helper.clean_db_update(db_up)
