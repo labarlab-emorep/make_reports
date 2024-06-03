@@ -21,6 +21,7 @@ from graphviz import Digraph
 from make_reports.resources import survey_download
 from make_reports.resources import build_reports
 from make_reports.resources import report_helper
+from make_reports.resources import manage_data
 
 
 # %%
@@ -750,7 +751,12 @@ class ParticipantFlow(build_reports.DemoAll, report_helper.CheckStatus):
 
     def _get_recruit(self) -> int:
         """Determine number of participants recruited."""
-        df_pre = survey_download.dl_prescreening()
+        get_rc = manage_data.GetRedcap(self._proj_dir)
+        get_rc.get_redcap(survey_list=["prescreen"])
+
+        # Only grab study (not pilot) since pilot participants
+        # did not fill out prescreener.
+        df_pre = get_rc.clean_redcap["study"]["visit_day0"]["prescreen"]
         return df_pre.shape[0]
 
     def _v1_subj(self) -> dict:

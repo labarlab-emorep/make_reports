@@ -121,16 +121,19 @@ class _GetData:
 
         # Build data_dict with redcap, qualtrics, and rest data
         self.data_dict = {"study": {}, "pilot": {}}
-        if "bdi01" in self._report_names:
+        if "bdi01" in self._report_names or "iec01" in self._report_names:
             self._get_red()
         self._get_qual()
         if "restsurv01" in self._report_names:
             self._get_rest()
 
     def _get_red(self):
-        """Add RedCap BDI to data_dict."""
+        """Add RedCap surveys to data_dict."""
         redcap_data = manage_data.GetRedcap(self._proj_dir)
-        redcap_data.get_redcap(survey_list=["bdi_day2", "bdi_day3"])
+        sur_list = ["bdi_day2", "bdi_day3"]
+        if "iec01" in self._report_names:
+            sur_list.append("prescreen")
+        redcap_data.get_redcap(survey_list=sur_list)
         self._merge_dict(redcap_data.clean_redcap)
 
     def _get_qual(self):
@@ -143,6 +146,7 @@ class _GetData:
             "pswq01",
             "rrs01",
             "tas01",
+            "iec01",
         ]
         qual_s23 = ["panas01"]
         qual_s123 = ["stai01"]
@@ -155,8 +159,9 @@ class _GetData:
         get_qsf = [x for x in self._report_names if x in qual_sf]
 
         # Initialize getting qualtrics
-        if get_qs1 or get_qs23 or get_qs123 or get_qsf:
-            qc_data = manage_data.GetQualtrics(self._proj_dir)
+        if not get_qs1 and not get_qs23 and not get_qs123 and not get_qsf:
+            return
+        qc_data = manage_data.GetQualtrics(self._proj_dir)
 
         # Get appropriate data
         if get_qsf:
@@ -219,17 +224,19 @@ class _BuildArgs:
         v1_list = ["AIM", "ALS", "ERQ", "PSWQ", "RRS", "TAS"]
         v23_list = ["BDI", "PANAS", "rest_ratings", "post_scan_ratings"]
         v123_list = ["STAI"]
-        if self._df_name not in v1_list + v23_list + v123_list:
+        spec_list = ["iec_mult"]
+        if self._df_name not in v1_list + v23_list + v123_list + spec_list:
             raise ValueError(f"Unexpected df name : {self._df_name}")
 
         # Get, return list of dataframes
         if self._df_name in v1_list:
-            arg_list = self._v1_pilot_study()
+            return self._v1_pilot_study()
         elif self._df_name in v23_list:
-            arg_list = self._v23_pilot_study()
+            return self._v23_pilot_study()
         elif self._df_name in v123_list:
-            arg_list = self._v123_pilot_study()
-        return arg_list
+            return self._v123_pilot_study()
+        elif self._df_name == "iec_mult":
+            return self._iec_pilot_study()
 
     def _v1_pilot_study(self) -> list:
         """Return visit_day1 dataframes."""
@@ -254,19 +261,23 @@ class _BuildArgs:
 
     def _v123_pilot_study(self) -> list:
         """Return STAI dataframes."""
-        df_pilot_1 = self._data_dict["pilot"]["visit_day1"]["STAI_Trait"]
-        df_study_1 = self._data_dict["study"]["visit_day1"]["STAI_Trait"]
-        df_pilot_2 = self._data_dict["pilot"]["visit_day2"]["STAI_State"]
-        df_study_2 = self._data_dict["study"]["visit_day2"]["STAI_State"]
-        df_pilot_3 = self._data_dict["pilot"]["visit_day3"]["STAI_State"]
-        df_study_3 = self._data_dict["study"]["visit_day3"]["STAI_State"]
         return [
-            df_pilot_1,
-            df_study_1,
-            df_pilot_2,
-            df_study_2,
-            df_pilot_3,
-            df_study_3,
+            self._data_dict["pilot"]["visit_day1"]["STAI_Trait"],
+            self._data_dict["study"]["visit_day1"]["STAI_Trait"],
+            self._data_dict["pilot"]["visit_day2"]["STAI_State"],
+            self._data_dict["study"]["visit_day2"]["STAI_State"],
+            self._data_dict["pilot"]["visit_day3"]["STAI_State"],
+            self._data_dict["study"]["visit_day3"]["STAI_State"],
+        ]
+
+    def _iec_pilot_study(self) -> list:
+        """Return prescreen, BDI, and ALS dataframes."""
+        return [
+            self._data_dict["study"]["visit_day0"]["prescreen"],
+            self._data_dict["study"]["visit_day2"]["BDI"],
+            self._data_dict["pilot"]["visit_day2"]["BDI"],
+            self._data_dict["study"]["visit_day1"]["ALS"],
+            self._data_dict["pilot"]["visit_day1"]["ALS"],
         ]
 
 
@@ -287,8 +298,8 @@ class MakeNdarReports(_BuildArgs):
 
     Methods
     -------
-    make_report(report_list: list)
-        Generate bi-annual NDAR reports.
+    make_report()
+        Generate requested bi-annual NDAR reports.
 
     Example
     -------
@@ -309,7 +320,7 @@ class MakeNdarReports(_BuildArgs):
         super().__init__()
 
     @property
-    def _nda_switch(self):
+    def _nda_switch(self) -> dict:
         """Map requested report to build_ndar class and dataset name."""
         return {
             "affim01": ["NdarAffim01", "AIM"],
@@ -319,11 +330,14 @@ class MakeNdarReports(_BuildArgs):
             "demo_info01": ["NdarDemoInfo01", None],
             "emrq01": ["NdarEmrq01", "ERQ"],
             "image03": ["NdarImage03", None],
+            "iec01": ["NdarIec01", "iec_mult"],
+            "ndar_subject01": ["NdarSubject01", None],
             "panas01": ["NdarPanas01", "PANAS"],
             "pswq01": ["NdarPswq01", "PSWQ"],
             "restsurv01": ["NdarRest01", "rest_ratings"],
             "rrs01": ["NdarRrs01", "RRS"],
             "stai01": ["NdarStai01", "STAI"],
+            "subject01": ["NdarSubject01", None],
             "tas01": ["NdarTas01", "TAS"],
         }
 
@@ -336,8 +350,7 @@ class MakeNdarReports(_BuildArgs):
             Names of desired NDA reports e.g. ["demo_info01", "affim01"]
 
         """
-        # Validate ndar_reports arguments, download and clean
-        # relevant data for requested report.
+        # Validate ndar_reports arguments
         for report in report_names:
             if report not in self._nda_switch.keys():
                 raise ValueError(f"Unexpected ndar_report value : {report}")
@@ -356,7 +369,7 @@ class MakeNdarReports(_BuildArgs):
         """Build requested report."""
         # Build args. All classes take df_demo as arg 1. Supply project_dir
         # to certain classes, give image03 close_date.
-        args = [self.df_demo]
+        args = [self.df_demo.copy()]
         if self._report in ["brd01", "image03", "panas01", "rrs01"]:
             args = args + [self._proj_dir]
         if self._report in ["image03"]:

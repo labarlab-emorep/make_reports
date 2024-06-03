@@ -367,6 +367,7 @@ def redcap_dict() -> dict:
     # Value : output parent directory name, False to avoid writing
     return {
         "demographics": False,
+        "prescreen": False,
         "consent_pilot": False,
         "consent_v1.22": False,
         "guid": "redcap",
