@@ -8,6 +8,7 @@ from make_reports.resources import survey_download
 from make_reports.resources import survey_clean
 from make_reports.resources import sql_database
 from make_reports.resources import manage_data
+from make_reports.resources import build_reports
 import helper
 
 
@@ -192,3 +193,9 @@ def fixt_db_update(
     supp_vars.df_rest = fixt_test_data.df_rest
     supp_vars.df_task = fixt_test_data.df_task
     yield supp_vars
+
+
+@pytest.fixture(scope="session")
+def fixt_demo_all(fixt_setup) -> Type[build_reports.DemoAll]:
+    demo_all = build_reports.DemoAll(fixt_setup.test_emorep)
+    yield demo_all
