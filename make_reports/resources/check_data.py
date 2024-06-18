@@ -5,6 +5,7 @@ CheckEmorepComplete : determine which EmoRep participants
     are missing data
 
 """
+
 import os
 import glob
 import time
@@ -213,6 +214,11 @@ class _CheckEmorep(_ChkRsc):
                 "func/*desc-scaled_bold.nii.gz",
                 9,
             ),
+            "afni-mixed": (
+                os.path.join(self._deriv_dir, "model_afni"),
+                "func/decon_mixed_stats_REML+tlrc.HEAD",
+                1,
+            ),
             # "afni-univ": (
             #     os.path.join(self._deriv_dir, "model_afni"),
             #     "func/decon_univ_stats_REML+tlrc.HEAD",
@@ -258,7 +264,7 @@ class _CheckEmorep(_ChkRsc):
             "dot-sep-stim": (
                 os.path.join(self._deriv_dir, "classify_rest"),
                 "func/df_dot-product_model-sep_con-stim_*.csv",
-                1,
+                3,
             ),
         }
 
