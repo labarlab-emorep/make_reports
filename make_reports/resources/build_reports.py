@@ -552,6 +552,8 @@ class ManagerRegular(DemoAll):
     def make_duke3(self):
         """Create report submitted to Duke every 3 months.
 
+        Deprecated.
+
         Determine the number of participants that belong to
         gender * ethnicity * race group combinations which have
         been recruited in the current period.
@@ -605,19 +607,30 @@ class ManagerRegular(DemoAll):
         gender * ethnicity * race group combinations which have
         been recruited in the current period.
 
+        Notes
+        -----
+        Only supports dates > 2023-09-30.
+
         Attributes
         ----------
         df_report : pd.DataFrame, None
             Relevant info, format for requested report
 
         """
-        # Set start, end dates for report periods
+        # Set start, end dates for report periods. This report replaces duke3
+        # and was initiated 2023-09, so the first report only covers 9 months
+        # and previous reports are not supported.
+        if (
+            self._query_date
+            < datetime.strptime("2023-09-30", "%Y-%m-%d").date()
+        ):
+            raise ValueError(
+                f"Query date {self._query_date} precedes 2023-09-30."
+            )
         duke_12mo_ranges = [
-            ("2020-07-01", "2021-06-30"),
-            ("2021-07-01", "2022-06-30"),
-            ("2022-07-01", "2023-06-30"),
-            ("2023-07-01", "2024-06-30"),
+            ("2023-09-30", "2024-06-30"),
             ("2024-07-01", "2025-06-30"),
+            ("2025-07-01", "2026-06-30"),
         ]
 
         # Find data within range, check for data
@@ -641,7 +654,7 @@ class ManagerRegular(DemoAll):
         # Combine responses for easy tabulation, silence pd warnings
         pd.options.mode.chained_assignment = None
         df_hold["comb"] = (
-            df_hold["sex"] + "," + df_hold["ethnicity"] + "," + df_hold["race"]
+            df_hold["sex"] + "," + df_hold["race"] + "," + df_hold["ethnicity"]
         )
         pd.options.mode.chained_assignment = "warn"
 
@@ -663,13 +676,13 @@ class ManagerRegular(DemoAll):
         )
         col_rename = {
             0: "Gender",
-            1: "Ethnicity",
-            2: "Race",
+            1: "Race",
+            2: "Ethnicity",
             "Counts": "Total",
         }
         self.df_report = self.df_report.rename(columns=col_rename)
         self.df_report = self.df_report.sort_values(
-            by=["Gender", "Ethnicity", "Race"]
+            by=["Gender", "Race", "Ethnicity"]
         )
 
     def make_nih12(self):

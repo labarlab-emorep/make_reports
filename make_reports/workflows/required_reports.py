@@ -29,8 +29,8 @@ def make_regular_reports(regular_reports, query_date, proj_dir):
     ----------
     regular_reports : list
         Desired report names e.g. ["nih4", "nih12"]
-    query_date : str, datetime
-        Date for finding report range
+    query_date : str, datetime.date
+        Date for finding report range, after 2022-03-31
     proj_dir : str, os.PathLike
         Project's experiment directory
 
@@ -45,10 +45,7 @@ def make_regular_reports(regular_reports, query_date, proj_dir):
     valid_mr_args = ["nih12", "nih4", "duke3", "duke12"]
     for report in regular_reports:
         if report not in valid_mr_args:
-            raise ValueError(
-                "--manager-reports contained inappropriate "
-                + f"argument : {report}"
-            )
+            raise ValueError(f"Unexpected report name : {report}")
 
     # Validate query date
     if isinstance(query_date, str):
