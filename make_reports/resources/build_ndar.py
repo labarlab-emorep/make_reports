@@ -1905,6 +1905,7 @@ class NdarIec01(_CleanDemo):
         # for persnickety validation.
         for col_name in [
             "excl_crit3",
+            "excl_crit3_alt",
             "excl_crit4",
             "incl_crit2",
             "incl_crit3",
