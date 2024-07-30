@@ -7,12 +7,14 @@ NdarBrd01 : build brd01 report
 NdarDemoInfo01 : build demo_info01 report
 NdarEmrq01 : build emrq01 report
 NdarImage03 : build image03 report
+NdarIec01 : build iec01 report
 NdarPanas01 : build panas01 report
 NdarPhysio : Deprecated
 NdarPswq01 : build pswq01 report
 NdarRest01 : build restsurv01 report
 NdarRrs01 : build rrs01 report
 NdarStai01 : build stai01 report
+NdarSubject01 : build ndar_subject01 report
 NdarTas01 : build tas01 report
 
 Notes
@@ -32,6 +34,7 @@ nda_label, as well as setting up any data for hosting. This consistent
 structure allows for the dynamic instantiation and use of the classes.
 
 """
+
 import os
 import re
 import glob
@@ -61,11 +64,18 @@ class _CleanDemo:
         Replace "NaN" str with np.nan
     remap_sex : bool, optional
         Replace Male, Female, Neither in sex col with M, F, O
+    remap_race : bool, optional
+        Replace NDA incompliant race responses
 
     """
 
     def __init__(
-        self, df_demo, drop_subjectkey=True, fix_nan=True, remap_sex=True
+        self,
+        df_demo,
+        drop_subjectkey=True,
+        fix_nan=True,
+        remap_sex=True,
+        remap_race=False,
     ):
         """Set _df_demo attr, trigger cleaning methods."""
         self._df_demo = df_demo
@@ -75,6 +85,8 @@ class _CleanDemo:
             self._fix_nan()
         if remap_sex:
             self._remap_sex()
+        if remap_race:
+            self._remap_race()
 
     def _drop_subjectkey(self):
         """Drop rows that have NaN in subjectkey col."""
@@ -88,6 +100,13 @@ class _CleanDemo:
         """Replace Male, Female, Neither in sex col with M, F, O."""
         self._df_demo["sex"] = self._df_demo["sex"].replace(
             ["Male", "Female", "Neither"], ["M", "F", "O"]
+        )
+
+    def _remap_race(self):
+        """Replace NDA incompatible race labels."""
+        self._df_demo["race"] = self._df_demo["race"].replace(
+            ["Black or African-American", "American Indian or Alaska Native"],
+            ["Black or African American", "American Indian/Alaska Native"],
         )
 
 
@@ -338,7 +357,7 @@ class NdarBdi01(_CleanDemo):
 
     Methods
     -------
-    make_bdi(sess: str)
+    make_bdi()
         Generate bdi01 dataset, builds df_report for one session
 
     """
@@ -406,7 +425,7 @@ class NdarBdi01(_CleanDemo):
         Parameters
         ----------
         sess : str
-            [day2 | day3]
+            {"day2", "day3"}
             visit/session name
 
         Returns
@@ -513,7 +532,7 @@ class NdarBrd01(_CleanDemo):
 
     Methods
     -------
-    make_brd(sess: str)
+    make_brd()
         Generate brd01 dataset, builds df_report for one session
 
     """
@@ -565,7 +584,7 @@ class NdarBrd01(_CleanDemo):
         Parameters
         ----------
         sess : str
-            [day2 | day3]
+            {"day2", "day3"}
             Session identifier
         df_study : pd.DataFrame
             Study post-scan ratings data
@@ -703,8 +722,10 @@ class NdarBrd01(_CleanDemo):
         }
 
 
-class NdarDemoInfo01:
+class NdarDemoInfo01(_CleanDemo):
     """Make demo_info01 report for NDAR submission.
+
+    Inherits _CleanDemo.
 
     Parameters
     ----------
@@ -740,7 +761,7 @@ class NdarDemoInfo01:
 
         """
         print("Buiding NDA report : demo_info01 ...")
-        self._df_demo = df_demo
+        super().__init__(df_demo, remap_race=True)
         self.nda_label, nda_cols = report_helper.mine_template(
             "demo_info01_template.csv"
         )
@@ -749,28 +770,8 @@ class NdarDemoInfo01:
 
     def make_demo(self):
         """Update df_report with NDAR-required demographic information."""
-        # Get subject key, src_id
-        subj_key = self._df_demo["subjectkey"]
-        subj_src_id = self._df_demo["src_subject_id"]
-
-        # Get inverview age, date
-        subj_inter_date = [
-            x.strftime("%m/%d/%Y") for x in self._df_demo["interview_date"]
-        ]
-        subj_inter_age = self._df_demo["interview_age"]
-
-        # Get subject sex
-        subj_sex = [x[:1] for x in self._df_demo["sex"]]
-        subj_sex = list(map(lambda x: x.replace("N", "O"), subj_sex))
-
-        # Get subject race
-        subj_race = self._df_demo["race"]
-        subj_race = list(
-            map(
-                lambda x: x.replace("African-American", "African American"),
-                subj_race,
-            )
-        )
+        # Manage race response 'other'
+        subj_race = list(self._df_demo["race"])
         subj_race_other = []
         for idx, resp in enumerate(subj_race):
             if "Other" in resp:
@@ -779,13 +780,10 @@ class NdarDemoInfo01:
             else:
                 subj_race_other.append(np.nan)
 
-        # Get education lavel
-        subj_educat = self._df_demo["years_education"]
-
         # Make comments for pilot subjs
         pilot_list = report_helper.pilot_list()
         subj_comments_misc = []
-        for subj in subj_src_id:
+        for subj in self._df_demo["src_subject_id"]:
             if subj in pilot_list:
                 subj_comments_misc.append("PILOT PARTICIPANT")
             else:
@@ -793,14 +791,16 @@ class NdarDemoInfo01:
 
         # Organize values, add to report
         report_dict = {
-            "subjectkey": subj_key,
-            "src_subject_id": subj_src_id,
-            "interview_date": subj_inter_date,
-            "interview_age": subj_inter_age,
-            "sex": subj_sex,
+            "subjectkey": self._df_demo["subjectkey"],
+            "src_subject_id": self._df_demo["src_subject_id"],
+            "interview_date": [
+                x.strftime("%m/%d/%Y") for x in self._df_demo["interview_date"]
+            ],
+            "interview_age": self._df_demo["interview_age"],
+            "sex": self._df_demo["sex"],
             "race": subj_race,
             "otherrace": subj_race_other,
-            "educat": subj_educat,
+            "educat": self._df_demo["years_education"],
             "comments_misc": subj_comments_misc,
         }
         for h_col, h_value in report_dict.items():
@@ -1292,9 +1292,7 @@ class NdarImage03(_CleanDemo):
         # Get JSON info
         json_list = sorted(glob.glob(f"{self._subj_sess}/anat/*.json"))
         if not json_list:
-            print(
-                f"No files found at {self._subj_sess}/anat, continuing ..."
-            )
+            print(f"No files found at {self._subj_sess}/anat, continuing ...")
             return
         json_file = json_list[0]
         with open(json_file, "r") as jf:
@@ -1405,9 +1403,7 @@ class NdarImage03(_CleanDemo):
         nii_list = sorted(glob.glob(f"{self._subj_sess}/fmap/*.nii.gz"))
         json_list = sorted(glob.glob(f"{self._subj_sess}/fmap/*.json"))
         if not nii_list or not json_list:
-            print(
-                f"No files found at {self._subj_sess}/fmap, continuing ..."
-            )
+            print(f"No files found at {self._subj_sess}/fmap, continuing ...")
             return
 
         if len(nii_list) != len(json_list):
@@ -1707,6 +1703,246 @@ class NdarImage03(_CleanDemo):
 
         new_row = pd.DataFrame(func_image03, index=[0])
         return (new_row, phys_exists)
+
+
+class NdarIec01(_CleanDemo):
+    """Make demo_info01 report for NDAR submission.
+
+    Inherits _CleanDemo.
+
+    Parameters
+    ----------
+    df_demo : make_reports.build_reports.DemoAll.final_demo, pd.DataFrame
+        Compiled demographic info
+    df_prescreen : pd.DataFrame
+        REDCap prescreener report
+    df_bdi_pilot_day2 : pd.DataFrame
+        Pilot BDI data from ses-day2
+    df_bdi_study_day2 : pd.DataFrame
+        Study BDI data from ses-day2
+    df_als_pilot : pd.DataFrame
+        Pilot ALS survey responses
+    df_als_study : pd.DataFrame
+        Study ALS survey responses
+
+    Attributes
+    ----------
+    df_report : pd.DataFrame
+        Report of exclusion data that complies with NDAR data definitions
+    nda_label : list
+        NDA report template label
+
+    Methods
+    -------
+    make_iec()
+        Generate iec01 dataset, builds df_report
+
+    """
+
+    def __init__(
+        self,
+        df_demo,
+        df_prescreen,
+        df_bdi_day2_pilot,
+        df_bdi_day2_study,
+        df_als_pilot,
+        df_als_study,
+    ):
+        """Trigger report generation."""
+        # Get needed column values from report template
+        print("Buiding NDA report : iec01 ...")
+        super().__init__(df_demo)
+        self.nda_label, nda_cols = report_helper.mine_template(
+            "iec01_template.csv"
+        )
+
+        # Get, organize input dfs
+        self._df_pre = df_prescreen
+        self._df_bdi = pd.concat(
+            [df_bdi_day2_pilot, df_bdi_day2_study], ignore_index=True
+        )
+        self._df_als = pd.concat(
+            [df_als_pilot, df_als_study], ignore_index=True
+        )
+
+        # Build report
+        self.df_report = pd.DataFrame(columns=nda_cols)
+        self.make_iec()
+
+    @property
+    def _bdi_change_date(self) -> datetime.date:
+        """Return date of BDI exclusion criterion change."""
+        return datetime.strptime("2022-07-18", "%Y-%m-%d").date()
+
+    def _proc_als(self):
+        """Process df_als for required input."""
+        # Prep df for merge
+        self._df_als["als_datetime"] = pd.to_datetime(self._df_als["datetime"])
+        self._df_als["als_datetime"] = self._df_als["als_datetime"].dt.date
+        self._df_als["src_subject_id"] = self._df_als["study_id"]
+        self._df_als.drop("datetime", axis=1, inplace=True)
+
+    def _proc_bdi(self):
+        """Process df_bdi_day2 for required input."""
+        # Prep df for merge
+        self._df_bdi["bdi_datetime"] = pd.to_datetime(self._df_bdi["datetime"])
+        self._df_bdi["bdi_datetime"] = self._df_bdi["bdi_datetime"].dt.date
+        self._df_bdi["src_subject_id"] = self._df_bdi["study_id"]
+        self._df_bdi.drop("datetime", axis=1, inplace=True)
+
+        # Sum values
+        val_cols = [x for x in self._df_bdi.columns if "BDI" in x]
+        self._df_bdi["bdi_sum"] = self._df_bdi[val_cols].sum(axis=1)
+
+        # Determine excl4 criterion
+        self._df_bdi["excl_crit4"] = 0
+        self._df_bdi.loc[self._df_bdi.BDI_9 > 2, "excl_crit4"] = 1
+
+        # Determine excl3 criterion
+        self._df_bdi["excl_crit3"] = np.nan
+        self._df_bdi.loc[
+            self._df_bdi.bdi_datetime >= self._bdi_change_date, "excl_crit3"
+        ] = 0
+        self._df_bdi.loc[
+            (self._df_bdi["bdi_sum"] > 20)
+            & (self._df_bdi["bdi_datetime"] >= self._bdi_change_date),
+            "excl_crit3",
+        ] = 1
+
+        # Determine excl3_alt criterion
+        self._df_bdi["excl_crit3_alt"] = np.nan
+        self._df_bdi.loc[
+            self._df_bdi.bdi_datetime < self._bdi_change_date, "excl_crit3_alt"
+        ] = 0
+        self._df_bdi.loc[
+            (self._df_bdi["bdi_sum"] > 14)
+            & (self._df_bdi["bdi_datetime"] < self._bdi_change_date),
+            "excl_crit3_alt",
+        ] = 1
+
+        # Account for missing BDI datetimes, add value to excl3
+        self._df_bdi.loc[
+            (self._df_bdi["bdi_datetime"].isna())
+            & (self._df_bdi["excl_crit3"].isna()),
+            "excl_crit3",
+        ] = 0
+        self._df_bdi.loc[
+            (self._df_bdi["bdi_datetime"].isna())
+            & (self._df_bdi["bdi_sum"] > 20),
+            "excl_crit3",
+        ] = 1
+
+    def _proc_pre(self):
+        """Process df_pre for required input."""
+        # Prep df for merge
+        self._df_pre["src_subject_id"] = [
+            f"ER{x:04}" for x in self._df_pre.record_id
+        ]
+
+        # Map new col to existing for inc/exclusion criteria
+        col_map = {
+            "excl_crit5": "head_injury",
+            "excl_crit6": "psychiatric_illness",
+            "excl_crit7": "neurological_illness",
+            "excl_crit8": "substance_abuse",
+            "excl_crit9": "headaches",
+            "excl_crit12": "pregnancy",
+            "incl_crit4": "english",
+        }
+        for new, orig in col_map.items():
+            self._df_pre[new] = self._df_pre[orig]
+            self._df_pre[new] = self._df_pre[new].astype("Int64")
+
+    def _proc_demo(self):
+        """Process df_demo for required input."""
+        # Determine inclusion criteria
+        self._df_demo["incl_crit2"] = 0
+        self._df_demo.loc[
+            (68 >= self._df_demo.age) & (self._df_demo.age >= 18), "incl_crit2"
+        ] = 1
+        self._df_demo["incl_crit3"] = 0
+        self._df_demo.loc[
+            self._df_demo.years_education >= 12, "incl_crit3"
+        ] = 1
+
+    def _make_all(self):
+        """Combine dataframes into attr df_all."""
+        # Process individual dataframes
+        self._proc_als()
+        self._proc_bdi()
+        self._proc_pre()
+        self._proc_demo()
+
+        # Left merge to only host those with GUIDs and
+        # account for missing data.
+        self._df_all = self._df_demo.merge(
+            self._df_bdi, how="left", on="src_subject_id"
+        )
+        self._df_all = self._df_all.merge(
+            self._df_pre, how="left", on="src_subject_id"
+        )
+        self._df_all = self._df_all.merge(
+            self._df_als, how="left", on="src_subject_id"
+        )
+
+        # Determine consent precede participation, manage NaNs.
+        self._df_all["incl_crit1"] = 888
+        self._df_all.loc[
+            self._df_all.interview_date <= self._df_all.als_datetime,
+            "incl_crit1",
+        ] = 1
+        self._df_all.loc[
+            self._df_all.interview_date > self._df_all.als_datetime,
+            "incl_crit1",
+        ] = 0
+
+        # Manage NaNs, account for meaningful NANs in excl_crit3
+        # and excl_crit3_alt.
+        not_excl3 = [x for x in self._df_all.columns if "excl_crit3" not in x]
+        self._df_all[not_excl3] = self._df_all[not_excl3].fillna(888)
+
+        # Manage remaining int types (not found in proc_pre)
+        # for persnickety validation.
+        for col_name in [
+            "excl_crit3",
+            "excl_crit3_alt",
+            "excl_crit4",
+            "incl_crit2",
+            "incl_crit3",
+            "incl_crit1",
+        ]:
+            self._df_all[col_name] = self._df_all[col_name].astype("Int64")
+
+    def make_iec(self):
+        """Update df_report with NDAR-required in/exclusion information."""
+        # Assemble required data, get NDA sex values
+        self._make_all()
+
+        # Setup dataframe, update df_report
+        report_dict = {
+            "subjectkey": self._df_all["subjectkey"],
+            "src_subject_id": self._df_all["src_subject_id"],
+            "interview_date": [
+                x.strftime("%m/%d/%Y") for x in self._df_all["interview_date"]
+            ],
+            "interview_age": self._df_all["interview_age"],
+            "sex": self._df_all["sex"],
+            "exclusion_crit3": self._df_all["excl_crit3"],
+            "exclusion_crit3_alt": self._df_all["excl_crit3_alt"],
+            "exclusion_crit4": self._df_all["excl_crit4"],
+            "exclusion_crit5": self._df_all["excl_crit5"],
+            "exclusion_crit6": self._df_all["excl_crit6"],
+            "exclusion_crit7": self._df_all["excl_crit7"],
+            "exclusion_crit8": self._df_all["excl_crit8"],
+            "exclusion_crit9": self._df_all["excl_crit9"],
+            "exclusion_crit12": self._df_all["excl_crit12"],
+            "inclusion_crit1": self._df_all["incl_crit1"],
+            "inclusion_crit2": self._df_all["incl_crit2"],
+            "inclusion_crit3": self._df_all["incl_crit3"],
+            "inclusion_crit4": self._df_all["incl_crit4"],
+        }
+        for h_col, h_value in report_dict.items():
+            self.df_report[h_col] = h_value
 
 
 class NdarPanas01(_CleanDemo):
@@ -2883,6 +3119,87 @@ class NdarStai01(_CleanDemo):
         )
         df_nda.update(df_stai_state_nda)
         return df_nda
+
+
+class NdarSubject01(_CleanDemo):
+    """Make ndar_subject01 report for NDAR submission.
+
+    Inherits _CleanDemo.
+
+    Parameters
+    ----------
+    df_demo : make_reports.build_reports.DemoAll.final_demo
+        pd.DataFrame, compiled demographic info
+
+    Attributes
+    ----------
+    df_report : pd.DataFrame
+        Report of demographic data that complies with NDAR data definitions
+    nda_label : list
+        NDA report template column label
+
+    Methods
+    -------
+    make_subject()
+        Generate demo_info01 dataset, builds df_report
+
+    """
+
+    def __init__(self, df_demo):
+        """Trigger report generation."""
+        print("Buiding NDA report : ndar_subject01 ...")
+        super().__init__(df_demo)
+        self.nda_label, nda_cols = report_helper.mine_template(
+            "ndar_subject01_template.csv"
+        )
+        self.df_report = pd.DataFrame(columns=nda_cols)
+        self.make_subject()
+
+    def make_subject(self):
+        """Update df_report with NDAR-required demographic information."""
+        # Manage race response 'other'
+        subj_race = list(self._df_demo["race"])
+        ethnic_group = []
+        for idx, resp in enumerate(subj_race):
+            if "Other" in resp:
+                subj_race[idx] = "Other"
+                ethnic_group.append(resp.split(" - ")[1])
+            else:
+                ethnic_group.append(np.nan)
+
+        # Make phenotype responses
+        self._df_demo["phenotype"] = "Healthy Control"
+        self._df_demo["phenotype_description"] = "Healthy Control"
+
+        # Make study type, sample responses
+        for col_name in [
+            "twins_study",
+            "sibling_study",
+            "family_study",
+            "sample_taken",
+        ]:
+            self._df_demo[col_name] = "No"
+
+        # Organize values, add to report
+        report_dict = {
+            "subjectkey": self._df_demo["subjectkey"],
+            "src_subject_id": self._df_demo["src_subject_id"],
+            "interview_date": [
+                x.strftime("%m/%d/%Y") for x in self._df_demo["interview_date"]
+            ],
+            "interview_age": self._df_demo["interview_age"],
+            "sex": self._df_demo["sex"],
+            "race": subj_race,
+            "ethnic_group": ethnic_group,
+            "phenotype": self._df_demo["phenotype"],
+            "phenotype_description": self._df_demo["phenotype_description"],
+            "twins_study": self._df_demo["twins_study"],
+            "sibling_study": self._df_demo["sibling_study"],
+            "family_study": self._df_demo["family_study"],
+            "sample_taken": self._df_demo["sample_taken"],
+        }
+        for h_col, h_value in report_dict.items():
+            self.df_report[h_col] = h_value
 
 
 class NdarTas01(_CleanDemo):

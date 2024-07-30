@@ -37,9 +37,9 @@ that can be accessed from their respective entrypoints (below).
 
 ## General Requirements
 Various workflows will require one or more of the following:
-- An API token for the REDCap project EmoRep_fMRI (PID 11938) accessible via `$PAT_REDCAP_EMOREP`
-- An API token to Qualtrics accessible via `$PAT_QUALTRICS_EMOREP`
-- User password to MySQL database `db_emorep` accessible via `$SQL_PASS`
+- An API token for the REDCap (see [here](https://portal.redcap.yale.edu/sites/default/files/files/FAQs/APIToken_v1_0.pdf)) project EmoRep_fMRI (PID 11938) accessible via `$PAT_REDCAP_EMOREP`
+- An API token to Qualtrics (see [here](https://www.qualtrics.com/support/integrations/api-integration/overview/)) accessible via `$PAT_QUALTRICS_EMOREP`
+- User password to MySQL database `db_emorep` (see [here](https://labarlab.github.io/databases.html#create_account)) accessible via `$SQL_PASS`
 
 Example:
 
@@ -52,7 +52,7 @@ $echo 'export PAT_REDCAP_EMOREP=$(cat ~/.ssh/pat_redcap_emorep)' >> ~/.bashrc
 ## rep_get
 This workflow downloads, aggregates, and cleans participant surveys and task responses. Data are then uploaded to their respective table in MySQL database `db_emorep`.
 
-Additionally, dataframes are written to the EmoRep data structure at `/mnt/keoki/experiments2/EmoRep/Exp2_Compute_Emotion/data_survey` and organized by visit. Original downloads from REDCap and Qualtrics are titled `raw_*.csv` while cleaned dataframes are titled `df_*.csv`. See below for directory tree. Cleaned data from tasks conducted in the scanner are stored in the BIDS structure at `/mnt/keoki/experiments2/EmoRep/Exp2_Compute_Emotion/data_scanner_BIDS/rawdata`
+Additionally, dataframes are written to the EmoRep data structure at /mnt/keoki/experiments2/EmoRep/Exp2_Compute_Emotion/data_survey and organized by visit. Original downloads from REDCap and Qualtrics are titled 'raw_\*.csv' while cleaned dataframes are titled 'df_\*.csv'. See below for directory tree. Cleaned data from tasks conducted in the scanner are stored in the BIDS structure at /mnt/keoki/experiments2/EmoRep/Exp2_Compute_Emotion/data_scanner_BIDS/rawdata.
 
 ```
 data_survey
@@ -144,9 +144,18 @@ This workflow is not unique and the same processes are utilized by other workflo
 
 
 ## rep_regular
-This workflow generates reportes required regularly by the NIH and Duke. Individual reports are requested by specifying the name of the institution + the frequency in months, e.g. a report submitted to the NIH every 12 months is requested via `--names nih12`.
+This workflow generates reports required regularly by the NIH and Duke. Individual reports are requested by specifying the name of the institution + the frequency in months, e.g. a report submitted to the NIH every 12 months is requested via `--names nih12`.
 
-Generated reports are written to `/mnt/keoki/experiments2/EmoRep/Exp2_Compute_Emotion/documents/regular_reports`.
+Generated reports are written to /mnt/keoki/experiments2/EmoRep/Exp2_Compute_Emotion/documents/regular_reports and named according to the instute and date range covered:
+
+```
+documents/regular_reports/
+├── report_duke12_2023-09-30_2024-06-30.csv
+├── report_duke3_2023-07-01_2023-09-30.csv
+├── report_nih12_2020-04-01_2024-03-31.csv
+└── report_nih4_2020-06-30_2024-07-31.csv
+
+```
 
 
 ### Setup
@@ -202,7 +211,26 @@ Required Arguments:
 
 
 ## rep_ndar
-This workflow generates datasets and reports required for the biannual NDAR upload. Reports are written to `/mnt/keoki/experiments2/EmoRep/Exp2_Compute_Emotion/ndar_upload/cycle_*` and associated data to `/mnt/keoki/experiments2/EmoRep/Exp2_Compute_Emotion/ndar_upload/data_[beh|mri|phys]`.
+This workflow generates datasets and reports required for the biannual NDAR upload. Reports are written to /mnt/keoki/experiments2/EmoRep/Exp2_Compute_Emotion/ndar_upload/cycle_* and associated data to /mnt/keoki/experiments2/EmoRep/Exp2_Compute_Emotion/ndar_upload/data_[beh|mri|phys]. Additionally, reports are organized in a sub-directory named for the submission date of the cycle. For instance, reports due for the 2023-12-01 to 2024-06-01 are saved in the directory cycle_2024-01-01:
+
+```
+ndar_upload/cycle_2024-06-01/
+├── affim01_dataset.csv
+├── als01_dataset.csv
+├── bdi01_dataset.csv
+├── brd01_dataset.csv
+├── demo_info01_dataset.csv
+├── emrq01_dataset.csv
+├── iec01_dataset.csv
+├── image03_dataset.csv
+├── ndar_subject01_dataset.csv
+├── panas01_dataset.csv
+├── pswq01_dataset.csv
+├── restsurv01_dataset.csv
+├── rrs01_dataset.csv
+├── stai01_dataset.csv
+└── tas01_dataset.csv
+```
 
 
 ### Setup
@@ -269,8 +297,18 @@ Required Arguments:
 
 
 ## rep_metrics
-This workflow generates snapshots of data to aid recruitment efforts, including demographics distrubtion, particpant retention, and scan pacing. Output files are written to `/mnt/keoki/experiments2/EmoRep/Exp2_Compute_Emotion/analyses/metrics_recruit`.
+This workflow generates snapshots of data to aid recruitment efforts, including demographics distrubtion, particpant retention, and scan pacing. Output files are written to /mnt/keoki/experiments2/EmoRep/Exp2_Compute_Emotion/analyses/metrics_recruit and named according to the data type and method of ploting:
 
+```
+analyses/metrics_recruit/
+├── plot_epi-motion_boxplot-double.png
+├── plot_flow-participant
+├── plot_flow-participant.png
+├── plot_recruit-all_barplot.png
+├── plot_recruit-female_barplot.png
+├── plot_recruit-male_barplot.png
+└── plot_scan-attempts_barplot-wide.png
+```
 
 ### Setup
 - Generate and store API token for REDCap (see [above](#general-requirements)).
@@ -338,7 +376,7 @@ This workflow checks BIDS derivatives for exepcted pipeline output for both EmoR
 
 
 ### Setup
-Workflows that write output to the EmoRep data structure.
+Execute workflows that write output to the EmoRep data structure.
 
 
 ### Usage
@@ -379,7 +417,7 @@ optional arguments:
 
 
 ## sur_stats
-This workflow generates descriptive statistics for participant survey and task responses. Output tables and figures are written to `/mnt/keoki/experiments2/EmoRep/Exp2_Compute_Emotion/analyses/metrics_surveys`.
+This workflow generates descriptive statistics for participant survey and task responses. Output tables and figures are written to /mnt/keoki/experiments2/EmoRep/Exp2_Compute_Emotion/analyses/metrics_surveys.
 
 
 ### Setup
@@ -445,12 +483,12 @@ Generated stats, tables, and plots include data from all participants.
 
 
 ## gen_guids
-This workflow downloads REDCap demographic information to use in conjunction with the NDA's `guid-tool` for the purpose of generating participant GUIDs. These GUIDs are written to `/mnt/keoki/experiments2/EmoRep/Exp2_Compute_Emotion/data_survey/redcap/output_guid_*.txt`. It can also check for GUID copy-paste errors by comparing generated GUIDs with those in REDCap.
+This workflow downloads REDCap demographic information to use in conjunction with the NDA's `guid-tool` for the purpose of generating participant GUIDs. These GUIDs are written to /mnt/keoki/experiments2/EmoRep/Exp2_Compute_Emotion/data_survey/redcap/output_guid_*.txt. It can also check for GUID copy-paste errors by comparing generated GUIDs with those in REDCap.
 
 
 ### Setup
 - Install the `guid-tool`(see [here](https://nda.nih.gov/nda/nda-tools)) into OS.
-- Update PATH with the install location (e.g. `$export PATH=${PATH}:/opt/nda_guid`).
+- Update PATH with the guid-tool install location (e.g. `$export PATH=${PATH}:/opt/nda_guid`).
 - Generate and store API token for REDCap (see [above](#general-requirements)).
 
 
@@ -496,7 +534,7 @@ Required Arguments:
 
 ### Considerations
 - Your password length will not appear (for security purposes).
-- Only 5 failed password attemps may occur before your NDA account is locked.
+- Only 5 failed password attemps may occur before your NDA account is locked!
 
 
 ## Diagrams
