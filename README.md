@@ -18,7 +18,7 @@ Sub-package/workflow navigation:
 ```
 (emorep)[nmm51-vm: day2_movies]$make_reports
 
-Version : 2.3.0
+Version : 2.4.0
 
 The package make_reports consists of several sub-packages
 that can be accessed from their respective entrypoints (below).
@@ -243,7 +243,8 @@ Trigger sub-package help and usage via `$rep_ndar`:
 
 ```
 (emorep)[nmm51-vm: ~]$rep_ndar
-usage: rep_ndar [-h] [--proj-dir PROJ_DIR] [--report-all] [--report-names REPORT_NAMES [REPORT_NAMES ...]] -c CLOSE_DATE
+usage: rep_ndar [-h] [--not-image03] [--proj-dir PROJ_DIR] [--all] [--names NAMES [NAMES ...]] -c
+                CLOSE_DATE
 
 Generate NDAR reports for EmoRep project.
 
@@ -258,8 +259,8 @@ Notes
 -----
 * Available reports:
     affim01, als01, bdi01, brd01, demo_info01, emrq01,
-    image03, panas01, pswq01, restsurv01, rrs01,
-    stai01, tas01
+    image03, iec01, ndar_subject01, panas01, pswq01,
+    restsurv01, rrs01, stai01, tas01
 * Requires global variables 'PAT_REDCAP_EMOREP' and
     'PAT_QUALTRICS_EMOREP' in user env, which hold the
     personal access tokens to the emorep REDCap and
@@ -267,27 +268,25 @@ Notes
 
 Examples
 --------
-rep_ndar -c 2022-12-01 --report-names demo_info01 affim01
-rep_ndar -c 2022-12-01 --report-all
+rep_ndar -c 2022-12-01 --names demo_info01 affim01
+rep_ndar -c 2022-12-01 --not-image03
+rep_ndar -c 2022-12-01 --all
 
 optional arguments:
   -h, --help            show this help message and exit
+  --not-image03         Make all reports except for image03
   --proj-dir PROJ_DIR   Path to project's experiment directory
                         (default : /mnt/keoki/experiments2/EmoRep/Exp2_Compute_Emotion)
-  --report-all          Make all planned NDA reports.
-                        True if "--report-all" else False.
-  --report-names REPORT_NAMES [REPORT_NAMES ...]
-                        Make specific NDA reports by name.
-                        e.g. --report-names affim01 als01
+  --all                 Make all reports
+  --names NAMES [NAMES ...]
+                        Make specific NDA reports by name
 
 Required Arguments:
   -c CLOSE_DATE, --close-date CLOSE_DATE
-                        YYYY-MM-DD format.
-                        Close date for NDAR submission cycle, e.g.
-                        "--close-date 2022-12-01" for 2023-01-15
-                        submission. Used to submit data from
-                        participants in the correct cycle.
-
+                        YYYY-06-01 or YYYY-12-01.
+                        Close date for NDAR submission cycle. Used to submit
+                        data for correct cycle (current or retroactively)
+                        e.g. 2022-12-01 for 2023-01-15 submission due date.
 ```
 
 
