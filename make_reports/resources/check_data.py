@@ -204,26 +204,26 @@ class _CheckEmorep(_ChkRsc):
                 "*defaced.nii.gz",
                 1,
             ),
-            # "fmriprep": (
-            #     os.path.join(self._deriv_dir, "pre_processing/fmriprep"),
-            #     "func/*desc-preproc_bold.nii.gz",
-            #     9,
-            # ),
+            "fmriprep": (
+                os.path.join(self._deriv_dir, "pre_processing/fmriprep"),
+                "func/*desc-preproc_bold.nii.gz",
+                9,
+            ),
             "fsl-preproc": (
                 os.path.join(self._deriv_dir, "pre_processing/fsl_denoise"),
                 "func/*desc-scaled_bold.nii.gz",
                 9,
             ),
-            "afni-mixed": (
+            "afni-task": (
                 os.path.join(self._deriv_dir, "model_afni"),
-                "func/decon_mixed_stats_REML+tlrc.HEAD",
+                "func/*_desc-decon_model-task_stats_REML+tlrc.HEAD",
                 1,
             ),
-            # "afni-univ": (
-            #     os.path.join(self._deriv_dir, "model_afni"),
-            #     "func/decon_univ_stats_REML+tlrc.HEAD",
-            #     1,
-            # ),
+            "afni-mixed": (
+                os.path.join(self._deriv_dir, "model_afni"),
+                "func/*_desc-decon_model-mixed_stats_REML+tlrc.HEAD",
+                1,
+            ),
             # "afni-rest": (
             #     os.path.join(self._deriv_dir, "model_afni"),
             #     "func/decon_rest_anaticor+tlrc.HEAD",
@@ -239,12 +239,12 @@ class _CheckEmorep(_ChkRsc):
                 "func/*level-first_name-sep.feat/stats/cope*.nii.gz",
                 60,
             ),
-            "fsl-sep-second": (
-                os.path.join(self._deriv_dir, "model_fsl"),
-                "func/level-second_name-sep.gfeat/"
-                + "cope1.feat/stats/cope*.nii.gz",
-                30,
-            ),
+            # "fsl-sep-second": (
+            #     os.path.join(self._deriv_dir, "model_fsl"),
+            #     "func/level-second_name-sep.gfeat/"
+            #     + "cope1.feat/stats/cope*.nii.gz",
+            #     30,
+            # ),
             # "fsl-tog-first": (
             #     os.path.join(self._deriv_dir, "model_fsl"),
             #     "func/*level-first_name-tog.feat/stats/cope*.nii.gz",
@@ -256,16 +256,16 @@ class _CheckEmorep(_ChkRsc):
             #     + "cope1.feat/stats/cope*.nii.gz",
             #     15,
             # ),
-            "fsl-lss": (
-                os.path.join(self._deriv_dir, "model_fsl-lss"),
-                "func/*level-first_name-lss*.feat/stats/cope1.nii.gz",
-                150,
-            ),
-            "dot-sep-stim": (
-                os.path.join(self._deriv_dir, "classify_rest"),
-                "func/df_dot-product_model-sep_con-stim_*.csv",
-                3,
-            ),
+            # "fsl-lss": (
+            #     os.path.join(self._deriv_dir, "model_fsl-lss"),
+            #     "func/*level-first_name-lss*.feat/stats/cope1.nii.gz",
+            #     150,
+            # ),
+            # "dot-sep-stim": (
+            #     os.path.join(self._deriv_dir, "classify_rest"),
+            #     "func/df_dot-product_model-sep_con-stim_*.csv",
+            #     3,
+            # ),
         }
 
         col_names = [
