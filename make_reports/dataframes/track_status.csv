@@ -21,10 +21,12 @@ ER0325,,excl,excl,BDI,day2 & day3 BDI scores exceeded the threshold (20)
 ER0400,,lost,lost,Personal Preference,
 ER0411,excl,excl,excl,MRI Compatibility,
 ER0454,lost,lost,lost,Time Conflict,visit1 marked lost bc didn't do Emotion surveys
+ER0524,,,lost,Unknown,
 ER0581,,,lost,Unknown,
 ER0618,lost,lost,lost,Time Conflict,visit1 marked lost bc didn't do Emotion surveys
 ER0620,excl,excl,excl,Eligibility,
 ER0631,,lost,lost,Unknown,
+ER0645,,,lost,Personal Preference,
 ER0724,,lost,lost,Unknown,
 ER0736,,,lost,Unknown,
 ER0744,,lost,lost,Time Conflict,
@@ -41,3 +43,4 @@ ER1142,,lost,lost,Time Conflict,
 ER1145,lost,lost,lost,Unknown,visit1 marked lost bc didn't do Emotion surveys
 ER1177,,,lost,Personal Preference,
 ER1194,lost,lost,lost,Personal Preference,visit1 marked lost bc didn't do Emotion surveys
+ER1285,lost,lost,lost,Unknown,visit1 marked lost bc didn't do Emotion surveys
