@@ -682,8 +682,8 @@ class ParticipantFlow(build_reports.DemoAll, report_helper.CheckStatus):
                 "1",
                 "Visit1: Enrollment\n"
                 + f"n={len(v1_dict['start'])} {self._get_female(v1_dict['start'])}\l"  # noqa: W605 E501
-                + f"{self._get_age(v1_dict['start'])}\l"  # noqa: W605 E501
-                + f"(in progress: {len(v1_dict['prog'])})\l",  # noqa: W605
+                + f"{self._get_age(v1_dict['start'])}\l",  # noqa: W605 E501
+                # + f"(in progress: {len(v1_dict['prog'])})\l",  # noqa: W605
                 shape="box",
             )
             c.node(
@@ -703,7 +703,7 @@ class ParticipantFlow(build_reports.DemoAll, report_helper.CheckStatus):
             if day == 2:
                 prog_str = (
                     f"{self._get_age(v_dict['start'])}\l"  # noqa: W605 E501
-                    + f"(in progress: {len(v_dict['prog'])})\l"  # noqa: W605 E501
+                    # + f"(in progress: {len(v_dict['prog'])})\l"  # noqa: W605 E501
                 )
             else:
                 prog_str = (
