@@ -1183,7 +1183,7 @@ class NdarImage03(_CleanDemo):
         # Identify scanner information
         scanner_manu = dicom_hdr[0x08, 0x70].value.split(" ")[0]
         scanner_type = dicom_hdr[0x08, 0x1090].value
-        phot_int = dicom_hdr[0x08, 0x9205].value
+        phot_int = dicom_hdr[0x28, 0x04].value
 
         # Identify grid information
         num_frames = int(dicom_hdr[0x28, 0x08].value)
