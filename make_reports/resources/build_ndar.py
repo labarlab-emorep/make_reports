@@ -1197,6 +1197,8 @@ class NdarImage03(_CleanDemo):
                 num_frames = 69
             elif 'Rest_run' in nii_json['SeriesDescription']:
                 num_frames = 69
+            elif 'Field_Map' in nii_json['SeriesDescription']:
+                num_frames = 69
 
         num_rows = int(dicom_hdr[0x28, 0x10].value)
         num_cols = int(dicom_hdr[0x28, 0x11].value)
