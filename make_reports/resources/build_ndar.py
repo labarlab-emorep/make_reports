@@ -1186,7 +1186,18 @@ class NdarImage03(_CleanDemo):
         phot_int = dicom_hdr[0x28, 0x04].value
 
         # Identify grid information
-        num_frames = int(dicom_hdr[0x28, 0x08].value)
+        # One participant has non-enhanced DICOM files, so some fields are missing.
+        # Associated values are hard-coded to support this data set.
+        try:
+            num_frames = int(dicom_hdr[0x28, 0x08].value)
+        except KeyError:
+            if 'EmoRep_anat' in nii_json['SeriesDescription']:
+                num_frames = 192
+            elif 'EmoRep_run' in nii_json['SeriesDescription']:
+                num_frames = 69
+            elif 'Rest_run' in nii_json['SeriesDescription']:
+                num_frames = 69
+
         num_rows = int(dicom_hdr[0x28, 0x10].value)
         num_cols = int(dicom_hdr[0x28, 0x11].value)
         h_mat = nii_json["AcquisitionMatrixPE"]
