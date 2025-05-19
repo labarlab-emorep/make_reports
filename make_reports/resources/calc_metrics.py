@@ -734,7 +734,7 @@ class ParticipantFlow(build_reports.DemoAll, report_helper.CheckStatus):
             c.attr(rank="same")
             c.node(
                 str(count),
-                "Final Participants:\l"  # noqa: W605
+                "Total Participants:\l"  # noqa: W605
                 + f"n={len(final_dict['final'])} {self._get_female(final_dict['final'])}\l"  # noqa: W605 E501
                 + f"{self._get_age(final_dict['final'])}\l",  # noqa: W605
                 shape="box",
