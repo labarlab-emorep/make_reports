@@ -114,7 +114,7 @@ def _local_path() -> str:
     """Return path to local files for ndar upload."""
     return (
         "/run/user/1001/gvfs/smb-share:server"
-        + "=ccn-keoki.win.duke.edu,share=experiments2/EmoRep/"
+        + f"={os.environ["SERVER_ADDR"]},share=experiments2/EmoRep/"
         + "Exp2_Compute_Emotion/ndar_upload"
     )
 

@@ -9,6 +9,8 @@ from diagrams.aws.general import General
 from diagrams.programming.language import Bash
 from diagrams.aws.storage import Storage
 
+import os
+
 # %%
 with Diagram("imports", direction="TB", show=False):
 
@@ -247,7 +249,7 @@ with Diagram("process get_surveys", graph_attr=graph_attr, show=False):
             rsc_sur_dl_rc = Compute("dl_redcap")
             rsc_sur_dl_qual = Compute("dl_qualtrics")
 
-    with Cluster("Keoki"):
+    with Cluster(os.environ["DATA_SERV_NAME"]):
         bids_files = Storage("BIDS files")
 
     with Cluster("Helper Files"):
@@ -368,7 +370,7 @@ with Diagram("process rep_metrics", graph_attr=graph_attr, show=False):
     with Cluster("LaBarLab Databases"):
         rsc_db_emorep = Database("db_emorep")
 
-    with Cluster("Keoki"):
+    with Cluster(os.environ["DATA_SERV_NAME"]):
         bids_files = Storage("BIDS files")
         metric_files = Storage("metrics_recruit")
 
@@ -421,7 +423,7 @@ with Diagram("process rep_ndar", graph_attr=graph_attr, show=False):
             with Cluster("MakeNdarReports"):
                 wf_mk_report = Compute("make_report")
 
-    with Cluster("Keoki"):
+    with Cluster(os.environ["DATA_SERV_NAME"]):
         bids_files = Storage("BIDS files")
         ndar_reports = Storage("ndar_upload")
 
@@ -586,7 +588,7 @@ with Diagram("process rep_regular", graph_attr=graph_attr, show=False):
     rsc_db_emorep = Database("db_emorep")
     db_redcap = Database("REDCap")
 
-    with Cluster("Keoki"):
+    with Cluster(os.environ["DATA_SERV_NAME"]):
         reg_files = Storage("regular_reports")
 
     #
@@ -648,7 +650,7 @@ with Diagram("process sur_stats", graph_attr=graph_attr, show=False):
             with Cluster("GetTask"):
                 rsc_get_task = DataPipeline("get_task")
 
-    with Cluster("Keoki"):
+    with Cluster(os.environ["DATA_SERV_NAME"]):
         sur_out = Storage("metrics_surveys")
         bids_files = Storage("BIDS files")
 

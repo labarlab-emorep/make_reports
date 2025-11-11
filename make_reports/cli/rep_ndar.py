@@ -26,7 +26,7 @@ rep_ndar -c 2022-12-01 --all
 
 """
 
-import sys
+import sys, os
 import textwrap
 from datetime import datetime
 from argparse import ArgumentParser, RawTextHelpFormatter
@@ -47,7 +47,7 @@ def _get_args():
     parser.add_argument(
         "--proj-dir",
         type=str,
-        default="/mnt/keoki/experiments2/EmoRep/Exp2_Compute_Emotion",
+        default=os.environ["SERVER_PROJ_DIR"],
         help=textwrap.dedent(
             """\
             Path to project's experiment directory

@@ -6,7 +6,7 @@ processing of MRI data.
 
 Notes
 -----
-- Written to be executed on the local VM labarserv2
+- Written to be executed on the local lab VM
 - Assumes EmoRep data structure
 
 Examples

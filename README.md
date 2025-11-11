@@ -12,7 +12,7 @@ Sub-package/workflow navigation:
 
 
 ## General Usage
-- Install into project environment on labarserv2 (see [here](https://github.com/labarlab/conda_labarserv2)) via `$python setup.py install`.
+- Install into project environment on lab server via `$python setup.py install`.
 - Trigger general package help and usage via entrypoint `$make_reports`.
 
 ```
@@ -52,7 +52,7 @@ $echo 'export PAT_REDCAP_EMOREP=$(cat ~/.ssh/pat_redcap_emorep)' >> ~/.bashrc
 ## rep_get
 This workflow downloads, aggregates, and cleans participant surveys and task responses. Data are then uploaded to their respective table in MySQL database `db_emorep`.
 
-Additionally, dataframes are written to the EmoRep data structure at /mnt/keoki/experiments2/EmoRep/Exp2_Compute_Emotion/data_survey and organized by visit. Original downloads from REDCap and Qualtrics are titled 'raw_\*.csv' while cleaned dataframes are titled 'df_\*.csv'. See below for directory tree. Cleaned data from tasks conducted in the scanner are stored in the BIDS structure at /mnt/keoki/experiments2/EmoRep/Exp2_Compute_Emotion/data_scanner_BIDS/rawdata.
+Additionally, dataframes are written to the EmoRep data structure at os.environ["SERVER_PROJ_DIR"]/data_survey and organized by visit. Original downloads from REDCap and Qualtrics are titled 'raw_\*.csv' while cleaned dataframes are titled 'df_\*.csv'. See below for directory tree. Cleaned data from tasks conducted in the scanner are stored in the BIDS structure at os.environ["SERVER_BIDS_DIR"]/rawdata.
 
 ```
 data_survey
@@ -135,18 +135,18 @@ optional arguments:
   --get-rest           Clean and aggregate resting state ratings
   --get-task           Clean and aggregate task ratings
   --proj-dir PROJ_DIR  Path to project's experiment directory
-                       (default : /mnt/keoki/experiments2/EmoRep/Exp2_Compute_Emotion)
+                       (default : os.environ["SERVER_PROJ_DIR"])
 ```
 
 
 ### Considerations
-This workflow is not unique and the same processes are utilized by other workflows (e.g. [rep_ndar](#rep_ndar)) -- accordingly it is not necessary to trigger this workflow before running others. This was added merely as a way of updating cleaned data on Keoki and `db_emorep` without needing to generate reports.
+This workflow is not unique and the same processes are utilized by other workflows (e.g. [rep_ndar](#rep_ndar)) -- accordingly it is not necessary to trigger this workflow before running others. This was added merely as a way of updating cleaned data on lab server and `db_emorep` without needing to generate reports.
 
 
 ## rep_regular
 This workflow generates reports required regularly by the NIH and Duke. Individual reports are requested by specifying the name of the institution + the frequency in months, e.g. a report submitted to the NIH every 12 months is requested via `--names nih12`.
 
-Generated reports are written to /mnt/keoki/experiments2/EmoRep/Exp2_Compute_Emotion/documents/regular_reports and named according to the instute and date range covered:
+Generated reports are written to os.environ["SERVER_PROJ_DIR"]/documents/regular_reports and named according to the instute and date range covered:
 
 ```
 documents/regular_reports/
@@ -191,7 +191,7 @@ rep_regular --names nih4 --query-date 2022-06-29
 optional arguments:
   -h, --help            show this help message and exit
   --proj-dir PROJ_DIR   Path to project's experiment directory
-                        (default : /mnt/keoki/experiments2/EmoRep/Exp2_Compute_Emotion)
+                        (default : os.environ["SERVER_PROJ_DIR"])
   --query-date QUERY_DATE
                         YYYY-MM-DD format, after 2022-04-01.
                         Used to find a submission window e.g. 2022-06-06
@@ -211,7 +211,7 @@ Required Arguments:
 
 
 ## rep_ndar
-This workflow generates datasets and reports required for the biannual NDAR upload. Reports are written to /mnt/keoki/experiments2/EmoRep/Exp2_Compute_Emotion/ndar_upload/cycle_* and associated data to /mnt/keoki/experiments2/EmoRep/Exp2_Compute_Emotion/ndar_upload/data_[beh|mri|phys]. Additionally, reports are organized in a sub-directory named for the submission date of the cycle. For instance, reports due for the 2023-12-01 to 2024-06-01 are saved in the directory cycle_2024-01-01:
+This workflow generates datasets and reports required for the biannual NDAR upload. Reports are written to os.environ["SERVER_PROJ_DIR"]/ndar_upload/cycle_* and associated data to os.environ["SERVER_PROJ_DIR"]/ndar_upload/data_[beh|mri|phys]. Additionally, reports are organized in a sub-directory named for the submission date of the cycle. For instance, reports due for the 2023-12-01 to 2024-06-01 are saved in the directory cycle_2024-01-01:
 
 ```
 ndar_upload/cycle_2024-06-01/
@@ -276,7 +276,7 @@ optional arguments:
   -h, --help            show this help message and exit
   --not-image03         Make all reports except for image03
   --proj-dir PROJ_DIR   Path to project's experiment directory
-                        (default : /mnt/keoki/experiments2/EmoRep/Exp2_Compute_Emotion)
+                        (default : os.environ["SERVER_PROJ_DIR"])
   --all                 Make all reports
   --names NAMES [NAMES ...]
                         Make specific NDA reports by name
@@ -296,7 +296,7 @@ Required Arguments:
 
 
 ## rep_metrics
-This workflow generates snapshots of data to aid recruitment efforts, including demographics distrubtion, particpant retention, and scan pacing. Output files are written to /mnt/keoki/experiments2/EmoRep/Exp2_Compute_Emotion/analyses/metrics_recruit and named according to the data type and method of ploting:
+This workflow generates snapshots of data to aid recruitment efforts, including demographics distrubtion, particpant retention, and scan pacing. Output files are written to os.environ["SERVER_PROJ_DIR"]/analyses/metrics_recruit and named according to the data type and method of ploting:
 
 ```
 analyses/metrics_recruit/
@@ -356,7 +356,7 @@ optional arguments:
   -h, --help           show this help message and exit
   --participant-flow   Draw participant PRISMA flowchart
   --proj-dir PROJ_DIR  Path to project's experiment directory
-                       (default : /mnt/keoki/experiments2/EmoRep/Exp2_Compute_Emotion)
+                       (default : os.environ["SERVER_PROJ_DIR"])
   --prop-motion        Calculate proportion of volumes that exceed FD threshold
   --recruit-demo       Calculate recruitment demographics
   --scan-pace          Plot weekly scanning pace
@@ -393,7 +393,7 @@ processing of MRI data.
 
 Notes
 -----
-- Written to be executed on the local VM labarserv2
+- Written to be executed on the local lab VM
 - Assumes EmoRep data structure
 
 Examples
@@ -416,7 +416,7 @@ optional arguments:
 
 
 ## sur_stats
-This workflow generates descriptive statistics for participant survey and task responses. Output tables and figures are written to /mnt/keoki/experiments2/EmoRep/Exp2_Compute_Emotion/analyses/metrics_surveys.
+This workflow generates descriptive statistics for participant survey and task responses. Output tables and figures are written to os.environ["SERVER_PROJ_DIR"]/analyses/metrics_surveys.
 
 
 ### Setup
@@ -463,7 +463,7 @@ optional arguments:
                         Replaces --survey-list.
                         True if "--make-table" else False.
   --proj-dir PROJ_DIR   Path to project's experiment directory
-                        (default : /mnt/keoki/experiments2/EmoRep/Exp2_Compute_Emotion)
+                        (default : os.environ["SERVER_PROJ_DIR"])
   --survey-all          Generate descriptive statistics and draw plots
                         for all surveys. Replaces --survey-list.
                         See --survey-avail for list.
@@ -482,7 +482,7 @@ Generated stats, tables, and plots include data from all participants.
 
 
 ## gen_guids
-This workflow downloads REDCap demographic information to use in conjunction with the NDA's `guid-tool` for the purpose of generating participant GUIDs. These GUIDs are written to /mnt/keoki/experiments2/EmoRep/Exp2_Compute_Emotion/data_survey/redcap/output_guid_*.txt. It can also check for GUID copy-paste errors by comparing generated GUIDs with those in REDCap.
+This workflow downloads REDCap demographic information to use in conjunction with the NDA's `guid-tool` for the purpose of generating participant GUIDs. These GUIDs are written to os.environ["SERVER_PROJ_DIR"]/data_survey/redcap/output_guid_*.txt. It can also check for GUID copy-paste errors by comparing generated GUIDs with those in REDCap.
 
 
 ### Setup
@@ -522,7 +522,7 @@ optional arguments:
   --find-mismatch       Check for mismatches between generated
                         GUIDs and those in the RedCap survey.
   --proj-dir PROJ_DIR   Path to project's experiment directory
-                        (default : /mnt/keoki/experiments2/EmoRep/Exp2_Compute_Emotion)
+                        (default : os.environ["SERVER_PROJ_DIR"])
 
 Required Arguments:
   -n USER_NAME, --user-name USER_NAME

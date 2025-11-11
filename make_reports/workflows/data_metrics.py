@@ -128,11 +128,11 @@ class CheckProjectMri:
         # Set paths, lists
         proj_dict = {
             "emorep": {
-                "proj_path": "/mnt/keoki/experiments2/EmoRep/Exp2_Compute_Emotion/data_scanner_BIDS",  # noqa: E501
+                "proj_path": os.environ["SERVER_BIDS_DIR"],  # noqa: E501
                 "sess": ["day2", "day3"],
             },
             "archival": {
-                "proj_path": "/mnt/keoki/experiments2/EmoRep/Exp3_Classify_Archival/data_mri_BIDS",  # noqa: E501
+                "proj_path": f"{os.environ["NKI_DIR"]}/data_mri_BIDS",  # noqa: E501
                 "sess": ["BAS1"],
             },
         }
@@ -169,7 +169,7 @@ def check_emorep_all():
 
     """
     # Conduct check
-    proj_dir = "/mnt/keoki/experiments2/EmoRep/Exp2_Compute_Emotion"
+    proj_dir = os.environ["SERVER_PROJ_DIR"]
     cec = check_data.CheckEmorepComplete(proj_dir)
     cec.check_data()
 

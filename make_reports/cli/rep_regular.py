@@ -17,7 +17,7 @@ rep_regular --names nih4 --query-date 2022-06-29
 
 """
 
-import sys
+import sys, os
 import textwrap
 from datetime import date
 from argparse import ArgumentParser, RawTextHelpFormatter
@@ -33,7 +33,7 @@ def _get_args():
     parser.add_argument(
         "--proj-dir",
         type=str,
-        default="/mnt/keoki/experiments2/EmoRep/Exp2_Compute_Emotion",
+        default=os.environ["SERVER_PROJ_DIR"],
         help=textwrap.dedent(
             """\
             Path to project's experiment directory

@@ -19,7 +19,7 @@ gen_guids -n nmuncy --find-mismatch
 
 """
 
-import sys
+import sys, os
 import textwrap
 from getpass import getpass
 from argparse import ArgumentParser, RawTextHelpFormatter
@@ -45,7 +45,7 @@ def _get_args():
     parser.add_argument(
         "--proj-dir",
         type=str,
-        default="/mnt/keoki/experiments2/EmoRep/Exp2_Compute_Emotion",
+        default=os.environ["SERVER_PROJ_DIR"],
         help=textwrap.dedent(
             """\
             Path to project's experiment directory
