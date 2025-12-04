@@ -16,7 +16,7 @@ Sub-package/workflow navigation:
 - Trigger general package help and usage via entrypoint `$make_reports`.
 
 ```
-(emorep)[nmm51-vm: day2_movies]$make_reports
+(emorep)[user-vm: day2_movies]$make_reports
 
 Version : 2.4.0
 
@@ -98,7 +98,7 @@ data_survey
 Trigger sub-package help and usage via `$rep_get`:
 
 ```
-(emorep)[nmm51-vm: ~]$rep_get
+(emorep)[user-vm: ~]$rep_get
 usage: rep_get [-h] [--get-demographics] [--get-redcap] [--get-qualtrics] [--get-rest] [--get-task] [--proj-dir PROJ_DIR]
 
 Download and clean survey data.
@@ -167,7 +167,7 @@ documents/regular_reports/
 Trigger sub-package help and usage via `$rep_regular`:
 
 ```
-(emorep)[nmm51-vm: ~]$rep_regular
+(emorep)[user-vm: ~]$rep_regular
 usage: rep_regular [-h] [--proj-dir PROJ_DIR] [--query-date QUERY_DATE] --names {nih4,nih12,duke3,duke12}
                    [{nih4,nih12,duke3,duke12} ...]
 
@@ -242,7 +242,7 @@ ndar_upload/cycle_2024-06-01/
 Trigger sub-package help and usage via `$rep_ndar`:
 
 ```
-(emorep)[nmm51-vm: ~]$rep_ndar
+(emorep)[user-vm: ~]$rep_ndar
 usage: rep_ndar [-h] [--not-image03] [--proj-dir PROJ_DIR] [--all] [--names NAMES [NAMES ...]] -c
                 CLOSE_DATE
 
@@ -318,7 +318,7 @@ analyses/metrics_recruit/
 Trigger sub-package help and usage via `$rep_metrics`:
 
 ```
-(emorep)[nmm51-vm: ~]$rep_metrics
+(emorep)[user-vm: ~]$rep_metrics
 usage: rep_metrics [-h] [--participant-flow] [--proj-dir PROJ_DIR] [--prop-motion] [--recruit-demo] [--scan-pace]
 
 Generate descriptive metrics about recruitment.
@@ -382,7 +382,7 @@ Execute workflows that write output to the EmoRep data structure.
 Trigger sub-package help and usage via `$chk_data`:
 
 ```
-(emorep)[nmm51-vm: ~]$chk_data
+(emorep)[user-vm: ~]$chk_data
 usage: chk_data [-h] [--complete] [--project {emorep,archival}]
 
 Conduct data checking for EmoRep and Archival data.
@@ -427,7 +427,7 @@ This workflow generates descriptive statistics for participant survey and task r
 Trigger sub-package help and usage via `$sur_stats`:
 
 ```
-(emorep)[nmm51-vm: ~]$sur_stats
+(emorep)[user-vm: ~]$sur_stats
 usage: sur_stats [-h] [--draw-plots] [--make-tables] [--proj-dir PROJ_DIR] [--survey-all]
                  [--survey-avail] [--survey-names SURVEY_NAMES [SURVEY_NAMES ...]]
                  [--write-json]
@@ -495,7 +495,7 @@ This workflow downloads REDCap demographic information to use in conjunction wit
 Trigger sub-package help and usage via `$gen_guids`:
 
 ```
-(emorep)[nmm51-vm: ~]$gen_guids
+(emorep)[user-vm: ~]$gen_guids
 usage: gen_guids [-h] [--find-mismatch] [--proj-dir PROJ_DIR] -n USER_NAME
 
 Generate GUIDs for EmoRep.
